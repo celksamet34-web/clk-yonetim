@@ -117,7 +117,8 @@
   }
 
   /* ---------- görsel hazırlama ---------- */
-  const loadImg = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
+  // Uzak görseller (Qukasoft CDN, Supabase) CORS ile yüklenmezse tuval kilitlenir ve toDataURL hata verir.
+  const loadImg = src => new Promise((ok, no) => { const i = new Image(); if (!src.startsWith('data:')) i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = () => no(new Error('Fotoğraf açılamadı.')); i.src = src; });
   const fileUrl = f => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
   async function square(src, mark) {
     const im = await loadImg(src), N = 1200, c = document.createElement('canvas'); c.width = c.height = N;
@@ -154,7 +155,7 @@
     const s = (D.shots.model = { busy: 'Manken pozu üretiliyor… (1-2 dk)' }); render();
     try {
       const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
-      const img = await aiImage(base.startsWith('data:') ? base : await square(base, false), 'model');
+      const img = await aiImage(base, 'model');
       s.preview = await square(img, D.auto.mark); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
     } catch (e) { delete D.shots.model; toast('Manken görseli üretilemedi: ' + e.message); }
     render();
