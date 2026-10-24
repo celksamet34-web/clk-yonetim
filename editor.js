@@ -7,13 +7,15 @@
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
   const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
   const HEIGHTS = { kadin: 170, erkek: 182, 'kiz-cocuk': 135, 'erkek-cocuk': 138 }; // sunucudaki manken boylarıyla aynı
+  const CARRIES = [['capraz','Çapraz / göğüs'],['omuz','Omuz'],['el','Elde'],['sirt','Sırt']];
+  const mHeight = () => (+D.mh >= 80 && +D.mh <= 220 ? +D.mh : HEIGHTS[D.audience]);
   const hexOf = n => (COLORS.find(c => c[0] === String(n).toLocaleUpperCase('tr')) || [0, '#ddd'])[1];
 
   let D = null; // taslak
   function blank() {
     return { isNew: true, code: hex12('CLK-'), name: '', barcode: '', brand: 'CLK', categoryId: '', categoryName: '', shortDescription: '', longDescription: '', active: true,
       buyPrice: '', listPrice: '', salePrice: '', fastSalePrice: '', dealerPrice1: '', dealerPrice2: '', dealerPrice3: '', taxRate: RULES.kdv, shipmentPayment: 0,
-      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, audience: 'kadin', auto: { cutout: true, mark: true } };
+      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, audience: 'kadin', carry: 'capraz', mh: '', auto: { cutout: true, mark: true } };
   }
   function fromProduct(p) {
     const imgs = P.imgs(p), shots = {};
@@ -23,7 +25,7 @@
       buyPrice: p.buyPrice ?? '', listPrice: p.listPrice ?? '', salePrice: p.salePrice ?? '', fastSalePrice: p.fastSalePrice ?? '', dealerPrice1: p.dealerPrice1 ?? '', dealerPrice2: p.dealerPrice2 ?? '', dealerPrice3: p.dealerPrice3 ?? '',
       taxRate: Number(p.taxRate ?? RULES.kdv), shipmentPayment: Number(p.shipmentPayment) || 0, desi: p.desi ?? RULES.desi, quantity: P.qty(p),
       variants: (Array.isArray(p.variants) ? p.variants : []).map(v => ({ v: [v.value1, v.value2, v.value3].filter(Boolean).join(' / '), b: v.barcode || '', q: Number(v.quantity) || 0 })),
-      w: '', d: '', h: '', material: '', shots, audience: 'kadin', auto: { cutout: true, mark: true } };
+      w: '', d: '', h: '', material: '', shots, audience: 'kadin', carry: 'capraz', mh: '', auto: { cutout: true, mark: true } };
   }
   function ensure() {
     const key = S.route === 'yeni' ? 'new' : 'e:' + S.arg;
@@ -79,7 +81,8 @@
       <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, 1200×1200 kare ve CLK filigranlı hazırlanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
         <div class="step-b"><div class="shots">${SLOTS.map(([k, t, h]) => shot(k, t, h)).join('')}</div>
           <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
-          <div class="fg three">${fld('En (cm)', ninp('w'))}${fld('Yükseklik (cm)', ninp('h'))}${fld('Derinlik (cm)', ninp('d'))}</div>
+          <div class="f"><span>Taşıma şekli</span><div class="chips" style="margin:0">${CARRIES.map(([k, l]) => `<button class="chip" data-act="edCarry" data-c="${k}" aria-pressed="${D.carry === k}">${l}</button>`).join('')}</div></div>
+          <div class="fg three">${fld('En (cm)', ninp('w'))}${fld('Yükseklik (cm)', ninp('h'))}${fld('Derinlik (cm)', ninp('d'))}${fld('Manken boyu (cm)', ninp('mh', `placeholder="${HEIGHTS[D.audience]}"`))}</div>
           <p class="hint">Ürün ölçüleri girilince çanta mankenin boyuna göre gerçek ölçüsünde gösterilir; ölçü yoksa manken otomatik üretilmez. Seçimi ya da ölçüyü değiştirdikten sonra Manken kutusunda “Yeniden”e bas.</p>
           <div class="row-opts"><label class="toggle"><input type="checkbox" data-auto="cutout" ${D.auto.cutout ? 'checked' : ''}> Otomatik dekupe</label><label class="toggle"><input type="checkbox" data-auto="mark" ${D.auto.mark ? 'checked' : ''}> CLK filigranı</label></div></div></section>
       <section class="step"><div class="step-h"><span class="no">02</span><div><h2>Ürün bilgileri</h2><p>Sitede ve faturada görünecek bilgiler</p></div></div>
@@ -144,7 +147,8 @@
   }
   // Ölçek rehberi: görüntü modeli santimetreye uymadığı için çantayı son karedeki gerçek boyutuna biz küçültürüz.
   // Kare, mankenin başından uyluk ortasına kadar (boyun ~%62'si) görüneceği kadraja göre hesaplanır.
-  async function scaleRef(du) {
+  // Ön fotoğrafta (beyaz arka plan) çantanın sınır kutusu
+  async function bagBox(du) {
     const im = await loadImg(du), c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
     const x = c.getContext('2d'); x.drawImage(im, 0, 0);
     const px = x.getImageData(0, 0, c.width, c.height).data, wmX = c.width - 260, wmY = c.height - 120; // sağ alt: CLK filigranı
@@ -155,21 +159,56 @@
     }
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
     if (x1 < 0 || (bw < c.width * 0.1 && bh < c.height * 0.1)) return null; // açık renkli ürün ayırt edilemedi
-    const N = 1024, ppc = N * 0.93 / (HEIGHTS[D.audience] * 0.62);
-    // 0.6: modeller (Seedream, OpenAI) tam çözünürlüklü ürün görselini de gördüğü için çantayı rehberdekinden büyük çiziyor; denemelerle ayarlandı
-    const s = 0.6 * Math.min(+D.w > 0 ? +D.w * ppc / bw : Infinity, +D.h > 0 ? +D.h * ppc / bh : Infinity);
-    const r = { x: Math.round((N - bw * s) / 2), y: Math.round(N * 0.55 - bh * s / 2), w: Math.round(bw * s), h: Math.round(bh * s) };
-    const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
-    ox.drawImage(c, x0, y0, bw, bh, r.x, r.y, r.w, r.h);
-    // Geri yapıştırma için çantanın kendisi: beyaz arka plan şeffaf, kenarlar hafif yumuşatılmış
-    const bag = document.createElement('canvas'); bag.width = r.w; bag.height = r.h; const bx = bag.getContext('2d');
-    bx.drawImage(o, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-    const bd = bx.getImageData(0, 0, r.w, r.h), m = document.createElement('canvas'); m.width = r.w; m.height = r.h; const mx = m.getContext('2d'), md = mx.createImageData(r.w, r.h);
+    return { c, x0, y0, bw, bh };
+  }
+  // Çantayı w×h boyutunda kes: beyaz arka plan şeffaf, kenarlar hafif yumuşatılmış
+  function cutBag(L, w, h) {
+    w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    const bag = document.createElement('canvas'); bag.width = w; bag.height = h; const bx = bag.getContext('2d');
+    bx.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, 0, 0, w, h);
+    const bd = bx.getImageData(0, 0, w, h), m = document.createElement('canvas'); m.width = w; m.height = h; const mx = m.getContext('2d'), md = mx.createImageData(w, h);
     for (let p = 0; p < bd.data.length; p += 4) md.data[p + 3] = Math.min(bd.data[p], bd.data[p + 1], bd.data[p + 2]) < 225 ? 255 : 0;
     mx.putImageData(md, 0, 0);
-    const soft = document.createElement('canvas'); soft.width = r.w; soft.height = r.h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(m, 0, 0);
+    const soft = document.createElement('canvas'); soft.width = w; soft.height = h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(m, 0, 0);
     bx.globalCompositeOperation = 'destination-in'; bx.drawImage(soft, 0, 0);
-    return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag };
+    return bag;
+  }
+  async function scaleRef(du) {
+    const L = await bagBox(du); if (!L) return null;
+    const N = 1024, ppc = N * 0.93 / (mHeight() * 0.62);
+    // 0.6: modeller (Seedream, OpenAI) tam çözünürlüklü ürün görselini de gördüğü için çantayı rehberdekinden büyük çiziyor; denemelerle ayarlandı
+    const s = 0.6 * Math.min(+D.w > 0 ? +D.w * ppc / L.bw : Infinity, +D.h > 0 ? +D.h * ppc / L.bh : Infinity);
+    const r = { x: Math.round((N - L.bw * s) / 2), y: Math.round(N * 0.55 - L.bh * s / 2), w: Math.round(L.bw * s), h: Math.round(L.bh * s) };
+    const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
+    ox.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, r.x, r.y, r.w, r.h);
+    return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag: cutBag(L, r.w, r.h) };
+  }
+  // Ölçülü manken: çantasız manken üretilir, Photoroom dekupesiyle boyu piksel olarak ölçülür, gerçek çanta santimetresine
+  // göre küçültülüp taşıma şekline göre yerleştirilir; model yalnızca askı ve gölgeyi ekler, sonra orijinal çanta geri basılır.
+  async function composeModel(du) {
+    const L = await bagBox(du); if (!L) return null;
+    const person = await siteImage({ action: 'model', stage: 'person', audience: D.audience, carry: D.carry, height: mHeight() }); if (!person) return null;
+    const pi = await loadImg(person), W = pi.width, H = pi.height;
+    const k = 768 / Math.max(W, H), sw = Math.round(W * k), sh = Math.round(H * k), sc = document.createElement('canvas'); sc.width = sw; sc.height = sh; sc.getContext('2d').drawImage(pi, 0, 0, sw, sh);
+    const si = await loadImg(await siteImage({ action: 'cutout', image: sc.toDataURL('image/jpeg', 0.9) }));
+    const mc = document.createElement('canvas'); mc.width = sw; mc.height = sh; const mcx = mc.getContext('2d'); mcx.drawImage(si, 0, 0, sw, sh);
+    const a = mcx.getImageData(0, 0, sw, sh).data, on = (i, y) => a[(y * sw + i) * 4 + 3] > 128;
+    if (on(0, 0) && on(sw - 1, 0)) throw new Error('manken dekupe edilemedi'); // şeffaflık yoksa (yedek dekupe) ölçüm yapılamaz
+    let top = -1, bot = -1;
+    for (let y = 0; y < sh && top < 0; y++) for (let i = 0; i < sw; i++) if (on(i, y)) { top = y; break; }
+    for (let y = sh - 1; y >= 0 && bot < 0; y--) for (let i = 0; i < sw; i++) if (on(i, y)) { bot = y; break; }
+    if (top < 0 || bot - top < sh * 0.5) throw new Error('manken boyu ölçülemedi');
+    const rowX = f => { const y = Math.round(top + (bot - top) * f); let s = 0, n = 0; for (let i = 0; i < sw; i++) if (on(i, y)) { s += i; n++; } return n ? s / n / k : W / 2; };
+    const ph = (bot - top) / k, T = top / k, ppc = ph / mHeight();
+    const s = Math.min(+D.w > 0 ? +D.w * ppc / L.bw : Infinity, +D.h > 0 ? +D.h * ppc / L.bh : Infinity), w = L.bw * s, h = L.bh * s, cx = rowX(0.35);
+    // Kişinin sağ eli/omzu görselin solunda kalır
+    const [px, py] = { capraz: [cx, T + ph * 0.36], omuz: [cx - ph * 0.14, T + ph * 0.47 + h / 2], el: [cx - ph * 0.19, T + ph * 0.5 + h / 2], sirt: [cx, T + ph * 0.36] }[D.carry] || [cx, T + ph * 0.36];
+    const rect = { x: px - w / 2, y: py - h / 2, w, h }, bag = cutBag(L, w, h);
+    const cc = document.createElement('canvas'); cc.width = W; cc.height = H; const cx2 = cc.getContext('2d'); cx2.drawImage(pi, 0, 0); cx2.drawImage(bag, rect.x, rect.y);
+    const out = await siteImage({ action: 'model', stage: 'compose', carry: D.carry, image: cc.toDataURL('image/jpeg', 0.9), product: du });
+    if (!out) return null;
+    const f = 1024 / W; // pasteBag 1024'lük karede çalışır
+    return pasteBag(out, { rect: { x: rect.x * f, y: rect.y * f, w: w * f, h: h * f }, bag }).catch(() => out);
   }
   // Üretilen görselde çantayı bul ve orijinal çanta piksellerini üstüne koy; logo ve detaylar ön fotoğrafla birebir kalır.
   // Model çantayı kaydırıp döndürebildiği ve rengini değiştirebildiği için çanta silüeti (içi 1, çevresi 0) ile
@@ -236,8 +275,6 @@
     const o = document.createElement('canvas'); o.width = r - l + 1; o.height = b - t + 1; o.getContext('2d').drawImage(c, l, t, o.width, o.height, 0, 0, o.width, o.height);
     return o.toDataURL('image/jpeg', 0.92);
   }
-  // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
-  // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
   // Bu sitenin görsel fonksiyonu (dekupede Photoroom, mankende fal.ai/Gemini, yedekte OpenAI). Yoksa null döner.
   async function siteImage(body) {
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
@@ -254,13 +291,20 @@
           j = await p.json().catch(() => ({})); if (!p.ok) throw new Error(j.message || 'fal.ai sonucu alınamadı.');
         }
         if (j.pending) throw new Error('fal.ai zaman aşımı');
-      } catch (e) { toast('fal.ai üretemedi, OpenAI ile üretiliyor: ' + e.message.split(/[.\n]/)[0]); return siteImage({ ...body, skipFal: true }); }
+      } catch (e) {
+        if (body.stage) throw e; // ölçülü üretimin adımları yalnızca fal.ai ile; çağıran eski yönteme düşer
+        toast('fal.ai üretemedi, OpenAI ile üretiliyor: ' + e.message.split(/[.\n]/)[0]); return siteImage({ ...body, skipFal: true });
+      }
     }
     if (!j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
     if (j.engineError) toast(/quota|top_up|balance|credit/i.test(j.engineError) ? 'Seçili servisin bakiyesi/kotası yok (' + j.engineError.split(':')[0] + '), OpenAI ile üretildi.' : 'Seçili servis üretemedi, OpenAI ile üretildi: ' + j.engineError.split(/[.\n]/)[0]);
     return j.image;
   }
   async function modelImage(du) {
+    if (hasSize()) {
+      try { const img = await composeModel(du); if (img) return img; }
+      catch (e) { toast('Ölçülü üretim olmadı (' + e.message.split(/[.\n]/)[0] + '), tek adımlı yönteme geçildi.'); }
+    }
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
     // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
@@ -288,7 +332,7 @@
   }
   async function makeModel() {
     const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.');
-    const s = (D.shots.model = { busy: 'Manken pozu üretiliyor… (1-2 dk)' }); render();
+    const s = (D.shots.model = { busy: hasSize() ? 'Manken ölçülü üretiliyor… (1-2 dk)' : 'Manken pozu üretiliyor… (1-2 dk)' }); render();
     try {
       const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
       const img = await aiImage(base, 'model');
@@ -378,6 +422,7 @@
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : square(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
     else if (act === 'edAud') { D.audience = el.dataset.a; S.keepScroll = true; render(); }
+    else if (act === 'edCarry') { D.carry = el.dataset.c; S.keepScroll = true; render(); }
     else if (act === 'edGallery') openGallery(+el.dataset.i || 0);
     else if (act === 'edSend') send(el);
     else if (act === 'edDraft') saveDraft();
