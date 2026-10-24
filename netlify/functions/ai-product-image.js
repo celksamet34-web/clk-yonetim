@@ -11,7 +11,9 @@ const AUDIENCE = {
 };
 const cm = v => { const n = Number(v); return n > 0 && n < 300 ? Math.round(n) : 0; };
 // Görüntü modelleri santimetreyi zayıf anlar; ölçüyü mankenin baş boyu ve gövdesi cinsinden de tarif ederiz.
-function scaleText(size, height, child, scaled) {
+// mode: 'guide' = ikinci görsel ölçek rehberi, 'text' = rehber yok, kadraj ve oran yazıyla (Seedream rehberi ayrı ürün sanıyor)
+function scaleText(size, height, child, mode) {
+  const scaled = !!mode;
   const w = cm(size?.w), h = cm(size?.h), d = cm(size?.d);
   if (!w && !h) return `Keep the bag at a realistic real-world size relative to a person about ${height} cm tall.`;
   const head = height / (child ? 6.5 : 7.5), torso = height * 0.3, shoulders = height * (child ? 0.22 : 0.25);
@@ -26,7 +28,9 @@ function scaleText(size, height, child, scaled) {
   const pct = [h && `its height must be about ${Math.round(h / frame * 100)}% of the image height`, w && `its width about ${Math.round(w / frame * 100)}% of the image width`].filter(Boolean).join(' and ');
   const share = scaled && pct ? ` In the final image ${pct}; the bag must look small relative to the body, never dominant.` : '';
   // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
-  const guide = scaled
+  const guide = mode === 'text'
+    ? ' Framing: one single full-bleed photo showing the model from the top of the head (near the top edge) down to mid-thigh (bottom edge), standing, facing the camera; not a close-up. Use only the one product from the input image, exactly one bag in the picture, worn with its strap across the body or over the shoulder (or held by its handle), front-facing and upright, not tilted; hands, hair and straps must not cover the bag.'
+    : scaled
     ? ' Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle); hands, hair and straps must not cover the bag.'
     : ' Choose a framing (full body or three-quarter) that makes the size comparison obvious.';
   return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}${share}`;
@@ -123,14 +127,15 @@ exports.handler = async event => {
     const guideMatch = action === 'model' && body.scaled === true ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
     const guideBytes = guideMatch ? Buffer.from(guideMatch[2], 'base64') : null;
     if (guideBytes && guideBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Ölçek görseli çok büyük.' });
-    const prompt = action === 'cutout'
+    const makePrompt = mode => action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
-      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background that fills the entire frame edge to edge (a full-bleed photo: no white border, no inset picture, no frame), soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
+      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), mode)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background that fills the entire frame edge to edge (a full-bleed photo: no white border, no inset picture, no frame), soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
     // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
+    const scaled = body.scaled === true, prompt = makePrompt(scaled && guideBytes ? 'guide' : scaled ? 'text' : false);
     const refs = [[match[1], bytes], ...(guideBytes ? [[guideMatch[1], guideBytes]] : [])];
     const errors = [];
     if (action === 'model' && falKey && body.skipFal !== true) {
-      try { return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, prompt, refs) }); }
+      try { return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, makePrompt(scaled ? 'text' : false), refs.slice(0, 1)) }); }
       catch (e) { errors.push(`fal: ${e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)}`); }
     }
     const engines = action === 'cutout' ? [['photoroom', photoroomKey, () => photoroom(photoroomKey, match[1], bytes)]]
