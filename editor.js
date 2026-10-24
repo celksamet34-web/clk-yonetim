@@ -11,22 +11,44 @@
   const mHeight = () => (+D.mh >= 80 && +D.mh <= 220 ? +D.mh : HEIGHTS[D.audience]);
   const hexOf = n => (COLORS.find(c => c[0] === String(n).toLocaleUpperCase('tr')) || [0, '#ddd'])[1];
 
+  // Qukasoft ölçüleri ürün özelliği (attribute) olarak tutuyor: En, Yükseklik, Boy (= derinlik)
+  const DIM_ATTR = { w: 'En', h: 'Yükseklik', d: 'Boy' };
+  const MATERIAL_ATTR = 'Malzeme', WATER_ATTR = 'Su Geçirmez';
+  // Panelin kendi alanlarına karşılık gelmeyen Qukasoft alanları (yeni üründe boş, düzenlemede üründen gelir)
+  const extra = (p = {}) => ({ invoiceName: p.invoiceName || '', modelCode: p.modelCode || '', mpn: p.mpn || '', dealerPrice4: p.dealerPrice4 ?? '',
+    domestic: p.domestic === undefined ? true : Number(p.domestic) === 1, showcase: p.showcaseStatus === undefined ? true : Number(p.showcaseStatus) === 1, seq: p.seq ?? 0,
+    specialCode1: p.specialCode1 || '', specialCode2: p.specialCode2 || '', specialCode3: p.specialCode3 || '',
+    seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || '', slug: p.slug || '' });
+
   let D = null; // taslak
   function blank() {
     return { isNew: true, code: hex12('CLK-'), name: '', barcode: '', brand: 'CLK', categoryId: '', categoryName: '', shortDescription: '', longDescription: '', active: true,
       buyPrice: '', listPrice: '', salePrice: '', fastSalePrice: '', dealerPrice1: '', dealerPrice2: '', dealerPrice3: '', taxRate: RULES.kdv, shipmentPayment: 0,
-      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, audience: 'kadin', carry: 'capraz', mh: '', waterproof: false, auto: { cutout: true, mark: true } };
+      desi: RULES.desi, quantity: RULES.stock, critical: RULES.critical, variants: [], w: '', d: '', h: '', material: '', attrs: [], ...extra(),
+      shots: {}, audience: 'kadin', carry: 'capraz', mh: '', waterproof: false, auto: { cutout: true, mark: true } };
   }
   function fromProduct(p) {
     const imgs = P.imgs(p), shots = {};
     imgs.forEach((u, i) => { shots[(SLOTS[i] || ['x' + i])[0]] = { url: u, existing: true }; });
+    const at = (Array.isArray(p.attributes) ? p.attributes : []).map(a => ({ n: String(a.name || ''), v: String(a.value ?? '') })).filter(a => a.n);
+    const take = name => { const i = at.findIndex(a => a.n.toLocaleLowerCase('tr') === name.toLocaleLowerCase('tr')); return i < 0 ? '' : at.splice(i, 1)[0].v; };
+    const num = v => String(v).replace(',', '.').match(/\d+(\.\d+)?/)?.[0] || '';
+    const w = num(take(DIM_ATTR.w)), h = num(take(DIM_ATTR.h)), d = num(take(DIM_ATTR.d)), material = take(MATERIAL_ATTR), water = take(WATER_ATTR);
     return { isNew: false, code: p.code, name: p.name || '', barcode: p.barcode || '', brand: p.brand || '', categoryId: p.categoryId ?? p.categoryID ?? '', categoryName: P.path(p),
       shortDescription: p.shortDescription || '', longDescription: p.longDescription || '', active: P.on(p),
       buyPrice: p.buyPrice ?? '', listPrice: p.listPrice ?? '', salePrice: p.salePrice ?? '', fastSalePrice: p.fastSalePrice ?? '', dealerPrice1: p.dealerPrice1 ?? '', dealerPrice2: p.dealerPrice2 ?? '', dealerPrice3: p.dealerPrice3 ?? '',
-      taxRate: Number(p.taxRate ?? RULES.kdv), shipmentPayment: Number(p.shipmentPayment) || 0, desi: p.desi ?? RULES.desi, quantity: P.qty(p),
+      taxRate: Number(p.taxRate ?? RULES.kdv), shipmentPayment: Number(p.shipmentPayment) || 0, desi: p.desi ?? RULES.desi, quantity: P.qty(p), critical: P.crit(p),
       variants: (Array.isArray(p.variants) ? p.variants : []).map(v => ({ v: [v.value1, v.value2, v.value3].filter(Boolean).join(' / '), b: v.barcode || '', q: Number(v.quantity) || 0 })),
-      w: '', d: '', h: '', material: '', shots, audience: 'kadin', carry: 'capraz', mh: '', waterproof: false, auto: { cutout: true, mark: true } };
+      w, d, h, material, attrs: at, ...extra(p),
+      shots, audience: 'kadin', carry: 'capraz', mh: '', waterproof: /^(evet|var|1|true)$/i.test(water), auto: { cutout: true, mark: true } };
   }
+  // Mevcut ürünlerden öneriler (marka, model kodu, özellik adları)
+  const known = () => {
+    const brands = new Map(), models = new Set(), attrs = new Set();
+    S.products.forEach(p => { if (p.brand && +p.brandId) brands.set(p.brand, +p.brandId); if (p.modelCode) models.add(p.modelCode); (p.attributes || []).forEach(a => a.name && attrs.add(a.name)); });
+    Object.values(DIM_ATTR).forEach(n => attrs.delete(n));
+    return { brands, models: [...models].sort(), attrs: [...attrs].sort() };
+  };
   function ensure() {
     const key = S.route === 'yeni' ? 'new' : 'e:' + S.arg;
     if (D && D._key === key) return true;
@@ -90,9 +112,12 @@
         <div class="step-b"><div class="fg">
           ${fld('Ürün adı <em>*</em>', inp('name', 'placeholder="ör. West Polo 7041 El Çantası"'), 'full')}
           ${fld('Kategori', `<select data-k="categoryId"><option value="">${cats.length ? 'Kategori seç' : (D.categoryName || 'Yükleniyor…')}</option>${cats.map(c => `<option value="${c.id}" ${String(c.id) === String(D.categoryId) ? 'selected' : ''}>${esc(c.path)}</option>`).join('')}</select>`)}
-          ${fld('Marka', inp('brand'))}
+          ${fld('Marka', inp('brand', 'list="ed-brands"'))}
           ${fld('Ürün kodu', `<div class="inline">${inp('code', D.isNew ? '' : 'readonly')}${D.isNew ? '<button class="btn sm" data-act="edCode">Yenile</button>' : ''}</div>`)}
           ${fld('Barkod', inp('barcode', 'placeholder="Varsa üretici barkodu"'))}
+          ${fld('Model kodu', inp('modelCode', 'list="ed-models" placeholder="ör. URBAN"'))}
+          ${fld('Fatura adı', inp('invoiceName', 'placeholder="Faturada görünecek ad"'))}
+          ${fld('MPN', inp('mpn', 'placeholder="Üretici parça numarası"'))}
           ${fld('Kısa açıklama', inp('shortDescription', 'placeholder="Listelerde görünen tek cümle"'), 'full')}
           <div class="f full"><span>Ürün açıklaması</span><textarea data-k="longDescription" rows="5" placeholder="Malzeme, bölmeler, askı, kullanım…">${esc(D.longDescription)}</textarea><div class="inline" style="justify-self:start;gap:8px;flex-wrap:wrap"><button class="btn sm dark" data-act="edDescAi">Yapay zekâ ile yaz</button><button class="btn sm" data-act="edDesc">Şablonla yaz</button></div>
             ${/<\w/.test(D.longDescription) ? `<div class="desc-pv"><span class="desc-pv-h">Sitede böyle görünür</span>${safeHtml(D.longDescription)}</div>` : ''}</div>
@@ -101,15 +126,29 @@
         </div></div></section>
       <section class="step"><div class="step-h"><span class="no">03</span><div><h2>Fiyatlar</h2><p>Alış fiyatını gir; diğerleri kurallara göre dolar, istersen değiştir.</p></div></div>
         <div class="step-b"><div class="calc"><span>Piyasa alışın ${RULES.market}, satış ${RULES.retail} katı (49/99 ile biter) · Hızlı satış ve Bayi 1 %${RULES.d1} · Bayi 2 %${RULES.d2} · Bayi 3 %${RULES.d3}</span><button class="btn sm dark" data-act="edCalc">Yeniden hesapla</button></div>
-          <div class="prices">${fld('Alış', ninp('buyPrice', 'placeholder="0"'), 'hl')}${fld('Piyasa', ninp('listPrice'))}${fld('Satış', ninp('salePrice'), 'hl')}${fld('Hızlı satış', ninp('fastSalePrice'))}${fld('Bayi 1', ninp('dealerPrice1'))}${fld('Bayi 2', ninp('dealerPrice2'))}${fld('Bayi 3', ninp('dealerPrice3'))}
+          <div class="prices">${fld('Alış', ninp('buyPrice', 'placeholder="0"'), 'hl')}${fld('Piyasa', ninp('listPrice'))}${fld('Satış', ninp('salePrice'), 'hl')}${fld('Hızlı satış', ninp('fastSalePrice'))}${fld('Bayi 1', ninp('dealerPrice1'))}${fld('Bayi 2', ninp('dealerPrice2'))}${fld('Bayi 3', ninp('dealerPrice3'))}${fld('Bayi 4', ninp('dealerPrice4'))}
             ${fld('KDV', `<select data-k="taxRate">${[0, 1, 10, 20].map(v => `<option value="${v}" ${+D.taxRate === v ? 'selected' : ''}>%${v}</option>`).join('')}</select>`)}
             ${fld('Kargo', `<select data-k="shipmentPayment"><option value="0" ${!+D.shipmentPayment ? 'selected' : ''}>Alıcı öder</option><option value="1" ${+D.shipmentPayment ? 'selected' : ''}>Satıcı öder</option></select>`)}</div>
           <p class="hint">Pazaryeri fiyatları satış fiyatından otomatik alınır. Kâr: <b>${+D.salePrice && +D.buyPrice ? tl(D.salePrice - D.buyPrice) + ' · %' + Math.round((1 - D.buyPrice / D.salePrice) * 100) : '—'}</b></p></div></section>
       <section class="step"><div class="step-h"><span class="no">04</span><div><h2>Renk ve stok</h2><p>Renge dokun: barkod ve ${RULES.stock} adet stok otomatik atanır</p></div></div>
         <div class="step-b"><div class="swatches">${COLORS.map(([n, h]) => `<button class="sw" data-color="${n}" aria-pressed="${D.variants.some(v => v.v === n)}"><i style="background:${h}"></i>${n}</button>`).join('')}</div>
           ${D.variants.length ? `<div class="vrows">${D.variants.map((v, i) => `<div class="vrow" data-i="${i}"><i style="background:${hexOf(v.v)}"></i><input type="text" data-vk="v" value="${esc(v.v)}" aria-label="Renk"><input type="text" class="bc" data-vk="b" value="${esc(v.b)}" aria-label="Barkod"><input type="number" inputmode="numeric" data-vk="q" value="${esc(v.q)}" aria-label="Stok"><button data-act="edVdel" data-i="${i}" aria-label="Sil">×</button></div>`).join('')}</div>` : `<div class="fg">${fld('Stok adedi (renksiz)', ninp('quantity'))}</div>`}
-          <div class="fg three">${fld('Desi', ninp('desi'))}<div class="f"><span>Toplam stok</span><input type="text" value="${num(totalQ)}" readonly></div><div class="f"><span>Kritik stok</span><input type="text" value="${RULES.critical}" readonly></div></div></div></section>
+          <div class="fg three">${fld('Desi', ninp('desi'))}<div class="f"><span>Toplam stok</span><input type="text" value="${num(totalQ)}" readonly></div>${fld('Kritik stok', ninp('critical'))}</div></div></section>
+      <section class="step"><div class="step-h"><span class="no">05</span><div><h2>Özellikler ve görünürlük</h2><p>Sitede filtre ve ürün tablosunda görünen özellikler. En, Yükseklik ve Boy ölçülerden otomatik eklenir.</p></div></div>
+        <div class="step-b">
+          ${D.attrs.length ? `<div class="vrows">${D.attrs.map((a, i) => `<div class="vrow attr" data-i="${i}"><input type="text" data-ak="n" value="${esc(a.n)}" list="ed-attrs" aria-label="Özellik" placeholder="Özellik (ör. Desen)"><input type="text" data-ak="v" value="${esc(a.v)}" aria-label="Değer" placeholder="Değer (ör. Düz)"><button data-act="edAttrDel" data-i="${i}" aria-label="Sil">×</button></div>`).join('')}</div>` : ''}
+          <button class="btn sm" data-act="edAttrAdd" style="justify-self:start">+ Özellik ekle</button>
+          <div class="fg three">${fld('Sıra', ninp('seq'))}${fld('Özel kod 1', inp('specialCode1'))}${fld('Özel kod 2', inp('specialCode2'))}${fld('Özel kod 3', inp('specialCode3'))}</div>
+          <div class="row-opts"><label class="toggle"><input type="checkbox" data-k="showcase" ${D.showcase ? 'checked' : ''}> Vitrinde göster</label><label class="toggle"><input type="checkbox" data-k="domestic" ${D.domestic ? 'checked' : ''}> Yerli üretim</label></div></div></section>
+      <section class="step"><div class="step-h"><span class="no">06</span><div><h2>Arama motoru (SEO)</h2><p>Google'da görünen başlık ve açıklama. Boş bırakılırsa Qukasoft ürün adını kullanır.</p></div><button class="btn sm" data-act="edSeo" style="margin-left:auto">Bilgilerden doldur</button></div>
+        <div class="step-b"><div class="fg">
+          ${fld(`SEO başlığı <em>${D.seoTitle.length}/60</em>`, inp('seoTitle', 'maxlength="70"'), 'full')}
+          ${fld(`SEO açıklaması <em>${D.seoDescription.length}/160</em>`, inp('seoDescription', 'maxlength="200"'), 'full')}
+          ${fld('Anahtar kelimeler', inp('seoKeywords', 'placeholder="virgülle ayır"'), 'full')}
+          ${fld('Sayfa adresi (URL)', inp('slug', 'placeholder="boşsa üründen oluşturulur"'), 'full')}
+        </div></div></section>
     </div>
+    ${(k => `<datalist id="ed-brands">${[...k.brands.keys()].map(b => `<option value="${esc(b)}">`).join('')}</datalist><datalist id="ed-models">${k.models.map(m => `<option value="${esc(m)}">`).join('')}</datalist><datalist id="ed-attrs">${k.attrs.map(m => `<option value="${esc(m)}">`).join('')}</datalist>`)(known())}
     <aside class="summary"><div class="sum-card"><div class="cover" ${cover ? 'data-act="edGallery" data-i="0" style="cursor:zoom-in"' : ''}>${cover ? `<img src="${esc(cover)}" alt="">` : 'CLK'}</div>${galleryList().length ? `<button class="btn gold" data-act="edGallery" data-i="0">Görselleri aç (${galleryList().length})</button>` : ''}
       <h3>${esc(D.name || 'Adsız ürün')}</h3>
       <dl><dt>Satış</dt><dd>${D.salePrice ? tl(D.salePrice) : '—'}</dd><dt>Bayi 1</dt><dd>${D.dealerPrice1 ? tl(D.dealerPrice1) : '—'}</dd><dt>Stok</dt><dd>${num(totalQ)} adet</dd><dt>Renk</dt><dd>${D.variants.length || '—'}</dd><dt>Fotoğraf</dt><dd>${Object.keys(D.shots).length}/${SLOTS.length}</dd></dl>
@@ -377,8 +416,20 @@
     const p = { code: D.code.trim(), name: D.name.trim(), status: D.active ? 1 : 0, brand: D.brand || undefined, barcode: D.barcode || undefined,
       shortDescription: D.shortDescription || undefined, longDescription: desc || undefined, taxRate: +D.taxRate, currency: 'TL', shipmentPayment: +D.shipmentPayment ? 1 : 0,
       buyPrice: n(D.buyPrice), listPrice: n(D.listPrice), salePrice: n(D.salePrice), fastSalePrice: n(D.fastSalePrice), dealerPrice1: n(D.dealerPrice1), dealerPrice2: n(D.dealerPrice2), dealerPrice3: n(D.dealerPrice3),
-      desi: n(D.desi), type: 0, criticalStockStatus: 1, criticalStockQuantity: RULES.critical };
+      dealerPrice4: n(D.dealerPrice4), desi: n(D.desi), type: 0, criticalStockStatus: 1, criticalStockQuantity: +D.critical >= 0 && D.critical !== '' ? +D.critical : RULES.critical,
+      invoiceName: D.invoiceName.trim(), modelCode: D.modelCode.trim(), mpn: D.mpn.trim(), domestic: D.domestic ? 1 : 0, showcaseStatus: D.showcase ? 1 : 0, seq: n(D.seq) ?? 0,
+      specialCode1: D.specialCode1.trim(), specialCode2: D.specialCode2.trim(), specialCode3: D.specialCode3.trim(),
+      seoTitle: D.seoTitle.trim(), seoDescription: D.seoDescription.trim(), seoKeywords: D.seoKeywords.trim(), slug: D.slug.trim() || undefined };
     if (D.categoryId) p.categoryId = Number(D.categoryId);
+    const k = known(), bid = k.brands.get(D.brand) ?? [...k.brands].find(([b]) => b.toLocaleLowerCase('tr') === String(D.brand).toLocaleLowerCase('tr'))?.[1];
+    if (bid) p.brandId = bid;
+    // Özellikler: ölçüler En/Yükseklik/Boy olarak; Malzeme ve Su Geçirmez yalnızca Qukasoft'ta bu adlarla tanımlıysa (tanımsız özellik kaydı bozabilir)
+    const defined = new Set(k.attrs.map(a => a.toLocaleLowerCase('tr'))), attrs = [];
+    Object.entries(DIM_ATTR).forEach(([f, name]) => { if (+D[f] > 0) attrs.push({ name, value: String(+D[f]) }); });
+    if (D.material.trim() && defined.has(MATERIAL_ATTR.toLocaleLowerCase('tr'))) attrs.push({ name: MATERIAL_ATTR, value: D.material.trim() });
+    if (D.waterproof && defined.has(WATER_ATTR.toLocaleLowerCase('tr'))) attrs.push({ name: WATER_ATTR, value: 'Evet' });
+    D.attrs.forEach(a => { if (a.n.trim() && a.v.trim() && !attrs.some(x => x.name.toLocaleLowerCase('tr') === a.n.trim().toLocaleLowerCase('tr'))) attrs.push({ name: a.n.trim(), value: a.v.trim() }); });
+    if (attrs.length || !D.isNew) p.attributes = attrs;
     if (D.variants.length) { p.variant1Name = 'Renk'; p.variants = D.variants.map(v => ({ value1: v.v, barcode: v.b || hex12('CLK-V-'), quantity: +v.q || 0, priceStatus: 0, price: 0 })); p.quantity = p.variants.reduce((a, v) => a + v.quantity, 0); }
     else p.quantity = +D.quantity || 0;
     if (p.salePrice) p.marketplacePrices = MARKETS.map(type => ({ type, currency: 'TL', price: p.salePrice }));
@@ -443,6 +494,14 @@
     } catch (e) { toast('Yapay zekâ yazamadı, şablon kullanıldı: ' + e.message.split(/[.\n]/)[0]); D.longDescription = autoDesc(); if (!D.shortDescription.trim()) D.shortDescription = autoShort(); }
     S.keepScroll = true; render();
   }
+  // SEO: başlık ≤60, açıklama ≤160 karakter; boş alanlar doldurulur, yazılmış olanlara dokunulmaz
+  function fillSeo() {
+    const [noun] = productKind(), cut = (s, n) => s.length <= n ? s : s.slice(0, s.lastIndexOf(' ', n - 1) > 0 ? s.lastIndexOf(' ', n - 1) : n).trim();
+    const name = [D.brand, D.name].filter(Boolean).join(' ').replace(/^(\S+) \1/i, '$1');
+    if (!D.seoTitle.trim()) D.seoTitle = cut(`${name} ${noun.charAt(0).toLocaleUpperCase('tr') + noun.slice(1)} | CLK Çanta`, 60);
+    if (!D.seoDescription.trim()) D.seoDescription = cut(D.shortDescription.trim() || autoShort(), 160);
+    if (!D.seoKeywords.trim()) D.seoKeywords = [...new Set([D.brand, D.name, noun, D.material, ...D.variants.map(v => `${v.v.toLocaleLowerCase('tr')} ${noun}`), ...String(D.categoryName).split('›')].map(s => String(s || '').trim().toLocaleLowerCase('tr')).filter(Boolean))].join(', ');
+  }
   function autoShort() {
     const [noun] = productKind(), size = sizeLine();
     return [[D.brand, D.name].filter(Boolean).join(' '), [D.material, noun].filter(Boolean).join(' '), size, D.waterproof && 'su geçirmez'].filter(Boolean).join(' · ');
@@ -492,6 +551,7 @@
       });
     });
     $$('[data-vk]').forEach(el => el.addEventListener('input', () => { const i = +el.closest('.vrow').dataset.i; const k = el.dataset.vk; D.variants[i][k] = k === 'q' ? (+el.value || 0) : el.value.toLocaleUpperCase('tr'); }));
+    $$('[data-ak]').forEach(el => el.addEventListener('input', () => { D.attrs[+el.closest('.vrow').dataset.i][el.dataset.ak] = el.value; }));
     $$('[data-auto]').forEach(el => el.addEventListener('change', () => { D.auto[el.dataset.auto] = el.checked; }));
     $$('[data-shot]').forEach(el => el.addEventListener('change', async () => { const f = el.files[0]; if (!f) return; processShot(el.dataset.shot, await fileUrl(f)); }));
     $$('[data-color]').forEach(b => b.addEventListener('click', () => {
@@ -508,6 +568,9 @@
     else if (act === 'edDescAi') aiDesc(el);
     else if (act === 'edDesc') { D.longDescription = autoDesc(); if (!D.shortDescription.trim()) D.shortDescription = autoShort(); S.keepScroll = true; render(); }
     else if (act === 'edVdel') { D.variants.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
+    else if (act === 'edAttrAdd') { D.attrs.push({ n: '', v: '' }); S.keepScroll = true; render(); }
+    else if (act === 'edAttrDel') { D.attrs.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
+    else if (act === 'edSeo') { fillSeo(); S.keepScroll = true; render(); }
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : square(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
