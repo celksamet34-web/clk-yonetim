@@ -229,7 +229,7 @@
     if (r.status === 404 || r.status === 503) return null;
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
-    if (j.engineError) toast(/quota/i.test(j.engineError) ? 'Seçili servisin kotası yok, OpenAI ile üretildi.' : 'Seçili servis üretemedi, OpenAI ile üretildi: ' + j.engineError.split(/[.\n]/)[0]);
+    if (j.engineError) toast(/quota|top_up|balance|credit/i.test(j.engineError) ? 'Seçili servisin bakiyesi/kotası yok (' + j.engineError.split(':')[0] + '), OpenAI ile üretildi.' : 'Seçili servis üretemedi, OpenAI ile üretildi: ' + j.engineError.split(/[.\n]/)[0]);
     return j.image;
   }
   async function modelImage(du) {
