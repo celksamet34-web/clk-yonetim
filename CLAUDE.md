@@ -36,7 +36,7 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 
 - Kullanıcı anasayfa banner ve manşetlerini Claude'un yönetmesini istedi (25.10.2026). Kural: **her görsel önce kullanıcıya gösterilir, onaysız yayına çıkmaz.**
 - Anasayfa (clkcanta.com) banner'ları 3:4 (1248×1664). Qukasoft başlık, alt yazı ve düğmeyi görselin alt kısmına siyah kutularla kendisi yazar; panel önizlemesi bunu taklit eder.
-- Görsel: `ai-product-image` `action: 'banner'` → Photoroom `v2/edit` AI arka plan (Plus planı, ~0,10 $/görsel), ürün üstte, alt %34 boş. `sandbox: true` anahtara `sandbox_` öneki ekler: ücretsiz, filigranlı; panelde düğmesi yok, `CLK.bannerTest()` ile çağrılır.
+- Görsel: `ai-product-image` `action: 'banner'` → Photoroom `v2/edit` AI arka plan (Plus planı, ~0,10 $/görsel). AI arka planda padding/hizalama yok sayılıyor (sandbox'ta denendi); panel ürünü 1248×1664 beyaz tuvalde üste yerleştirir (`placeBag`, genişlik ≤%62, alt kenar %68), `referenceBox=originalImage` ürünü yerinde bırakır, alt kısım sahneye kalır. `sandbox: true` anahtara `sandbox_` öneki ekler: ücretsiz, filigranlı; panelde düğmesi yok, `CLK.bannerTest()` ile çağrılır.
 - Qukasoft API'sinde banner uç noktası yok (API notlarında geçmiyor). Onaylanan banner'ı kullanıcı Qukasoft yönetim paneline giriş yaptıktan sonra Claude tarayıcıdan yükler; kaydetmeden önce sorar. Onaylanan görsel Supabase'e kaydedilir (`banner-*.jpg`, 7 günlük bağlantı, `localStorage` `clk-banner-approved`).
 
 ## Qukasoft API notları (web servis dokümanı v2.3.1)

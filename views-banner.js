@@ -57,12 +57,18 @@
     bindTxt('#bncustom', 'custom'); bindTxt('#bntitle', 'title', true); bindTxt('#bnsub', 'sub', true); bindTxt('#bnbtn', 'btn', true); bindTxt('#bnlink', 'link');
   };
 
-  // Ürün görseli: CORS ile yüklenip en çok 1600 px JPEG'e çevrilir (Photoroom'a giden)
+  // Photoroom'a giden girdi: ürün 1248×1664 beyaz tuvalde üst kısma yerleştirilir (genişliğin en çok %62'si, alt kenarı %68'de).
+  // Photoroom AI arka planda ürünü bu yerde bırakır (referenceBox=originalImage); alt kısım sahneye kalır, Qukasoft yazıları oraya gelir.
   const loadImg = src => new Promise((ok, no) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = () => no(new Error('Ürün fotoğrafı açılamadı.')); i.src = src; });
-  async function toJpeg(src) {
-    const im = await loadImg(src), k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas');
-    c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
-    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+  async function placeBag(src) {
+    const im = await loadImg(src), c0 = document.createElement('canvas'); c0.width = im.width; c0.height = im.height;
+    const x0 = c0.getContext('2d'); x0.drawImage(im, 0, 0);
+    const d = x0.getImageData(0, 0, im.width, im.height).data; let l = im.width, t = im.height, r = -1, b = -1;
+    for (let y = 0; y < im.height; y += 2) for (let i = 0; i < im.width; i += 2) { const q = (y * im.width + i) * 4; if (d[q] < 235 || d[q + 1] < 235 || d[q + 2] < 235) { if (i < l) l = i; if (i > r) r = i; if (y < t) t = y; if (y > b) b = y; } }
+    if (r < 0) { l = 0; t = 0; r = im.width - 1; b = im.height - 1; } // açık renkli ürün ayırt edilemezse tüm fotoğraf
+    const bw = r - l + 1, bh = b - t + 1, W = 1248, H = 1664, s = Math.min(W * 0.62 / bw, H * 0.58 / bh), w = bw * s, h = bh * s;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(c0, l, t, bw, bh, (W - w) / 2, H * 0.68 - h, w, h);
     return c.toDataURL('image/jpeg', 0.92);
   }
   async function make(sandbox, opts = {}) {
@@ -72,7 +78,7 @@
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
       const scene = B.custom.trim() ? 'kendi tarif' : (SCENES.find(s => s[0] === B.scene) || SCENES[0])[1];
       const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'banner', image: await toJpeg(P.img(p)), prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model }) });
+        body: JSON.stringify({ action: 'banner', image: await placeBag(P.img(p)), prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.image) throw new Error(j.message || 'Banner üretilemedi.');
       B.out = { preview: j.image, sandbox: !!j.sandbox, scene, code: p.code };

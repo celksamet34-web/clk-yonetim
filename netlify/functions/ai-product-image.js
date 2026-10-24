@@ -122,10 +122,12 @@ async function photoroom(key, mime, bytes) {
 }
 
 // Anasayfa banner'ı için Photoroom AI arka plan (Plus planı, görsel başı ~0,10 $): ürün dekupe edilir, arkasına istemdeki sahne üretilir.
-// Çıktı tema banner'ı oranında (3:4, 1248×1664); Qukasoft başlık/düğme kutularını alt kısma koyduğu için ürün üstte, alt %30 boş kalır.
+// Çıktı tema banner'ı oranında (3:4, 1248×1664). AI arka planda padding/hizalama yok sayılıyor (sandbox'ta denendi); bu yüzden panel
+// ürünü 1248×1664 beyaz tuvalde üst kısma kendisi yerleştirir, referenceBox=originalImage ile Photoroom ürünü yerinde bırakır.
+// Alt kısım sahneye (ör. kaide) kalır; Qukasoft başlık/düğme kutularını oraya yazar.
 // sandbox: anahtarın başına "sandbox_" eklenir, ücretsiz ve filigranlıdır (parametre denemesi için).
 const BANNER_SIZE = '1248x1664';
-const BANNER_LAYOUT = { paddingTop: '0.1', paddingLeft: '0.14', paddingRight: '0.14', paddingBottom: '0.34', 'shadow.mode': 'ai.soft' };
+const BANNER_LAYOUT = { referenceBox: 'originalImage', 'shadow.mode': 'ai.soft' };
 // Yerleşim denemesi için izinli alanlar (panel `layout` ile geçersiz kılabilir); değerler kısa düz metin olmalı
 const LAYOUT_KEYS = ['padding', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
   'verticalAlignment', 'horizontalAlignment', 'referenceBox', 'scaling', 'shadow.mode', 'background.expandPrompt.mode', 'background.seed'];
