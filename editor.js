@@ -205,7 +205,7 @@
     const [px, py] = { capraz: [cx, T + ph * 0.36], omuz: [cx - ph * 0.14, T + ph * 0.47 + h / 2], el: [cx - ph * 0.19, T + ph * 0.5 + h / 2], sirt: [cx, T + ph * 0.36] }[D.carry] || [cx, T + ph * 0.36];
     const rect = { x: px - w / 2, y: py - h / 2, w, h }, bag = cutBag(L, w, h);
     const cc = document.createElement('canvas'); cc.width = W; cc.height = H; const cx2 = cc.getContext('2d'); cx2.drawImage(pi, 0, 0); cx2.drawImage(bag, rect.x, rect.y);
-    const out = await siteImage({ action: 'model', stage: 'compose', carry: D.carry, image: cc.toDataURL('image/jpeg', 0.9), product: du });
+    const out = await siteImage({ action: 'model', stage: 'compose', carry: D.carry, image: cc.toDataURL('image/jpeg', 0.9) });
     if (!out) return null;
     const f = 1024 / W; // pasteBag 1024'lük karede çalışır
     return pasteBag(out, { rect: { x: rect.x * f, y: rect.y * f, w: w * f, h: h * f }, bag }).catch(() => out);
