@@ -310,7 +310,8 @@
     const N = 1024, ppc = N * 0.93 / (mHeight() * 0.62);
     // 0.6: modeller (Seedream, OpenAI) tam çözünürlüklü ürün görselini de gördüğü için çantayı rehberdekinden büyük çiziyor; denemelerle ayarlandı
     const s = 0.6 * Math.min(+D.w > 0 ? +D.w * ppc / L.bw : Infinity, +D.h > 0 ? +D.h * ppc / L.bh : Infinity);
-    const r = { x: Math.round((N - L.bw * s) / 2), y: Math.round(N * 0.55 - L.bh * s / 2), w: Math.round(L.bw * s), h: Math.round(L.bh * s) };
+    // Sırt çantası sırtın üstünde durur (manken arkadan çekilir); diğerleri bel-göğüs hizasında
+    const r = { x: Math.round((N - L.bw * s) / 2), y: Math.round(N * (D.carry === 'sirt' ? 0.45 : 0.55) - L.bh * s / 2), w: Math.round(L.bw * s), h: Math.round(L.bh * s) };
     const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
     ox.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, r.x, r.y, r.w, r.h);
     return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag: cutBag(L, r.w, r.h) };
