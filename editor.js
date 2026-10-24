@@ -21,7 +21,9 @@
     seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || '', slug: p.slug || '',
     id: p.id || '', videoText: p.videoText || '', unitId: p.unitId || 1,
     // İlişkili ürünler ayrı Qukasoft işlemleriyle kaydedilir; yalnızca değiştirilenler (touched) gönderilir
-    similars: [], combines: [], compat: {}, rel: { sim: false, comb: false, combLoaded: false } });
+    similars: [], combines: [], compat: {}, rel: { sim: false, comb: false, combLoaded: false, grp: false },
+    // Ürün grubu (ilişkili ürünler): aynı modelin renk/boyut gibi ayrı ürünlerini seçenek adıyla bağlar; bu ürün de grubun üyesidir
+    group: { name: '', items: [] } });
 
   let D = null; // taslak
   function blank() {
@@ -213,6 +215,9 @@
           ${REF.err ? `<div class="msg err">${esc(REF.err)}</div>` : ''}
           <div class="f"><span>Benzer ürünler${D.isNew ? '' : ' <em>(Qukasoft mevcut listeyi vermiyor; eklediğin liste kaydedilince geçerli olur)</em>'}</span>${picker('ed-sim', 'edSim', D.similars.map(code => ({ code })), false)}</div>
           <div class="f"><span>Kombin ürünler</span>${picker('ed-comb', 'edComb', D.combines, true)}</div>
+          <div class="f"><span>Ürün grubu (ilişkili ürünler)${D.isNew ? '' : ' <em>(Qukasoft mevcut grubu vermiyor; doldurursan kaydedilince geçerli olur)</em>'}</span>
+            <div class="fg">${fld('Grup adı', `<input type="text" data-gk="name" value="${esc(D.group.name)}" placeholder="ör. West Polo 7041 renkleri">`)}${fld('Bu ürünün seçenek adı', `<input type="text" data-gk="self" value="${esc(D.group.self || '')}" placeholder="ör. Kahve">`)}</div>
+            ${picker('ed-grp', 'edGrp', D.group.items, true).replace(/data-ck="/g, 'data-gl="').replace(/Kombin metni \(ör\. Cüzdanıyla al\)/g, 'Seçenek adı (ör. Siyah)')}</div>
           <div class="f"><span>Uyumluluk</span>${!REF.compat ? '<p class="hint">Yükleniyor…</p>' : REF.compat.length ? `<div class="vrows">${REF.compat.map(c => `<div class="vrow rel"><span><b>${esc(c.group)}</b> ${esc(c.label)}</span><span></span><select data-cv="${c.id}"><option value="">—</option><option value="insert" ${D.compat[c.id] === 'insert' ? 'selected' : ''}>Ekle</option><option value="delete" ${D.compat[c.id] === 'delete' ? 'selected' : ''}>Çıkar</option></select></div>`).join('')}</div>` : '<p class="hint">Mağazada tanımlı uyumluluk değeri yok. Qukasoft panelinde Uyumluluklar bölümünden tanımlanabilir.</p>'}</div>
           <div class="fg">
             ${fld('Birim', `<select data-k="unitId">${(REF.units || [{ id: D.unitId, title: 'Adet' }]).map(u => `<option value="${u.id}" ${+u.id === +D.unitId ? 'selected' : ''}>${esc(u.title)}</option>`).join('')}</select>`)}
@@ -503,6 +508,10 @@
     if (D.waterproof) attrs.push({ name: WATER_ATTR, value: 'Evet' });
     D.attrs.forEach(a => { if (a.n.trim() && a.v.trim() && !attrs.some(x => x.name.toLocaleLowerCase('tr') === a.n.trim().toLocaleLowerCase('tr'))) attrs.push({ name: a.n.trim(), value: a.v.trim() }); });
     if (attrs.length || !D.isNew) p.attributes = attrs;
+    // Ürün grubu: yalnızca değiştirildiyse; üyeler kod + grup adı + seçenek adı, bu ürün de dahil
+    const gname = D.group.name.trim();
+    if (D.rel.grp && gname) p.groups = [{ code: p.code, label: String(D.group.self || '').trim() }, ...D.group.items.map(i => ({ code: i.code, label: String(i.text || '').trim() }))]
+      .filter(g => g.label).map(g => ({ code: g.code, name: gname, label: g.label }));
     if (D.variants.length) { p.variant1Name = 'Renk'; p.variants = D.variants.map(v => ({ value1: v.v, barcode: v.b || hex12('CLK-V-'), quantity: +v.q || 0, priceStatus: 0, price: 0 })); p.quantity = p.variants.reduce((a, v) => a + v.quantity, 0); }
     else p.quantity = +D.quantity || 0;
     if (p.salePrice) p.marketplacePrices = MARKETS.map(type => ({ type, currency: 'TL', price: p.salePrice }));
@@ -628,6 +637,8 @@
     $$('[data-ak]').forEach(el => el.addEventListener('input', () => { D.attrs[+el.closest('.vrow').dataset.i][el.dataset.ak] = el.value; }));
     $$('[data-ck]').forEach(el => el.addEventListener('input', () => { D.combines[+el.dataset.ck].text = el.value; D.rel.comb = true; }));
     $$('[data-cv]').forEach(el => el.addEventListener('change', () => { D.compat[el.dataset.cv] = el.value; }));
+    $$('[data-gk]').forEach(el => el.addEventListener('input', () => { D.group[el.dataset.gk] = el.value; D.rel.grp = true; }));
+    $$('[data-gl]').forEach(el => el.addEventListener('input', () => { D.group.items[+el.dataset.gl].text = el.value; D.rel.grp = true; }));
     loadRefs(); loadCombines();
     $$('[data-auto]').forEach(el => el.addEventListener('change', () => { D.auto[el.dataset.auto] = el.checked; }));
     $$('[data-shot]').forEach(el => el.addEventListener('change', async () => { const f = el.files[0]; if (!f) return; processShot(el.dataset.shot, await fileUrl(f)); }));
@@ -651,6 +662,11 @@
       else { if (!D.combines.some(c => c.code === code)) D.combines.push({ code, text: '' }); D.rel.comb = true; }
       S.keepScroll = true; render();
     }
+    else if (act === 'edGrp') {
+      const code = pickCode($('#ed-grp')?.value); if (!code) return toast('Listeden bir ürün seç.');
+      if (!D.group.items.some(c => c.code === code)) D.group.items.push({ code, text: '' }); D.rel.grp = true; S.keepScroll = true; render();
+    }
+    else if (act === 'edGrpDel') { D.group.items.splice(+el.dataset.i, 1); D.rel.grp = true; S.keepScroll = true; render(); }
     else if (act === 'edSimDel') { D.similars.splice(+el.dataset.i, 1); D.rel.sim = true; S.keepScroll = true; render(); }
     else if (act === 'edCombDel') { D.combines.splice(+el.dataset.i, 1); D.rel.comb = true; S.keepScroll = true; render(); }
     else if (act === 'edAttrAdd') { D.attrs.push({ n: '', v: '' }); S.keepScroll = true; render(); }
