@@ -156,7 +156,8 @@
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
     if (x1 < 0 || (bw < c.width * 0.1 && bh < c.height * 0.1)) return null; // açık renkli ürün ayırt edilemedi
     const N = 1024, ppc = N * 0.93 / (HEIGHTS[D.audience] * 0.62);
-    const s = Math.min(+D.w > 0 ? +D.w * ppc / bw : Infinity, +D.h > 0 ? +D.h * ppc / bh : Infinity);
+    // 0.8: model, tam çözünürlüklü ürün görselini de gördüğü için çantayı rehberdekinden ~%30 büyük çiziyor; denemelerle ayarlandı
+    const s = 0.8 * Math.min(+D.w > 0 ? +D.w * ppc / bw : Infinity, +D.h > 0 ? +D.h * ppc / bh : Infinity);
     const r = { x: Math.round((N - bw * s) / 2), y: Math.round(N * 0.55 - bh * s / 2), w: Math.round(bw * s), h: Math.round(bh * s) };
     const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
     ox.drawImage(c, x0, y0, bw, bh, r.x, r.y, r.w, r.h);
