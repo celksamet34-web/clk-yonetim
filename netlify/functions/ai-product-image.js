@@ -23,7 +23,7 @@ function scaleText(size, height, child, scaled) {
   ].filter(Boolean).join('; ');
   // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
   const guide = scaled
-    ? ' The input image is a scale layout guide: the bag is already drawn at its exact real-world size for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Keep this framing. Do not move, rotate, resize, tilt or redraw the bag: keep it at exactly the same position and size in the frame as in the input, front-facing and flat, because the original product photo will be placed back over it. Pose the person so the bag sits naturally at that spot (worn with its strap across the body or over the shoulder, or held by its handle) and draw the person around it at matching scale; hands, hair and straps must not cover the bag.'
+    ? ' Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle); hands, hair and straps must not cover the bag.'
     : ' Choose a framing (full body or three-quarter) that makes the size comparison obvious.';
   return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}`;
 }
@@ -54,15 +54,15 @@ exports.handler = async event => {
     const bytes = Buffer.from(match[2], 'base64');
     if (bytes.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük. Daha küçük bir görsel seç.' });
     if (action === 'original') return reply(200, { success: true, action, image: body.image });
-    // Ölçek rehberiyle gelen maske: opak alan (çanta) korunur, şeffaf alan çizilir
-    const maskMatch = action === 'model' && body.scaled === true ? /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(body.mask || '')) : null;
-    const maskBytes = maskMatch ? Buffer.from(maskMatch[1], 'base64') : null;
-    if (maskBytes && maskBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Maske çok büyük.' });
+    // Ölçek rehberi ikinci görsel olarak gider; ilk görsel (ürün) en yüksek sadakatle korunur
+    const guideMatch = action === 'model' && body.scaled === true ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
+    const guideBytes = guideMatch ? Buffer.from(guideMatch[2], 'base64') : null;
+    if (guideBytes && guideBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Ölçek görseli çok büyük.' });
     const prompt = action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
       : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
-    // Logo ve yazıların korunması için yüksek girdi sadakati ve maske; model reddederse o ayar olmadan tekrar dener.
-    const edit = async (fidelity, useMask) => {
+    // Logo ve yazıların korunması için yüksek girdi sadakati; model reddederse ayarsız tekrar dener.
+    const edit = async fidelity => {
       const form = new FormData();
       form.append('model', 'gpt-image-1.5');
       form.append('prompt', prompt);
@@ -71,7 +71,7 @@ exports.handler = async event => {
       form.append('output_format', 'jpeg');
       if (fidelity) form.append('input_fidelity', 'high');
       form.append('image[]', new Blob([bytes], { type: match[1] }), 'product.jpg');
-      if (useMask && maskBytes) form.append('mask', new Blob([maskBytes], { type: 'image/png' }), 'mask.png');
+      if (guideBytes) form.append('image[]', new Blob([guideBytes], { type: guideMatch[1] }), 'scale-guide.jpg');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 110000);
       try {
@@ -79,13 +79,8 @@ exports.handler = async event => {
         return [r, await r.json().catch(() => ({}))];
       } finally { clearTimeout(timeout); }
     };
-    let fidelity = true, useMask = !!maskBytes;
-    let [response, result] = await edit(fidelity, useMask);
-    for (let i = 0; i < 2 && !response.ok && response.status === 400; i++) {
-      const msg = result?.error?.message || '';
-      if (useMask && /mask/i.test(msg)) useMask = false; else if (fidelity && /input_fidelity/i.test(msg)) fidelity = false; else break;
-      [response, result] = await edit(fidelity, useMask);
-    }
+    let [response, result] = await edit(true);
+    if (!response.ok && /input_fidelity/i.test(result?.error?.message || '')) [response, result] = await edit(false);
     const image = result?.data?.[0]?.b64_json;
     if (!response.ok || !image) return reply(422, { success: false, message: result?.error?.message || 'Görsel üretilemedi.' });
     return reply(200, { success: true, action, image: `data:image/jpeg;base64,${image}` });

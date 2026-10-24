@@ -168,33 +168,55 @@
     mx.putImageData(md, 0, 0);
     const soft = document.createElement('canvas'); soft.width = r.w; soft.height = r.h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(m, 0, 0);
     bx.globalCompositeOperation = 'destination-in'; bx.drawImage(soft, 0, 0);
-    // Görsel servisine maske: şeffaf alan çizilir, çantanın olduğu opak alan korunur
-    const mk = document.createElement('canvas'); mk.width = mk.height = N; mk.getContext('2d').drawImage(m, r.x, r.y);
-    return { du: o.toDataURL('image/jpeg', 0.92), mask: mk.toDataURL('image/png'), rect: r, bag };
+    return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag };
   }
-  // Üretilen görselde çantayı bul (model biraz kaydırmış/ölçeklemiş olabilir) ve orijinal çanta piksellerini üstüne koy.
-  // Böylece logo ve detaylar ön fotoğrafla birebir aynı kalır. Çanta bulunamazsa üretilen görsel olduğu gibi kalır.
+  // Üretilen görselde çantayı bul ve orijinal çanta piksellerini üstüne koy; logo ve detaylar ön fotoğrafla birebir kalır.
+  // Model çantayı kaydırıp döndürebildiği ve rengini değiştirebildiği için çanta silüeti (içi 1, çevresi 0) ile
+  // gri görüntü arasında normalize korelasyon aranır: önce 1/8 çözünürlükte geniş, sonra 1/4'te dar arama.
+  // Eşleşme zayıfsa üretilen görsel olduğu gibi kalır.
   async function pasteBag(aiDu, ref) {
-    const N = 1024, k = 4, n = N / k, im = await loadImg(aiDu), c = document.createElement('canvas'); c.width = c.height = N;
+    const N = 1024, im = await loadImg(aiDu), c = document.createElement('canvas'); c.width = c.height = N;
     const x = c.getContext('2d'); x.drawImage(im, 0, 0, N, N);
-    const sm = document.createElement('canvas'); sm.width = sm.height = n; const smx = sm.getContext('2d'); smx.drawImage(c, 0, 0, n, n);
-    const a = smx.getImageData(0, 0, n, n).data, gray = (d, p) => d[p] * 0.3 + d[p + 1] * 0.59 + d[p + 2] * 0.11;
-    let best = { e: Infinity };
-    for (const sc of [0.85, 0.92, 1, 1.08, 1.15]) {
-      const pw = Math.max(4, Math.round(ref.rect.w * sc / k)), ph = Math.max(4, Math.round(ref.rect.h * sc / k));
-      const pc = document.createElement('canvas'); pc.width = pw; pc.height = ph; const px = pc.getContext('2d'); px.drawImage(ref.bag, 0, 0, pw, ph);
-      const b = px.getImageData(0, 0, pw, ph).data, pts = [];
-      for (let y = 0; y < ph; y++) for (let i = 0; i < pw; i++) { const p = (y * pw + i) * 4; if (b[p + 3] > 200) pts.push(i, y, gray(b, p)); }
-      if (pts.length < 60) continue;
-      const cx = (ref.rect.x + ref.rect.w / 2) / k - pw / 2, cy = (ref.rect.y + ref.rect.h / 2) / k - ph / 2;
-      for (let dy = -30; dy <= 30; dy++) for (let dx = -30; dx <= 30; dx++) {
-        const ox = Math.round(cx + dx), oy = Math.round(cy + dy); if (ox < 0 || oy < 0 || ox + pw > n || oy + ph > n) continue;
-        let e = 0; for (let q = 0; q < pts.length; q += 3) e += Math.abs(gray(a, ((oy + pts[q + 1]) * n + ox + pts[q]) * 4) - pts[q + 2]);
-        e /= pts.length / 3; if (e < best.e) best = { e, x: ox * k, y: oy * k, w: pw * k, h: ph * k };
+    const level = k => {
+      const n = N / k, cv = document.createElement('canvas'); cv.width = cv.height = n; const cx = cv.getContext('2d'); cx.drawImage(c, 0, 0, n, n);
+      const d = cx.getImageData(0, 0, n, n).data, g = new Float32Array(n * n);
+      for (let i = 0; i < g.length; i++) g[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+      return { n, g };
+    };
+    const tpl = new Map();
+    const template = (k, ang, sc) => { // silüet ve 2 piksellik çevre halkası, merkeze göre
+      const key = k + ':' + ang + ':' + sc; if (tpl.has(key)) return tpl.get(key);
+      const w = ref.rect.w * sc / k, h = ref.rect.h * sc / k, R = Math.ceil(Math.hypot(w, h) / 2) + 3, S = 2 * R;
+      const cv = document.createElement('canvas'); cv.width = cv.height = S; const cx = cv.getContext('2d');
+      cx.translate(R, R); cx.rotate(ang * Math.PI / 180); cx.drawImage(ref.bag, -w / 2, -h / 2, w, h);
+      const a = cx.getImageData(0, 0, S, S).data, inside = i => a[i * 4 + 3] > 128, pts = [];
+      for (let y = 0; y < S; y++) for (let i = 0; i < S; i++) {
+        const j = y * S + i; let v = inside(j) ? 1 : -1;
+        if (v < 0) { let near = false; for (let dy = -2; dy <= 2 && !near; dy++) for (let dx = -2; dx <= 2; dx++) { const yy = y + dy, xx = i + dx; if (yy >= 0 && xx >= 0 && yy < S && xx < S && inside(yy * S + xx)) { near = true; break; } } if (!near) continue; v = 0; }
+        pts.push(i - R, y - R, v > 0 ? 1 : 0);
       }
+      const t = { pts, R }; tpl.set(key, t); return t;
+    };
+    const score = (L, t, cx, cy) => { // |NCC| (çanta açık ya da koyu olabilir)
+      let n = 0, sa = 0, saa = 0, st = 0, stt = 0, sat = 0; const p = t.pts;
+      for (let q = 0; q < p.length; q += 3) { const xx = cx + p[q], yy = cy + p[q + 1]; if (xx < 0 || yy < 0 || xx >= L.n || yy >= L.n) return 0; const a = L.g[yy * L.n + xx], v = p[q + 2]; n++; sa += a; saa += a * a; st += v; stt += v * v; sat += a * v; }
+      const va = saa - sa * sa / n, vt = stt - st * st / n; return va > 0 && vt > 0 ? Math.abs((sat - sa * st / n) / Math.sqrt(va * vt)) : 0;
+    };
+    const L8 = level(8), L4 = level(4), c0x = ref.rect.x + ref.rect.w / 2, c0y = ref.rect.y + ref.rect.h / 2;
+    let best = { s: 0 };
+    for (let ang = -40; ang <= 40; ang += 5) for (const sc of [0.8, 0.9, 1, 1.1, 1.25]) {
+      const t = template(8, ang, sc);
+      for (let dy = -20; dy <= 20; dy++) for (let dx = -20; dx <= 20; dx++) { const cx = Math.round(c0x / 8) + dx, cy = Math.round(c0y / 8) + dy, s = score(L8, t, cx, cy); if (s > best.s) best = { s, ang, sc, cx: cx * 8, cy: cy * 8 }; }
     }
-    if (!(best.e < 30)) return aiDu;
-    x.drawImage(ref.bag, best.x, best.y, best.w, best.h);
+    const coarse = best; best = { s: 0 };
+    for (let ang = coarse.ang - 4; ang <= coarse.ang + 4; ang += 2) for (const sc of [0.94, 0.97, 1, 1.03, 1.06].map(v => +(v * coarse.sc).toFixed(3))) {
+      const t = template(4, ang, sc);
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const cx = Math.round(coarse.cx / 4) + dx, cy = Math.round(coarse.cy / 4) + dy, s = score(L4, t, cx, cy); if (s > best.s) best = { s, ang, sc, cx: cx * 4, cy: cy * 4 }; }
+    }
+    pasteBag.last = best;
+    if (!(best.s > 0.72)) return aiDu; // zayıf eşleşmede yapıştırmak iki çantayı üst üste bindirir
+    const w = ref.rect.w * best.sc * 1.02, h = ref.rect.h * best.sc * 1.02; // %2 büyük: modelin çantasının kenarlarını örter
+    x.save(); x.translate(best.cx, best.cy); x.rotate(best.ang * Math.PI / 180); x.drawImage(ref.bag, -w / 2, -h / 2, w, h); x.restore();
     return c.toDataURL('image/jpeg', 0.92);
   }
   // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
@@ -203,7 +225,8 @@
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
-    const body = { action: 'model', image: ref ? ref.du : du, mask: ref?.mask, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
+    // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
+    const body = { action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
     const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const j = await r.json().catch(() => ({}));
