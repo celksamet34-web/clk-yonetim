@@ -220,6 +220,22 @@
     x.save(); x.translate(best.cx, best.cy); x.rotate(best.ang * Math.PI / 180); x.drawImage(ref.bag, -w / 2, -h / 2, w, h); x.restore();
     return c.toDataURL('image/jpeg', 0.92);
   }
+  // Model bazen sahneyi beyaz rehber karesinin içine küçük bir fotoğraf gibi koyuyor: kenarlardaki düz beyaz bantları kırp.
+  async function trimBorder(du) {
+    const im = await loadImg(du), W = im.width, H = im.height, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, W, H).data;
+    // Satır/sütunun %95'i neredeyse beyazsa çerçevedir (modelin bıraktığı silik izler kırpmayı durdurmasın)
+    const plain = (x0, y0, dx, dy, n) => { let k = 0; for (let i = 0; i < n; i++) { const p = ((y0 + dy * i) * W + x0 + dx * i) * 4; if (d[p] * 0.3 + d[p + 1] * 0.59 + d[p + 2] * 0.11 > 236) k++; } return k / n > 0.95; };
+    let t = 0, b = H - 1, l = 0, r = W - 1;
+    while (t < H / 3 && plain(0, t, 1, 0, W)) t++;
+    while (b > H * 2 / 3 && plain(0, b, 1, 0, W)) b--;
+    while (l < W / 3 && plain(l, 0, 0, 1, H)) l++;
+    while (r > W * 2 / 3 && plain(r, 0, 0, 1, H)) r--;
+    // Yalnızca dört kenarın hepsinde bant varsa çerçevedir; beyaz stüdyoda başın üstündeki boşluk kırpılmasın
+    const min = Math.min(W, H) * 0.03; if (t < min || H - 1 - b < min || l < min || W - 1 - r < min) return du;
+    const o = document.createElement('canvas'); o.width = r - l + 1; o.height = b - t + 1; o.getContext('2d').drawImage(c, l, t, o.width, o.height, 0, 0, o.width, o.height);
+    return o.toDataURL('image/jpeg', 0.92);
+  }
   // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
   // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
   // Bu sitenin görsel fonksiyonu (dekupede Photoroom, mankende fal.ai/Gemini, yedekte OpenAI). Yoksa null döner.
@@ -250,7 +266,8 @@
     // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
     const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } });
     if (!img) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
-    return ref ? pasteBag(img, ref).catch(() => img) : img;
+    const out = ref ? await pasteBag(img, ref).catch(() => img) : img;
+    return trimBorder(out).catch(() => out);
   }
   async function aiImage(du, action) {
     const img = action === 'model' ? await modelImage(du) : await siteImage({ action, image: du });
