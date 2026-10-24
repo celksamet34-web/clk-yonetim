@@ -23,7 +23,7 @@ function scaleText(size, height, child, scaled) {
   ].filter(Boolean).join('; ');
   // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
   const guide = scaled
-    ? ' The input image is a scale layout guide: the bag is already drawn at its exact real-world size for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Keep this framing and keep the bag at exactly the same size in the frame as in the input (same pixel width and height); place it on the body in its natural carrying position and draw the person around it at matching scale.'
+    ? ' The input image is a scale layout guide: the bag is already drawn at its exact real-world size for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Keep this framing. Do not move, rotate, resize, tilt or redraw the bag: keep it at exactly the same position and size in the frame as in the input, front-facing and flat, because the original product photo will be placed back over it. Pose the person so the bag sits naturally at that spot (worn with its strap across the body or over the shoulder, or held by its handle) and draw the person around it at matching scale; hands, hair and straps must not cover the bag.'
     : ' Choose a framing (full body or three-quarter) that makes the size comparison obvious.';
   return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}`;
 }

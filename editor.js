@@ -157,9 +157,43 @@
     if (x1 < 0 || (bw < c.width * 0.1 && bh < c.height * 0.1)) return null; // açık renkli ürün ayırt edilemedi
     const N = 1024, ppc = N * 0.93 / (HEIGHTS[D.audience] * 0.62);
     const s = Math.min(+D.w > 0 ? +D.w * ppc / bw : Infinity, +D.h > 0 ? +D.h * ppc / bh : Infinity);
+    const r = { x: Math.round((N - bw * s) / 2), y: Math.round(N * 0.55 - bh * s / 2), w: Math.round(bw * s), h: Math.round(bh * s) };
     const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
-    ox.drawImage(c, x0, y0, bw, bh, (N - bw * s) / 2, N * 0.55 - bh * s / 2, bw * s, bh * s);
-    return o.toDataURL('image/jpeg', 0.92);
+    ox.drawImage(c, x0, y0, bw, bh, r.x, r.y, r.w, r.h);
+    // Geri yapıştırma için çantanın kendisi: beyaz arka plan şeffaf, kenarlar hafif yumuşatılmış
+    const bag = document.createElement('canvas'); bag.width = r.w; bag.height = r.h; const bx = bag.getContext('2d');
+    bx.drawImage(o, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    const bd = bx.getImageData(0, 0, r.w, r.h), m = document.createElement('canvas'); m.width = r.w; m.height = r.h; const mx = m.getContext('2d'), md = mx.createImageData(r.w, r.h);
+    for (let p = 0; p < bd.data.length; p += 4) md.data[p + 3] = Math.min(bd.data[p], bd.data[p + 1], bd.data[p + 2]) < 225 ? 255 : 0;
+    mx.putImageData(md, 0, 0);
+    const soft = document.createElement('canvas'); soft.width = r.w; soft.height = r.h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(m, 0, 0);
+    bx.globalCompositeOperation = 'destination-in'; bx.drawImage(soft, 0, 0);
+    return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag };
+  }
+  // Üretilen görselde çantayı bul (model biraz kaydırmış/ölçeklemiş olabilir) ve orijinal çanta piksellerini üstüne koy.
+  // Böylece logo ve detaylar ön fotoğrafla birebir aynı kalır. Çanta bulunamazsa üretilen görsel olduğu gibi kalır.
+  async function pasteBag(aiDu, ref) {
+    const N = 1024, k = 4, n = N / k, im = await loadImg(aiDu), c = document.createElement('canvas'); c.width = c.height = N;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0, N, N);
+    const sm = document.createElement('canvas'); sm.width = sm.height = n; const smx = sm.getContext('2d'); smx.drawImage(c, 0, 0, n, n);
+    const a = smx.getImageData(0, 0, n, n).data, gray = (d, p) => d[p] * 0.3 + d[p + 1] * 0.59 + d[p + 2] * 0.11;
+    let best = { e: Infinity };
+    for (const sc of [0.85, 0.92, 1, 1.08, 1.15]) {
+      const pw = Math.max(4, Math.round(ref.rect.w * sc / k)), ph = Math.max(4, Math.round(ref.rect.h * sc / k));
+      const pc = document.createElement('canvas'); pc.width = pw; pc.height = ph; const px = pc.getContext('2d'); px.drawImage(ref.bag, 0, 0, pw, ph);
+      const b = px.getImageData(0, 0, pw, ph).data, pts = [];
+      for (let y = 0; y < ph; y++) for (let i = 0; i < pw; i++) { const p = (y * pw + i) * 4; if (b[p + 3] > 200) pts.push(i, y, gray(b, p)); }
+      if (pts.length < 60) continue;
+      const cx = (ref.rect.x + ref.rect.w / 2) / k - pw / 2, cy = (ref.rect.y + ref.rect.h / 2) / k - ph / 2;
+      for (let dy = -30; dy <= 30; dy++) for (let dx = -30; dx <= 30; dx++) {
+        const ox = Math.round(cx + dx), oy = Math.round(cy + dy); if (ox < 0 || oy < 0 || ox + pw > n || oy + ph > n) continue;
+        let e = 0; for (let q = 0; q < pts.length; q += 3) e += Math.abs(gray(a, ((oy + pts[q + 1]) * n + ox + pts[q]) * 4) - pts[q + 2]);
+        e /= pts.length / 3; if (e < best.e) best = { e, x: ox * k, y: oy * k, w: pw * k, h: ph * k };
+      }
+    }
+    if (!(best.e < 30)) return aiDu;
+    x.drawImage(ref.bag, best.x, best.y, best.w, best.h);
+    return c.toDataURL('image/jpeg', 0.92);
   }
   // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
   // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
@@ -167,11 +201,12 @@
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
-    const body = { action: 'model', image: ref || du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
+    const body = { action: 'model', image: ref ? ref.du : du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
     const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.'); return j.image;
+    if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
+    return ref ? pasteBag(j.image, ref).catch(() => j.image) : j.image;
   }
   async function aiImage(du, action) {
     if (action === 'model') { const img = await modelImage(du); if (img) return img; }
