@@ -462,8 +462,10 @@
     const head = (px, py, ang) => { x.beginPath(); x.moveTo(px, py); x.lineTo(px - 18 * Math.cos(ang - 0.45), py - 18 * Math.sin(ang - 0.45)); x.lineTo(px - 18 * Math.cos(ang + 0.45), py - 18 * Math.sin(ang + 0.45)); x.closePath(); x.fill(); };
     const arrow = (x0, y0, x1, y1) => { const a = Math.atan2(y1 - y0, x1 - x0); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); head(x1, y1, a); head(x0, y0, a + Math.PI); };
     const tick = (x0, y0, x1, y1) => { x.save(); x.lineWidth = 2; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
-    const label = (t, px, py, align = 'center', rot = 0) => { x.save(); x.translate(px, py); x.rotate(rot); x.font = '600 34px "Lora", Georgia, serif'; x.textAlign = align; x.textBaseline = 'middle';
+    const label = (t, px, py, align = 'center', rot = 0) => { x.save(); x.font = '600 34px "Lora", Georgia, serif'; x.textAlign = align; x.textBaseline = 'middle';
       const m = x.measureText(t).width, ox = align === 'center' ? -m / 2 : align === 'right' ? -m : 0;
+      if (!rot) px = Math.min(Math.max(px, 40 - ox), PW - 40 - ox - m); // geniş çantada yazı (ör. Derinlik) tuvalden taşmasın
+      x.translate(px, py); x.rotate(rot);
       x.fillStyle = '#1b1916'; x.beginPath(); x.roundRect(ox - 16, -26, m + 32, 52, 26); x.fill(); x.fillStyle = ink; x.fillText(t, 0, 0); x.restore(); };
     if (+D.w > 0) { const y = by + h + 70; tick(bx, by + h + 10, bx, y + 16); tick(bx + w, by + h + 10, bx + w, y + 16); arrow(bx, y, bx + w, y); label('En ' + fmt(D.w), bx + w / 2, y); }
     if (+D.h > 0) { const X = bx - 70; tick(bx - 10, by, X - 16, by); tick(bx - 10, by + h, X - 16, by + h); arrow(X, by, X, by + h); label('Yükseklik ' + fmt(D.h), X, by + h / 2, 'center', -Math.PI / 2); }
