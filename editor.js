@@ -106,16 +106,18 @@
     const p = S.products.find(x => String(x.code) === String(S.arg)); if (!p) return false;
     D = fromProduct(p); D._key = key; placeSizeShot(D); return true;
   }
-  // Qukasoft görsel sırasını tutar, hangi görselin hangi kutuya ait olduğunu tutmaz. Ölçü görseli koyu zeminli
-  // çizildiği için köşeleri koyu olan görsel Ölçü kutusuna taşınır.
+  // Qukasoft görsel sırasını tutar, hangi görselin hangi kutuya ait olduğunu tutmaz. Ölçü görseli gri zeminli
+  // (eskileri koyu zeminli) çizildiği için köşeleri düz gri ya da koyu olan görsel Ölçü kutusuna taşınır.
+  const SIZE_GRAY = 122;
   async function placeSizeShot(d) {
     if (d.shots.olcu) return;
     for (const [k, s] of Object.entries(d.shots)) {
       if (k === 'front' || k === 'model' || !s.url) continue;
       try {
         const im = await loadImg(s.url), c = document.createElement('canvas'); c.width = c.height = 40; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 40, 40);
-        const px = x.getImageData(0, 0, 40, 40).data, at = (i, j) => { const p = (j * 40 + i) * 4; return (px[p] + px[p + 1] + px[p + 2]) / 3; };
-        if ([at(1, 1), at(38, 1), at(1, 38), at(20, 1)].every(v => v < 60)) { d.shots.olcu = s; delete d.shots[k]; if (D === d) { S.keepScroll = true; render(); } return; }
+        const px = x.getImageData(0, 0, 40, 40).data, rgb = (i, j) => { const p = (j * 40 + i) * 4; return [px[p], px[p + 1], px[p + 2]]; }, at = (i, j) => rgb(i, j).reduce((a, b) => a + b) / 3;
+        const gray = (i, j) => rgb(i, j).every(v => Math.abs(v - SIZE_GRAY) < 16);
+        if ([at(1, 1), at(38, 1), at(1, 38), at(20, 1)].every(v => v < 60) || [gray(1, 1), gray(38, 1), gray(1, 38)].every(Boolean)) { d.shots.olcu = s; delete d.shots[k]; if (D === d) { S.keepScroll = true; render(); } return; }
       } catch {}
     }
   }
@@ -432,16 +434,16 @@
     const L = await bagBox(du); if (!L) throw new Error('Çanta ön fotoğrafta ayırt edilemedi.');
     const N = 1200, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
     const s = Math.min(N * 0.58 / L.bw, N * 0.6 / L.bh), w = L.bw * s, h = L.bh * s, bx = (N - w) / 2 - 40, by = (N - h) / 2 - 50;
-    // Koyu zemin: çantanın arkasında hafif ışık, altında yumuşak gölge (koyu çanta zeminde kaybolmasın)
-    const bg = x.createRadialGradient(bx + w / 2, by + h / 2, 40, bx + w / 2, by + h / 2, N * 0.75); bg.addColorStop(0, '#4a4540'); bg.addColorStop(1, '#121110');
+    // Gri zemin: çantanın arkasında hafif ışık, altında yumuşak gölge. Köşeler düz SIZE_GRAY olur (placeSizeShot buna bakar)
+    const bg = x.createRadialGradient(bx + w / 2, by + h / 2, 40, bx + w / 2, by + h / 2, N * 0.75); bg.addColorStop(0, '#a6a6a6'); bg.addColorStop(0.85, `rgb(${SIZE_GRAY},${SIZE_GRAY},${SIZE_GRAY})`);
     x.fillStyle = bg; x.fillRect(0, 0, N, N);
-    x.save(); x.filter = 'blur(18px)'; x.fillStyle = 'rgba(0,0,0,.55)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 8, w * 0.42, 16, 0, 0, Math.PI * 2); x.fill(); x.restore();
+    x.save(); x.filter = 'blur(18px)'; x.fillStyle = 'rgba(0,0,0,.4)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 8, w * 0.42, 16, 0, 0, Math.PI * 2); x.fill(); x.restore();
     x.drawImage(cutBag(L, w, h, 185), bx, by);
     const ink = '#fff', fmt = v => String(+v).replace('.', ',') + ' cm';
-    x.strokeStyle = ink; x.fillStyle = ink; x.lineWidth = 3; x.lineCap = 'round';
+    x.strokeStyle = ink; x.fillStyle = ink; x.lineWidth = 4; x.lineCap = 'round';
     const head = (px, py, ang) => { x.beginPath(); x.moveTo(px, py); x.lineTo(px - 18 * Math.cos(ang - 0.45), py - 18 * Math.sin(ang - 0.45)); x.lineTo(px - 18 * Math.cos(ang + 0.45), py - 18 * Math.sin(ang + 0.45)); x.closePath(); x.fill(); };
     const arrow = (x0, y0, x1, y1) => { const a = Math.atan2(y1 - y0, x1 - x0); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); head(x1, y1, a); head(x0, y0, a + Math.PI); };
-    const tick = (x0, y0, x1, y1) => { x.save(); x.lineWidth = 1.5; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
+    const tick = (x0, y0, x1, y1) => { x.save(); x.lineWidth = 2; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
     const label = (t, px, py, align = 'center', rot = 0) => { x.save(); x.translate(px, py); x.rotate(rot); x.font = '600 34px "Lora", Georgia, serif'; x.textAlign = align; x.textBaseline = 'middle';
       const m = x.measureText(t).width, ox = align === 'center' ? -m / 2 : align === 'right' ? -m : 0;
       x.fillStyle = '#1b1916'; x.beginPath(); x.roundRect(ox - 16, -26, m + 32, 52, 26); x.fill(); x.fillStyle = ink; x.fillText(t, 0, 0); x.restore(); };
