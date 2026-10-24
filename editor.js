@@ -94,7 +94,8 @@
           ${fld('Ürün kodu', `<div class="inline">${inp('code', D.isNew ? '' : 'readonly')}${D.isNew ? '<button class="btn sm" data-act="edCode">Yenile</button>' : ''}</div>`)}
           ${fld('Barkod', inp('barcode', 'placeholder="Varsa üretici barkodu"'))}
           ${fld('Kısa açıklama', inp('shortDescription', 'placeholder="Listelerde görünen tek cümle"'), 'full')}
-          <div class="f full"><span>Ürün açıklaması</span><textarea data-k="longDescription" rows="5" placeholder="Malzeme, bölmeler, askı, kullanım…">${esc(D.longDescription)}</textarea><button class="btn sm" data-act="edDesc" style="justify-self:start">Bilgilerden açıklama yaz</button></div>
+          <div class="f full"><span>Ürün açıklaması</span><textarea data-k="longDescription" rows="5" placeholder="Malzeme, bölmeler, askı, kullanım…">${esc(D.longDescription)}</textarea><button class="btn sm" data-act="edDesc" style="justify-self:start">Bilgilerden açıklama yaz</button>
+            ${/<\w/.test(D.longDescription) ? `<div class="desc-pv"><span class="desc-pv-h">Sitede böyle görünür</span>${safeHtml(D.longDescription)}</div>` : ''}</div>
           ${fld('Malzeme', inp('material', 'placeholder="ör. Suni deri"'))}
           <label class="toggle full"><input type="checkbox" data-k="active" ${D.active ? 'checked' : ''}> Sitede yayında</label>
         </div></div></section>
@@ -385,13 +386,57 @@
     Object.keys(p).forEach(k => p[k] === undefined && delete p[k]);
     return p;
   }
+  // Ürün türü: ad ve kategoriden; bulunamazsa taşıma şeklinden. [ad, giriş cümlesi, kullanım yeri]
+  const KINDS = [
+    [/valiz/, ['valiz', 'seyahatlerinizde düzeni ve dayanıklılığı bir arada sunan', 'kısa kaçamaklardan uzun yolculuklara kadar']],
+    [/kalemlik/, ['kalemlik', 'ders ve masa başında düzeni kolaylaştıran', 'okulda ve evde']],
+    [/beslenme/, ['beslenme çantası', 'pratik yapısıyla öğünleri yanınızda taşıtan', 'okulda ve gezilerde']],
+    [/cüzdan/, ['cüzdan', 'düzenli bölmeleri ve derli toplu yapısıyla öne çıkan', 'cebinizde ya da çantanızda']],
+    [/makyaj/, ['makyaj çantası', 'kozmetik ürünlerinizi düzenli tutan', 'evde ve seyahatte']],
+    [/evrak|laptop/, ['evrak çantası', 'belgelerinizi ve eşyalarınızı derli toplu taşıyan', 'iş toplantılarında ve ofis temposunda']],
+    [/spor/, ['spor çantası', 'antrenmandan hafta sonu kaçamaklarına eşlik eden', 'spor salonunda ve seyahatte']],
+    [/sırt|dağcı|anaokul/, ['sırt çantası', 'gün boyu konforu ve kullanışlı iç hacmi bir araya getiren', 'okulda, işte ve seyahatte']],
+    [/göğüs|bel çanta|çapraz/, ['çapraz çanta', 'elleri serbest bırakan, vücuda oturan', 'şehirde, seyahatte ve günlük koşturmada']],
+    [/portföy|el çanta|clutch/, ['el çantası', 'zarif hatlarıyla kombinlerinizi tamamlayan', 'gün içinde ve özel davetlerde']]
+  ];
+  const CARRY_KIND = { capraz: ['çapraz çanta', 'elleri serbest bırakan, vücuda oturan', 'şehirde, seyahatte ve günlük koşturmada'], omuz: ['omuz çantası', 'şık duruşu ve rahat kullanımıyla öne çıkan', 'işte, okulda ve gün içinde'], el: ['el çantası', 'zarif hatlarıyla kombinlerinizi tamamlayan', 'gün içinde ve özel davetlerde'], sirt: ['sırt çantası', 'gün boyu konforu ve kullanışlı iç hacmi bir araya getiren', 'okulda, işte ve seyahatte'] };
+  const CARRY_LABEL = { capraz: 'Çapraz ya da göğüs çantası olarak taşınır', omuz: 'Omuzda taşınır', el: 'Elde taşınır', sirt: 'Sırtta taşınır' };
+  function productKind() {
+    const t = `${D.name} ${D.categoryName}`.toLocaleLowerCase('tr');
+    return (KINDS.find(([re]) => re.test(t)) || [0, D.carry && CARRY_KIND[D.carry]])[1] || ['çanta', 'şık tasarımı ve kullanışlı yapısıyla öne çıkan', 'günlük hayatta'];
+  }
+  function careText() {
+    const m = (D.material || '').toLocaleLowerCase('tr');
+    if (/suni|vegan|pu\b|sentetik/.test(m)) return 'Hafif nemli, yumuşak bir bezle silerek temizleyin; aşındırıcı temizleyici ve sert fırça kullanmayın. Uzun süre doğrudan güneş ve ısı kaynağı karşısında bırakmayın.';
+    if (/deri/.test(m)) return 'Nemli, yumuşak bir bezle silin ve kendi kendine kurumaya bırakın. Doğrudan güneş ve ısı kaynaklarından uzak tutun; dönem dönem deri bakım kremiyle beslemek ömrünü uzatır.';
+    if (/kumaş|polyester|naylon|kanvas|keten|denim/.test(m)) return 'Lekeleri hafif sabunlu suyla, yumuşak bir bezle silerek temizleyin. Makinede yıkamayın, ütülemeyin; gölgede kurutun.';
+    return 'Yumuşak, hafif nemli bir bezle silerek temizleyin. Kullanmadığınız zamanlarda içini doldurup kuru ve serin bir yerde saklamak formunu korur.';
+  }
+  const sizeLine = () => [D.w, D.h, D.d].some(v => +v > 0) ? `${[D.w, D.h, D.d].map(v => +v > 0 ? String(+v).replace('.', ',') : '–').join(' × ')} cm` : '';
+  // Verilen bilgilerden Qukasoft'a HTML açıklama: giriş, öne çıkanlar, ürün bilgileri, bakım. Yalnızca girilen bilgiler yazılır.
   function autoDesc() {
-    const parts = [];
-    if (D.name) parts.push(`${D.name}${D.brand ? ', ' + D.brand + ' kalitesiyle' : ''} günlük kullanım için tasarlandı.`);
-    if (D.material) parts.push(`Malzeme: ${D.material}.`);
-    if (hasSize()) parts.push(`Ölçüler: ${[D.w && 'En ' + D.w + ' cm', D.h && 'Yükseklik ' + D.h + ' cm', D.d && 'Derinlik ' + D.d + ' cm'].filter(Boolean).join(' · ')}.`);
-    if (D.variants.length) parts.push(`Renk seçenekleri: ${D.variants.map(v => v.v.toLocaleLowerCase('tr')).join(', ')}.`);
-    return parts.join(' ');
+    const [noun, intro, use] = productKind(), e = s => esc(String(s || '').trim()), lc = s => String(s).toLocaleLowerCase('tr');
+    const title = [D.brand, D.name].filter(Boolean).map(e).join(' '), colors = D.variants.map(v => lc(v.v)), size = sizeLine();
+    const mat = D.material ? `${e(D.material.charAt(0).toLocaleUpperCase('tr') + D.material.slice(1))} gövdesi zamansız bir görünümü günlük kullanıma taşır.` : '';
+    const p1 = `<p><strong>${title || 'Bu ürün'}</strong>, ${intro} bir ${noun}. ${mat}${D.waterproof ? ' Su geçirmez yapısı sayesinde yağmurlu havalarda da eşyalarınızı korur.' : ''}</p>`;
+    const p2 = `<p>${use.charAt(0).toLocaleUpperCase('tr') + use.slice(1)} rahatlıkla kullanabileceğiniz bu ${noun}${size ? `, ${size} ölçüleriyle ihtiyacınız olanı yanınızda taşımanız için tasarlandı` : ' ihtiyacınız olanı yanınızda taşımanız için tasarlandı'}.${colors.length > 1 ? ` ${colors.length} farklı renk seçeneğiyle tarzınıza en uygun olanı seçebilirsiniz.` : ''}</p>`;
+    const feats = [D.material && `${e(D.material)} malzeme`, D.waterproof && 'Su geçirmez yapı', D.carry && CARRY_LABEL[D.carry], size && `Ölçüler: ${size} (en × yükseklik × derinlik)`, colors.length && `Renk seçenekleri: ${colors.map(e).join(', ')}`].filter(Boolean);
+    const info = [['Marka', D.brand], ['Ürün kodu', D.code], ['Kategori', D.categoryName], ['Malzeme', D.material], ['Ölçüler', size], ['Renk', colors.join(', ')], ['Su geçirmez', D.waterproof ? 'Evet' : '']].filter(([, v]) => String(v || '').trim());
+    return [p1, p2,
+      feats.length ? `<h3>Öne çıkan özellikler</h3><ul>${feats.map(f => `<li>${f}</li>`).join('')}</ul>` : '',
+      `<h3>Ürün bilgileri</h3><ul>${info.map(([k, v]) => `<li><strong>${k}:</strong> ${e(v)}</li>`).join('')}</ul>`,
+      `<h3>Bakım önerisi</h3><p>${careText()}</p>`].filter(Boolean).join('\n');
+  }
+  function autoShort() {
+    const [noun] = productKind(), size = sizeLine();
+    return [[D.brand, D.name].filter(Boolean).join(' '), [D.material, noun].filter(Boolean).join(' '), size, D.waterproof && 'su geçirmez'].filter(Boolean).join(' · ');
+  }
+  // Açıklama önizlemesi: yalnızca bilinen biçim etiketleri, nitelikler atılır (elle yazılan HTML de güvenle gösterilir)
+  function safeHtml(html) {
+    const ok = new Set(['P', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'H3', 'H4', 'BR']);
+    const doc = new DOMParser().parseFromString(`<div>${html || ''}</div>`, 'text/html');
+    const walk = n => [...n.childNodes].map(c => c.nodeType === 3 ? esc(c.textContent) : c.nodeType === 1 ? (ok.has(c.tagName) ? `<${c.tagName.toLowerCase()}>${walk(c)}${c.tagName === 'BR' ? '' : `</${c.tagName.toLowerCase()}>`}` : walk(c)) : '').join('');
+    return walk(doc.body.firstChild);
   }
   async function send(btn) {
     const msg = $('#ed-msg'); const say = (t, ok) => { msg.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${esc(t)}</div>`; };
@@ -444,7 +489,7 @@
     if (!act.startsWith('ed')) return prevAct?.(act, el, e);
     if (act === 'edCalc') { if (!(+D.buyPrice > 0)) return toast('Önce alış fiyatını gir'); const r = prices(D.buyPrice); Object.assign(D, { listPrice: r.market, salePrice: r.retail, fastSalePrice: r.quick, dealerPrice1: r.d1, dealerPrice2: r.d2, dealerPrice3: r.d3 }); S.keepScroll = true; render(); }
     else if (act === 'edCode') { D.code = hex12('CLK-'); S.keepScroll = true; render(); }
-    else if (act === 'edDesc') { D.longDescription = autoDesc(); S.keepScroll = true; render(); }
+    else if (act === 'edDesc') { D.longDescription = autoDesc(); if (!D.shortDescription.trim()) D.shortDescription = autoShort(); S.keepScroll = true; render(); }
     else if (act === 'edVdel') { D.variants.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : square(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }

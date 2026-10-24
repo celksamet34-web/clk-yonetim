@@ -216,6 +216,10 @@ table.tbl{width:100%;border-collapse:collapse;min-width:760px}
 .shot label{position:absolute;inset:0;cursor:pointer}
 .shot.has label{display:none}
 .toggle{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.desc-pv{border:1px solid var(--line-2);border-radius:14px;padding:16px 18px;background:#fff;font-size:14px;line-height:1.6;color:var(--ink)}
+.desc-pv-h{display:block;font:700 11px var(--f-b);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.desc-pv h3{font:600 17px "Playfair Display",Georgia,serif;margin:14px 0 6px}
+.desc-pv p{margin:0 0 8px}.desc-pv ul{margin:0;padding-left:18px}.desc-pv li{margin:2px 0}
 .toggle input{width:20px;height:20px;accent-color:var(--ink)}
 
 .swatches{display:flex;flex-wrap:wrap;gap:8px}
