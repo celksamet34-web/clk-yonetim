@@ -447,30 +447,67 @@
     } catch (e) { delete D.shots.model; toast('Manken görseli üretilemedi: ' + e.message); }
     render();
   }
-  // Ölçü görseli: ön fotoğraftaki çantanın çevresine En, Yükseklik ve Derinlik okları ile santimetreleri çizer (yapay zekâ yok)
+  // Ölçü görseli: ön fotoğraftaki çantanın çevresine En, Yükseklik ve Derinlik ölçü çizgileri ile santimetreleri çizer (yapay zekâ yok).
+  // Katalog düzeni: sol üstte başlık ve ürün adı, ortada çanta, ince çizgiler ve çentikler, altın küçük başlıklı değerler, altta özet.
   async function sizeImage(du) {
     const L = await bagBox(du); if (!L) throw new Error('Çanta ön fotoğrafta ayırt edilemedi.');
+    await Promise.all(['600 40px "Playfair Display"', '600 20px "Lora"'].map(f => document.fonts.load(f).catch(() => {})));
     const c = document.createElement('canvas'); c.width = PW; c.height = PH; const x = c.getContext('2d');
-    const s = Math.min(PW * 0.58 / L.bw, PH * 0.5 / L.bh), w = L.bw * s, h = L.bh * s, bx = (PW - w) / 2 - 40, by = (PH - h) / 2 - 50;
-    // Gri zemin: çantanın arkasında hafif ışık, altında yumuşak gölge. Köşeler düz SIZE_GRAY olur (placeSizeShot buna bakar):
-    // ışığın merkezi hep (560, 750), en yakın köşe ~936 px; düz renk 864 px'te başlar
-    const bg = x.createRadialGradient(bx + w / 2, by + h / 2, 40, bx + w / 2, by + h / 2, PH * 0.75); bg.addColorStop(0, '#a6a6a6'); bg.addColorStop(0.72, `rgb(${SIZE_GRAY},${SIZE_GRAY},${SIZE_GRAY})`);
+    const s = Math.min(PW * 0.56 / L.bw, PH * 0.44 / L.bh), w = L.bw * s, h = L.bh * s, bx = (PW - w) / 2, by = 780 - h / 2;
+    // Gri zemin: çantanın arkasında stüdyo ışığı. Köşeler düz SIZE_GRAY olur (placeSizeShot buna bakar):
+    // ışığın merkezi hep (600, 780), en yakın köşe ~984 px; düz renk 864 px'te başlar. Köşelerin 80 px içine yazı konmaz.
+    const bg = x.createRadialGradient(PW / 2, 780, 40, PW / 2, 780, PH * 0.75); bg.addColorStop(0, '#adadad'); bg.addColorStop(0.4, '#979797'); bg.addColorStop(0.72, `rgb(${SIZE_GRAY},${SIZE_GRAY},${SIZE_GRAY})`);
     x.fillStyle = bg; x.fillRect(0, 0, PW, PH);
-    x.save(); x.filter = 'blur(18px)'; x.fillStyle = 'rgba(0,0,0,.4)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 8, w * 0.42, 16, 0, 0, Math.PI * 2); x.fill(); x.restore();
+    // Yer gölgesi: geniş yumuşak hale ve çantanın hemen altında koyu temas gölgesi
+    x.save(); x.filter = 'blur(28px)'; x.fillStyle = 'rgba(0,0,0,.28)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 14, w * 0.55, 34, 0, 0, Math.PI * 2); x.fill(); x.restore();
+    x.save(); x.filter = 'blur(10px)'; x.fillStyle = 'rgba(0,0,0,.45)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 4, w * 0.4, 10, 0, 0, Math.PI * 2); x.fill(); x.restore();
     x.drawImage(cutBag(L, w, h, 185), bx, by);
-    const ink = '#fff', fmt = v => String(+v).replace('.', ',') + ' cm';
-    x.strokeStyle = ink; x.fillStyle = ink; x.lineWidth = 4; x.lineCap = 'round';
-    const head = (px, py, ang) => { x.beginPath(); x.moveTo(px, py); x.lineTo(px - 18 * Math.cos(ang - 0.45), py - 18 * Math.sin(ang - 0.45)); x.lineTo(px - 18 * Math.cos(ang + 0.45), py - 18 * Math.sin(ang + 0.45)); x.closePath(); x.fill(); };
-    const arrow = (x0, y0, x1, y1) => { const a = Math.atan2(y1 - y0, x1 - x0); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); head(x1, y1, a); head(x0, y0, a + Math.PI); };
-    const tick = (x0, y0, x1, y1) => { x.save(); x.lineWidth = 2; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
-    const label = (t, px, py, align = 'center', rot = 0) => { x.save(); x.font = '600 34px "Lora", Georgia, serif'; x.textAlign = align; x.textBaseline = 'middle';
-      const m = x.measureText(t).width, ox = align === 'center' ? -m / 2 : align === 'right' ? -m : 0;
-      if (!rot) px = Math.min(Math.max(px, 40 - ox), PW - 40 - ox - m); // geniş çantada yazı (ör. Derinlik) tuvalden taşmasın
-      x.translate(px, py); x.rotate(rot);
-      x.fillStyle = '#1b1916'; x.beginPath(); x.roundRect(ox - 16, -26, m + 32, 52, 26); x.fill(); x.fillStyle = ink; x.fillText(t, 0, 0); x.restore(); };
-    if (+D.w > 0) { const y = by + h + 70; tick(bx, by + h + 10, bx, y + 16); tick(bx + w, by + h + 10, bx + w, y + 16); arrow(bx, y, bx + w, y); label('En ' + fmt(D.w), bx + w / 2, y); }
-    if (+D.h > 0) { const X = bx - 70; tick(bx - 10, by, X - 16, by); tick(bx - 10, by + h, X - 16, by + h); arrow(X, by, X, by + h); label('Yükseklik ' + fmt(D.h), X, by + h / 2, 'center', -Math.PI / 2); }
-    if (+D.d > 0) { const x0 = bx + w + 30, y0 = by + h - 10, len = Math.min(220, 60 + +D.d * 10); arrow(x0, y0, x0 + len * 0.7, y0 - len * 0.7); label('Derinlik ' + fmt(D.d), x0 + len * 0.7 + 14, y0 - len * 0.7 - 34, 'left'); }
+    const gold = '#e3c78f', line = 'rgba(255,255,255,.92)', fmt = v => String(+v).replace('.', ',') + ' cm';
+    const text = (t, px, py, font, color, spacing = '0px', align = 'center') => { x.save(); x.font = font; x.letterSpacing = spacing; x.textAlign = align; x.textBaseline = 'middle'; x.fillStyle = color; x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 8; x.shadowOffsetY = 2; x.fillText(t, px, py); x.restore(); };
+    const seg = (x0, y0, x1, y1, dash) => { x.save(); x.strokeStyle = dash ? 'rgba(255,255,255,.5)' : line; x.lineWidth = dash ? 1.5 : 2.5; x.lineCap = 'round'; if (dash) x.setLineDash([4, 7]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
+    // Ölçü çizgisi: iki ucunda dik çentik, ortasında yazıya boşluk (gap px)
+    const dim = (x0, y0, x1, y1, gap = 0) => {
+      const a = Math.atan2(y1 - y0, x1 - x0), len = Math.hypot(x1 - x0, y1 - y0), ux = Math.cos(a), uy = Math.sin(a), nx = -uy * 14, ny = ux * 14;
+      const g = Math.min(gap, len - 40) / 2, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      if (g > 0) { seg(x0, y0, mx - ux * g, my - uy * g); seg(mx + ux * g, my + uy * g, x1, y1); } else seg(x0, y0, x1, y1);
+      seg(x0 - nx, y0 - ny, x0 + nx, y0 + ny); seg(x1 - nx, y1 - ny, x1 + nx, y1 + ny);
+    };
+    // Değer bloğu: altın küçük başlık ve altında büyük serif değer; genişliğini döndürür
+    const VAL = '600 40px "Playfair Display", Georgia, serif', CAP = '600 20px "Lora", Georgia, serif';
+    const blockW = (cap, val) => { x.save(); x.font = VAL; const a = x.measureText(val).width; x.font = CAP; x.letterSpacing = '5px'; const b = x.measureText(cap).width; x.restore(); return Math.max(a, b); };
+    const block = (cap, val, px, py, align = 'center') => { text(cap, px, py - 24, CAP, gold, '5px', align); text(val, px, py + 12, VAL, '#fff', '0px', align); };
+    if (+D.w > 0) {
+      const y = by + h + 92, v = fmt(D.w), bw = blockW('EN', v);
+      seg(bx, by + h + 22, bx, y + 22, true); seg(bx + w, by + h + 22, bx + w, y + 22, true);
+      dim(bx, y, bx + w, y, bw + 48); block('EN', v, bx + w / 2, y - 6);
+    }
+    if (+D.h > 0) {
+      const X = bx - 86, v = fmt(D.h), bw = blockW('YÜKSEKLİK', v);
+      seg(bx - 22, by, X - 22, by, true); seg(bx - 22, by + h, X - 22, by + h, true);
+      dim(X, by, X, by + h, bw + 48);
+      x.save(); x.translate(X, by + h / 2); x.rotate(-Math.PI / 2); block('YÜKSEKLİK', v, 0, -6); x.restore();
+    }
+    if (+D.d > 0) {
+      const x0 = bx + w + 34, y0 = by + h - 14, len = Math.min(200, 60 + +D.d * 9), x1 = x0 + len * 0.7, y1 = y0 - len * 0.7, v = fmt(D.d);
+      dim(x0, y0, x1, y1);
+      const bw = blockW('DERİNLİK', v), px = Math.min(x1 + 18, PW - 80 - bw); // sağ kenardan taşmasın
+      block('DERİNLİK', v, px, y1 - 52, 'left');
+    }
+    // Başlık: altın küçük yazı, ince altın çizgi, ürün adı (rozetle çakışmasın diye genişlik sınırlı)
+    text('ÜRÜN ÖLÇÜLERİ', 88, 118, '600 20px "Lora", Georgia, serif', gold, '7px', 'left');
+    x.save(); x.strokeStyle = gold; x.globalAlpha = 0.8; x.lineWidth = 1.5; x.beginPath(); x.moveTo(88, 146); x.lineTo(168, 146); x.stroke(); x.restore();
+    if (D.name) {
+      x.save(); x.font = '600 44px "Playfair Display", Georgia, serif'; let n = D.name.trim(); const max = D.waterproof ? PW - 88 - 330 : PW - 176;
+      if (x.measureText(n).width > max) { while (n.length > 1 && x.measureText(n + '…').width > max) n = n.slice(0, -1); n = n.trimEnd() + '…'; }
+      x.restore(); text(n, 88, 192, '600 44px "Playfair Display", Georgia, serif', '#fff', '0px', 'left');
+    }
+    // Özet: En × Yükseklik × Derinlik
+    const parts = [[D.w, 'EN'], [D.h, 'YÜKSEKLİK'], [D.d, 'DERİNLİK']].filter(([v]) => +v > 0);
+    if (parts.length) {
+      x.save(); x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1; x.beginPath(); x.moveTo(PW / 2 - 220, PH - 228); x.lineTo(PW / 2 + 220, PH - 228); x.stroke(); x.restore();
+      text(parts.map(([v]) => String(+v).replace('.', ',')).join(' × ') + ' cm', PW / 2, PH - 170, '600 54px "Playfair Display", Georgia, serif', '#fff');
+      text(parts.map(([, k]) => k).join('  ×  '), PW / 2, PH - 118, '600 18px "Lora", Georgia, serif', gold, '5px');
+    }
     if (D.waterproof) waterBadge(x, PW - 165, 165, 115);
     if (D.auto.mark) { x.save(); x.globalAlpha = 0.22; x.fillStyle = '#fff'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); }
     return c.toDataURL('image/jpeg', 0.92);

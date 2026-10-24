@@ -29,7 +29,7 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Fotoğraf kutuları (`SLOTS`): Ön, Manken, Arka, Yan, Detay, İç, Ek, Ölçü. Qukasoft yalnızca görsel sırasını tutar; ürün açılınca görseller sırayla kutulara dağılır, köşeleri düz gri (ya da eski görsellerde koyu) olan görsel Ölçü kutusuna taşınır.
 - Dekupe: Photoroom (ürün piksellerine dokunmaz).
 - Manken: kullanıcı beğendiği yöntemi seçti — Seedream'e ürün fotoğrafı + ölçek rehberi (çanta 0.6 oranında küçültülmüş, baştan uyluk ortasına kadraj) birlikte gider; çerçeve oluşursa panel kırpar. "Elde (yakın çekim)" seçilince manken yerine el çekimi, ölçek el boyuna göre. Çok adımlı ölçülü yöntem denendi ve kaldırıldı. "Sırt" seçilince manken arkadan çekilir (logo kameraya bakar; önden istemde çanta göğse geliyordu), rehberde çanta daha yukarıda (0.45).
-- Ölçü görseli: kodla çizilir (gri zemin, köşeler düz `SIZE_GRAY` = 122; beyaz oklar ve yazılar), "Su geçirmez" seçiliyse rozet; yapay zekâ ve kredi yok.
+- Ölçü görseli: kodla çizilir, katalog düzeni: sol üstte altın "ÜRÜN ÖLÇÜLERİ" ve ürün adı, ince beyaz ölçü çizgileri ve uç çentikleri, altın küçük başlıklı serif değerler, altta "En × Yükseklik × Derinlik" özeti (gri zemin, köşeler düz `SIZE_GRAY` = 122, köşelerin 80 px içine yazı konmaz), "Su geçirmez" seçiliyse rozet; yapay zekâ ve kredi yok.
 - Açıklama: "Yapay zekâ ile yaz" (yalnızca verilen bilgiler, övgü sıfatı yok) ya da "Şablonla yaz"; Qukasoft'a HTML (p, h3, ul, li, strong) gider, panelde güvenli önizleme var.
 
 ## Qukasoft API notları (web servis dokümanı v2.3.1)
