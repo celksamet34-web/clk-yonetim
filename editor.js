@@ -232,6 +232,7 @@
     if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
+    if (j.geminiError) toast('Gemini üretemedi, OpenAI ile üretildi: ' + j.geminiError);
     return ref ? pasteBag(j.image, ref).catch(() => j.image) : j.image;
   }
   async function aiImage(du, action) {
