@@ -168,7 +168,9 @@
     mx.putImageData(md, 0, 0);
     const soft = document.createElement('canvas'); soft.width = r.w; soft.height = r.h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(m, 0, 0);
     bx.globalCompositeOperation = 'destination-in'; bx.drawImage(soft, 0, 0);
-    return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag };
+    // Görsel servisine maske: şeffaf alan çizilir, çantanın olduğu opak alan korunur
+    const mk = document.createElement('canvas'); mk.width = mk.height = N; mk.getContext('2d').drawImage(m, r.x, r.y);
+    return { du: o.toDataURL('image/jpeg', 0.92), mask: mk.toDataURL('image/png'), rect: r, bag };
   }
   // Üretilen görselde çantayı bul (model biraz kaydırmış/ölçeklemiş olabilir) ve orijinal çanta piksellerini üstüne koy.
   // Böylece logo ve detaylar ön fotoğrafla birebir aynı kalır. Çanta bulunamazsa üretilen görsel olduğu gibi kalır.
@@ -201,7 +203,7 @@
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
-    const body = { action: 'model', image: ref ? ref.du : du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
+    const body = { action: 'model', image: ref ? ref.du : du, mask: ref?.mask, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
     const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const j = await r.json().catch(() => ({}));
