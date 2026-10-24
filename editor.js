@@ -3,7 +3,7 @@
   const { S, $, $$, esc, tl, num, P, RULES, prices, hex12, call, loadCategories, head, views, go, render, sb, toast } = CLK;
   const BUCKET = 'product-images';
   const COLORS = [['SİYAH','#151515'],['LACİVERT','#1f2a44'],['GRİ','#8b9097'],['FÜME','#4a4d52'],['BEJ','#d9c6a8'],['KAHVE','#5b3f2a'],['TABA','#a2642f'],['KIRMIZI','#b2271f'],['BORDO','#6c1b2a'],['PEMBE','#e8a3b6'],['PUDRA','#e9c9c0'],['MOR','#6a4c93'],['MAVİ','#2f6db5'],['YEŞİL','#2e7d4f'],['HAKİ','#6b6b3a'],['TURUNCU','#e07a1f'],['SARI','#e9c440'],['BEYAZ','#f6f6f4'],['KREM','#efe6d2']];
-  const SLOTS = [['front','Ön','Tam karşıdan, çanta ortada'],['model','Manken','Ön çekimden otomatik üretilir'],['back','Arka','Arka yüz ve askılar'],['side','Yan','Derinliği gösteren açı'],['detail','Detay','Logo, fermuar, dikiş'],['inside','İç','Bölmeler açık'],['extra','Ek','İsteğe bağlı']];
+  const SLOTS = [['front','Ön','Tam karşıdan, çanta ortada'],['model','Manken','Ön çekimden otomatik üretilir'],['back','Arka','Arka yüz ve askılar'],['side','Yan','Derinliği gösteren açı'],['detail','Detay','Logo, fermuar, dikiş'],['inside','İç','Bölmeler açık'],['extra','Ek','İsteğe bağlı'],['olcu','Ölçü','Ön fotoğraftan ölçülerle çizilir']];
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
   const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
   const HEIGHTS = { kadin: 170, erkek: 182, 'kiz-cocuk': 135, 'erkek-cocuk': 138 }; // sunucudaki manken boylarıyla aynı
@@ -110,20 +110,20 @@
     </div>
     <aside class="summary"><div class="sum-card"><div class="cover" ${cover ? 'data-act="edGallery" data-i="0" style="cursor:zoom-in"' : ''}>${cover ? `<img src="${esc(cover)}" alt="">` : 'CLK'}</div>${galleryList().length ? `<button class="btn gold" data-act="edGallery" data-i="0">Görselleri aç (${galleryList().length})</button>` : ''}
       <h3>${esc(D.name || 'Adsız ürün')}</h3>
-      <dl><dt>Satış</dt><dd>${D.salePrice ? tl(D.salePrice) : '—'}</dd><dt>Bayi 1</dt><dd>${D.dealerPrice1 ? tl(D.dealerPrice1) : '—'}</dd><dt>Stok</dt><dd>${num(totalQ)} adet</dd><dt>Renk</dt><dd>${D.variants.length || '—'}</dd><dt>Fotoğraf</dt><dd>${Object.keys(D.shots).length}/7</dd></dl>
+      <dl><dt>Satış</dt><dd>${D.salePrice ? tl(D.salePrice) : '—'}</dd><dt>Bayi 1</dt><dd>${D.dealerPrice1 ? tl(D.dealerPrice1) : '—'}</dd><dt>Stok</dt><dd>${num(totalQ)} adet</dd><dt>Renk</dt><dd>${D.variants.length || '—'}</dd><dt>Fotoğraf</dt><dd>${Object.keys(D.shots).length}/${SLOTS.length}</dd></dl>
       <ul class="checklist">${ck.map(([l, ok]) => `<li class="${ok ? 'ok' : ''}">${l}</li>`).join('')}</ul>
       <div id="ed-msg"></div><div class="sum-acts">${actions}</div></div></aside></div>
     <div class="ed-bar">${actions}</div>`;
   };
   function shot(k, t, h) {
     const s = D.shots[k], src = s?.preview || s?.url;
-    const isModel = k === 'model';
-    if (isModel && !src && !hasSize()) h = 'Önce ürün ölçülerini gir';
+    const isModel = k === 'model', isSize = k === 'olcu', auto = isModel || isSize, act = isModel ? 'edModel' : 'edSize';
+    if (auto && !src && !hasSize()) h = 'Önce ürün ölçülerini gir';
     return `<div class="shot ${src ? 'has' : ''}"><span class="lb ${isModel ? 'auto' : ''}">${t}</span>
       ${src ? `<img src="${esc(src)}" alt="${t}">` : `<div class="empty-s">${CLK.ICONS.cam}<b>${t}</b><span>${h}</span></div>`}
       ${s?.busy ? `<div class="busy">${esc(s.busy)}</div>` : ''}
-      ${src ? `<div class="ops">${isModel ? `<button data-act="edModel">Yeniden</button>` : `<button data-act="edCut" data-k="${k}">Dekupe</button>`}<button class="x" data-act="edShotDel" data-k="${k}">Sil</button></div>` :
-        isModel ? `<div class="ops"><button data-act="edModel" ${D.shots.front ? '' : 'disabled'}>Manken üret</button></div>` : `<label><input type="file" accept="image/*" capture="environment" data-shot="${k}" hidden></label>`}</div>`;
+      ${src ? `<div class="ops">${auto ? `<button data-act="${act}">Yeniden</button>` : `<button data-act="edCut" data-k="${k}">Dekupe</button>`}<button class="x" data-act="edShotDel" data-k="${k}">Sil</button></div>` :
+        auto ? `<div class="ops"><button data-act="${act}" ${D.shots.front && (isModel || hasSize()) ? '' : 'disabled'}>${isModel ? 'Manken üret' : 'Ölçü çiz'}</button></div>` : `<label><input type="file" accept="image/*" capture="environment" data-shot="${k}" hidden></label>`}</div>`;
   }
 
   /* ---------- görsel hazırlama ---------- */
@@ -294,6 +294,7 @@
       const final = await square(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
       if (k === 'front' && !D.shots.model && hasSize()) makeModel();
+      if (k === 'front' && !D.shots.olcu && hasSize()) makeSize();
     } catch (e) { s.busy = ''; toast(e.message); }
     render();
   }
@@ -305,6 +306,34 @@
       const img = await aiImage(base, 'model');
       s.preview = await square(img, D.auto.mark); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
     } catch (e) { delete D.shots.model; toast('Manken görseli üretilemedi: ' + e.message); }
+    render();
+  }
+  // Ölçü görseli: ön fotoğraftaki çantanın çevresine En, Yükseklik ve Derinlik okları ile santimetreleri çizer (yapay zekâ yok)
+  async function sizeImage(du) {
+    const L = await bagBox(du); if (!L) throw new Error('Çanta ön fotoğrafta ayırt edilemedi.');
+    const N = 1200, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, N, N);
+    const s = Math.min(N * 0.58 / L.bw, N * 0.6 / L.bh), w = L.bw * s, h = L.bh * s, bx = (N - w) / 2 - 40, by = (N - h) / 2 - 50;
+    x.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, bx, by, w, h);
+    const ink = '#121110', fmt = v => String(+v).replace('.', ',') + ' cm';
+    x.strokeStyle = ink; x.fillStyle = ink; x.lineWidth = 3; x.lineCap = 'round';
+    const head = (px, py, ang) => { x.beginPath(); x.moveTo(px, py); x.lineTo(px - 18 * Math.cos(ang - 0.45), py - 18 * Math.sin(ang - 0.45)); x.lineTo(px - 18 * Math.cos(ang + 0.45), py - 18 * Math.sin(ang + 0.45)); x.closePath(); x.fill(); };
+    const arrow = (x0, y0, x1, y1) => { const a = Math.atan2(y1 - y0, x1 - x0); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); head(x1, y1, a); head(x0, y0, a + Math.PI); };
+    const tick = (x0, y0, x1, y1) => { x.save(); x.lineWidth = 1.5; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
+    const label = (t, px, py, align = 'center', rot = 0) => { x.save(); x.translate(px, py); x.rotate(rot); x.font = '600 34px "Lora", Georgia, serif'; x.textAlign = align; x.textBaseline = 'middle';
+      const m = x.measureText(t).width, ox = align === 'center' ? -m / 2 : align === 'right' ? -m : 0; x.fillStyle = '#fff'; x.fillRect(ox - 10, -24, m + 20, 48); x.fillStyle = ink; x.fillText(t, 0, 0); x.restore(); };
+    if (+D.w > 0) { const y = by + h + 70; tick(bx, by + h + 10, bx, y + 16); tick(bx + w, by + h + 10, bx + w, y + 16); arrow(bx, y, bx + w, y); label('En ' + fmt(D.w), bx + w / 2, y); }
+    if (+D.h > 0) { const X = bx - 70; tick(bx - 10, by, X - 16, by); tick(bx - 10, by + h, X - 16, by + h); arrow(X, by, X, by + h); label('Yükseklik ' + fmt(D.h), X, by + h / 2, 'center', -Math.PI / 2); }
+    if (+D.d > 0) { const x0 = bx + w + 30, y0 = by + h - 10, len = Math.min(220, 60 + +D.d * 10); arrow(x0, y0, x0 + len * 0.7, y0 - len * 0.7); label('Derinlik ' + fmt(D.d), x0 + len * 0.7 + 14, y0 - len * 0.7 - 34, 'left'); }
+    return c.toDataURL('image/jpeg', 0.92);
+  }
+  async function makeSize() {
+    const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.'); if (!hasSize()) return toast('Önce ürün ölçülerini gir.');
+    const s = (D.shots.olcu = { busy: 'Ölçü görseli çiziliyor…' }); render();
+    try {
+      const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
+      s.preview = await square(await sizeImage(base), D.auto.mark); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
+    } catch (e) { delete D.shots.olcu; toast('Ölçü görseli çizilemedi: ' + e.message); }
     render();
   }
 
@@ -388,6 +417,7 @@
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : square(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
+    else if (act === 'edSize') makeSize();
     else if (act === 'edAud') { D.audience = el.dataset.a; S.keepScroll = true; render(); }
     else if (act === 'edCarry') { D.carry = el.dataset.c; S.keepScroll = true; render(); }
     else if (act === 'edGallery') openGallery(+el.dataset.i || 0);
