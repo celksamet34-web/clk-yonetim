@@ -430,8 +430,9 @@
   // Yapay zekâ ile açıklama: yalnızca paneldeki bilgiler gider; hata olursa şablona düşer
   async function aiDesc(btn) {
     const [noun] = productKind();
-    const facts = { marka: D.brand, urunAdi: D.name, urunTuru: noun, kategori: D.categoryName, urunKodu: D.code, malzeme: D.material, olculer: sizeLine() && `${sizeLine()} (en × yükseklik × derinlik)`,
-      renkler: D.variants.map(v => v.v.toLocaleLowerCase('tr')), suGecirmez: D.waterproof ? 'evet' : '', tasima: D.carry && CARRY_LABEL[D.carry], kisaAciklama: D.shortDescription };
+    // Alan adları Türkçe gider; model "Ürün bilgileri" listesinde bunları olduğu gibi kullanıyor
+    const facts = { 'Marka': D.brand, 'Ürün adı': D.name, 'Ürün türü': noun, 'Kategori': D.categoryName, 'Ürün kodu': D.code, 'Malzeme': D.material, 'Ölçüler': sizeLine() && `${sizeLine()} (en × yükseklik × derinlik)`,
+      'Renk': D.variants.map(v => v.v.toLocaleLowerCase('tr')).join(', '), 'Su geçirmez': D.waterproof ? 'Evet' : '', 'Taşıma şekli': D.carry && CARRY_LABEL[D.carry], 'Kısa açıklama': D.shortDescription };
     btn.disabled = true; btn.textContent = 'Yazılıyor…';
     try {
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');

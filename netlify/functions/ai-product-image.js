@@ -118,13 +118,13 @@ async function photoroom(key, mime, bytes) {
 const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
 async function describe(key, facts) {
   const f = Object.fromEntries(Object.entries(facts || {}).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 300) : v]));
-  const sys = 'Sen premium bir Türk çanta markası (CLK Çanta) için e-ticaret metin yazarısın. Akıcı, zarif ve güven veren bir Türkçeyle yazarsın; abartılı reklam dili, ünlem ve emoji kullanmazsın. YALNIZCA verilen bilgileri kullanırsın: bölme sayısı, fermuar türü, garanti, iade, kargo, malzeme kalitesi derecesi gibi verilmeyen hiçbir özellik uydurmazsın. Yanıtı JSON olarak verirsin: {"long": "...", "short": "..."}.';
+  const sys = 'Sen premium bir Türk çanta markası (CLK Çanta) için e-ticaret metin yazarısın. Akıcı, zarif ve güven veren bir Türkçeyle yazarsın; abartılı reklam dili, ünlem ve emoji kullanmazsın. YALNIZCA verilen bilgileri kullanırsın: bölme sayısı, fermuar türü, garanti, iade, kargo gibi verilmeyen hiçbir özellik uydurmazsın; "kaliteli", "birinci sınıf", "hakiki", "dayanıklı" gibi ürün hakkında doğrulanmamış övgü sıfatları kullanmazsın. Yanıtı JSON olarak verirsin: {"long": "...", "short": "..."}.';
   const user = `Ürün bilgileri (JSON): ${JSON.stringify(f)}
 
 "long" için yalnızca şu HTML etiketlerini kullan: <p>, <h3>, <ul>, <li>, <strong>. Yapı:
 1) Ürünün kimliğini ve kullanım alanını anlatan 2 kısa paragraf (ilk paragrafta marka ve ürün adı <strong> ile).
 2) <h3>Öne çıkan özellikler</h3> ve verilen bilgilere dayanan 3-5 madde.
-3) <h3>Ürün bilgileri</h3> ve "<strong>Alan:</strong> değer" biçiminde maddeler (yalnızca verilen alanlar).
+3) <h3>Ürün bilgileri</h3> ve "<strong>Alan:</strong> değer" biçiminde maddeler: alan adlarını verildiği gibi yaz; yalnızca Marka, Ürün kodu, Kategori, Malzeme, Ölçüler, Renk ve Su geçirmez alanlarından verilmiş olanları listele.
 4) <h3>Bakım önerisi</h3> ve malzemeye uygun tek paragraf.
 Toplam 120-200 kelime. "short" için listelerde görünecek, 90 karakteri geçmeyen tek cümle yaz.`;
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
