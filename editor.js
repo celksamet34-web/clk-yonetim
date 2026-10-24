@@ -165,7 +165,7 @@
     const actions = `<button class="btn dark" data-act="edSend">${D.isNew ? 'Qukasoft’a yükle' : 'Qukasoft’ta güncelle'}</button><button class="btn" data-act="edDraft">Taslak kaydet</button>`;
     return head(D.isNew ? 'Yeni ürün' : 'Ürünü düzenle', D.isNew ? 'Ürün ekle' : esc(D.name || D.code), D.isNew ? 'Fotoğrafla, alış fiyatını gir, gerisini sistem hesaplasın.' : esc(D.code) + ' · Qukasoft’taki kayıt güncellenir', `<button class="btn sm" data-go="${D.isNew ? 'panel' : 'urunler'}">← Geri</button>`) + `
     <div class="ed"><div class="steps">
-      <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, 1200×1200 kare ve CLK filigranlı hazırlanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
+      <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, mağazanın oranında 1200×1600 (3:4) ve CLK filigranlı hazırlanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
         <div class="step-b"><div class="shots">${SLOTS.map(([k, t, h]) => shot(k, t, h)).join('')}</div>
           <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
           <div class="f"><span>Taşıma şekli</span><div class="chips" style="margin:0">${CARRIES.map(([k, l]) => `<button class="chip" data-act="edCarry" data-c="${k}" aria-pressed="${D.carry === k}">${l}</button>`).join('')}</div></div>
@@ -250,12 +250,23 @@
   // Uzak görseller (Qukasoft CDN, Supabase) CORS ile yüklenmezse tuval kilitlenir ve toDataURL hata verir.
   const loadImg = src => new Promise((ok, no) => { const i = new Image(); if (!src.startsWith('data:')) i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = () => no(new Error('Fotoğraf açılamadı.')); i.src = src; });
   const fileUrl = f => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
-  async function square(src, mark) {
-    const im = await loadImg(src), N = 1200, c = document.createElement('canvas'); c.width = c.height = N;
-    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, N, N);
-    const s = Math.min(N * 0.92 / im.width, N * 0.92 / im.height); const w = im.width * s, h = im.height * s;
-    x.drawImage(im, (N - w) / 2, (N - h) / 2, w, h);
-    if (mark) { x.save(); x.globalAlpha = 0.18; x.fillStyle = '#121110'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', N - 40, N - 34); x.restore(); }
+  // Mağaza teması ürün görsellerini 3:4 gösterir; kare görsele Qukasoft alt ve üste boş bant ekliyor (doğrulandı).
+  const PW = 1200, PH = 1600;
+  // focus yoksa görsel %92'ye sığdırılır (beyaz kenar). focus varsa kaplanır: yanlardan kırpılır, verilmişse
+  // focus.x0–x1 (görsel genişliğine oranla çanta) kadrajda kalır.
+  async function portrait(src, mark, focus) {
+    const im = await loadImg(src), c = document.createElement('canvas'); c.width = PW; c.height = PH;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, PW, PH);
+    if (focus) {
+      const s = Math.max(PW / im.width, PH / im.height), w = im.width * s, h = im.height * s, cw = PW / w;
+      let L = (1 - cw) / 2; if (focus.x1 != null) { L = Math.min(L, focus.x0); L = Math.max(L, focus.x1 - cw); }
+      L = Math.max(0, Math.min(1 - cw, L));
+      x.drawImage(im, -L * w, (PH - h) / 2, w, h);
+    } else {
+      const s = Math.min(PW * 0.92 / im.width, PH * 0.92 / im.height); const w = im.width * s, h = im.height * s;
+      x.drawImage(im, (PW - w) / 2, (PH - h) / 2, w, h);
+    }
+    if (mark) { x.save(); x.globalAlpha = 0.18; x.fillStyle = '#121110'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); }
     return c.toDataURL('image/jpeg', 0.9);
   }
   const toBlob = du => fetch(du).then(r => r.blob());
@@ -366,6 +377,7 @@
     while (r > W * 2 / 3 && plain(r, 0, 0, 1, H)) r--;
     // Yalnızca dört kenarın hepsinde bant varsa çerçevedir; beyaz stüdyoda başın üstündeki boşluk kırpılmasın
     const min = Math.min(W, H) * 0.03; if (t < min || H - 1 - b < min || l < min || W - 1 - r < min) return du;
+    trimBorder.last = { l, w: r - l + 1, W };
     const o = document.createElement('canvas'); o.width = r - l + 1; o.height = b - t + 1; o.getContext('2d').drawImage(c, l, t, o.width, o.height, 0, 0, o.width, o.height);
     return o.toDataURL('image/jpeg', 0.92);
   }
@@ -392,6 +404,7 @@
     return j.image;
   }
   async function modelImage(du) {
+    modelImage.focus = {}; pasteBag.last = null; trimBorder.last = null;
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     // "Elde" seçiminde manken yok, yakın çekim el: kadraj rehberi uymaz, ölçek el boyuna göre yazıyla verilir
     const ref = hasSize() && D.carry !== 'el' ? await scaleRef(du).catch(() => null) : null;
@@ -399,7 +412,11 @@
     const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, carry: D.carry, height: mHeight(), size: { w: D.w, d: D.d, h: D.h } });
     if (!img) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const out = ref ? await pasteBag(img, ref).catch(() => img) : img;
-    return trimBorder(out).catch(() => out);
+    const fin = await trimBorder(out).catch(() => out);
+    // Görseller kare gelir, 3:4'e yanlardan kırpılır: çantanın yatay yeri (görsel genişliğine oranla) kırpmaya aktarılır
+    const b = ref && pasteBag.last?.s > 0.72 ? pasteBag.last : null, t = trimBorder.last;
+    if (b) { const half = (ref.rect.w * b.sc / 2 + 20) / 1024, map = f => t ? (f * t.W - t.l) / t.w : f; modelImage.focus = { x0: map(b.cx / 1024 - half), x1: map(b.cx / 1024 + half) }; }
+    return fin;
   }
   async function aiImage(du, action) {
     const img = action === 'model' ? await modelImage(du) : await siteImage({ action, image: du });
@@ -410,9 +427,9 @@
   async function processShot(k, raw) {
     const s = (D.shots[k] = { preview: raw, busy: 'Hazırlanıyor…' }); render();
     try {
-      let base = await square(raw, false);
+      let base = await portrait(raw, false);
       if (D.auto.cutout) { s.busy = 'Arka plan temizleniyor…'; render(); try { base = await aiImage(base, 'cutout'); } catch (e) { toast('Dekupe yapılamadı, orijinal kullanıldı.'); } }
-      const final = await square(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
+      const final = await portrait(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
       if (k === 'front' && !D.shots.model && hasSize()) makeModel();
       if (k === 'front' && !D.shots.olcu && hasSize()) makeSize();
@@ -423,20 +440,21 @@
     const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.');
     const s = (D.shots.model = { busy: 'Manken pozu üretiliyor… (1-2 dk)' }); render();
     try {
-      const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
+      const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await portrait(src, false);
       const img = await aiImage(base, 'model');
-      s.preview = await square(img, D.auto.mark); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
+      s.preview = await portrait(img, D.auto.mark, modelImage.focus || {}); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
     } catch (e) { delete D.shots.model; toast('Manken görseli üretilemedi: ' + e.message); }
     render();
   }
   // Ölçü görseli: ön fotoğraftaki çantanın çevresine En, Yükseklik ve Derinlik okları ile santimetreleri çizer (yapay zekâ yok)
   async function sizeImage(du) {
     const L = await bagBox(du); if (!L) throw new Error('Çanta ön fotoğrafta ayırt edilemedi.');
-    const N = 1200, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
-    const s = Math.min(N * 0.58 / L.bw, N * 0.6 / L.bh), w = L.bw * s, h = L.bh * s, bx = (N - w) / 2 - 40, by = (N - h) / 2 - 50;
-    // Gri zemin: çantanın arkasında hafif ışık, altında yumuşak gölge. Köşeler düz SIZE_GRAY olur (placeSizeShot buna bakar)
-    const bg = x.createRadialGradient(bx + w / 2, by + h / 2, 40, bx + w / 2, by + h / 2, N * 0.75); bg.addColorStop(0, '#a6a6a6'); bg.addColorStop(0.85, `rgb(${SIZE_GRAY},${SIZE_GRAY},${SIZE_GRAY})`);
-    x.fillStyle = bg; x.fillRect(0, 0, N, N);
+    const c = document.createElement('canvas'); c.width = PW; c.height = PH; const x = c.getContext('2d');
+    const s = Math.min(PW * 0.58 / L.bw, PH * 0.5 / L.bh), w = L.bw * s, h = L.bh * s, bx = (PW - w) / 2 - 40, by = (PH - h) / 2 - 50;
+    // Gri zemin: çantanın arkasında hafif ışık, altında yumuşak gölge. Köşeler düz SIZE_GRAY olur (placeSizeShot buna bakar):
+    // ışığın merkezi hep (560, 750), en yakın köşe ~936 px; düz renk 864 px'te başlar
+    const bg = x.createRadialGradient(bx + w / 2, by + h / 2, 40, bx + w / 2, by + h / 2, PH * 0.75); bg.addColorStop(0, '#a6a6a6'); bg.addColorStop(0.72, `rgb(${SIZE_GRAY},${SIZE_GRAY},${SIZE_GRAY})`);
+    x.fillStyle = bg; x.fillRect(0, 0, PW, PH);
     x.save(); x.filter = 'blur(18px)'; x.fillStyle = 'rgba(0,0,0,.4)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 8, w * 0.42, 16, 0, 0, Math.PI * 2); x.fill(); x.restore();
     x.drawImage(cutBag(L, w, h, 185), bx, by);
     const ink = '#fff', fmt = v => String(+v).replace('.', ',') + ' cm';
@@ -450,8 +468,8 @@
     if (+D.w > 0) { const y = by + h + 70; tick(bx, by + h + 10, bx, y + 16); tick(bx + w, by + h + 10, bx + w, y + 16); arrow(bx, y, bx + w, y); label('En ' + fmt(D.w), bx + w / 2, y); }
     if (+D.h > 0) { const X = bx - 70; tick(bx - 10, by, X - 16, by); tick(bx - 10, by + h, X - 16, by + h); arrow(X, by, X, by + h); label('Yükseklik ' + fmt(D.h), X, by + h / 2, 'center', -Math.PI / 2); }
     if (+D.d > 0) { const x0 = bx + w + 30, y0 = by + h - 10, len = Math.min(220, 60 + +D.d * 10); arrow(x0, y0, x0 + len * 0.7, y0 - len * 0.7); label('Derinlik ' + fmt(D.d), x0 + len * 0.7 + 14, y0 - len * 0.7 - 34, 'left'); }
-    if (D.waterproof) waterBadge(x, N - 165, 165, 115);
-    if (D.auto.mark) { x.save(); x.globalAlpha = 0.22; x.fillStyle = '#fff'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', N - 40, N - 34); x.restore(); }
+    if (D.waterproof) waterBadge(x, PW - 165, 165, 115);
+    if (D.auto.mark) { x.save(); x.globalAlpha = 0.22; x.fillStyle = '#fff'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); }
     return c.toDataURL('image/jpeg', 0.92);
   }
   // Su geçirmez rozeti: CLK renkleriyle koyu daire, altın halka, su damlası ve dalgalar
@@ -482,7 +500,7 @@
     const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.'); if (!hasSize()) return toast('Önce ürün ölçülerini gir.');
     const s = (D.shots.olcu = { busy: 'Ölçü görseli çiziliyor…' }); render();
     try {
-      const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
+      const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await portrait(src, false);
       s.preview = await sizeImage(base); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
     } catch (e) { delete D.shots.olcu; toast('Ölçü görseli çizilemedi: ' + e.message); }
     render();
@@ -675,7 +693,7 @@
     else if (act === 'edAttrDel') { D.attrs.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else if (act === 'edSeo') { fillSeo(); S.keepScroll = true; render(); }
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
-    else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : square(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
+    else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : portrait(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
     else if (act === 'edSize') makeSize();
     else if (act === 'edAud') { D.audience = el.dataset.a; S.keepScroll = true; render(); }

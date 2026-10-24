@@ -25,6 +25,7 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 
 ## Ürün formu (editor.js)
 
+- Tüm ürün görselleri 1200×1600 (3:4) üretilir (`portrait()`, `PW`/`PH`): clkcanta.com teması görselleri 3:4 gösterir, kare görsele Qukasoft alt ve üste boş bant ekliyor (doğrulandı 25.10.2026). Manken çıktısı kare gelir, yanlardan kırpılır; çanta konumu (`pasteBag.last`, `trimBorder.last` → `modelImage.focus`) kadrajda tutulur.
 - Fotoğraf kutuları (`SLOTS`): Ön, Manken, Arka, Yan, Detay, İç, Ek, Ölçü. Qukasoft yalnızca görsel sırasını tutar; ürün açılınca görseller sırayla kutulara dağılır, köşeleri düz gri (ya da eski görsellerde koyu) olan görsel Ölçü kutusuna taşınır.
 - Dekupe: Photoroom (ürün piksellerine dokunmaz).
 - Manken: kullanıcı beğendiği yöntemi seçti — Seedream'e ürün fotoğrafı + ölçek rehberi (çanta 0.6 oranında küçültülmüş, baştan uyluk ortasına kadraj) birlikte gider; çerçeve oluşursa panel kırpar. "Elde (yakın çekim)" seçilince manken yerine el çekimi, ölçek el boyuna göre. Çok adımlı ölçülü yöntem denendi ve kaldırıldı.

@@ -202,7 +202,7 @@ table.tbl{width:100%;border-collapse:collapse;min-width:760px}
 
 .shots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 @media(max-width:620px){.shots{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.shot{position:relative;aspect-ratio:1;max-width:100%;border-radius:16px;border:1.5px dashed var(--line-2);background:var(--bg);overflow:hidden;display:grid;place-items:center;text-align:center}
+.shot{position:relative;aspect-ratio:3/4;max-width:100%;border-radius:16px;border:1.5px dashed var(--line-2);background:var(--bg);overflow:hidden;display:grid;place-items:center;text-align:center}
 .shot.has{border-style:solid;border-color:var(--line);background:#fff}
 .shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .shot .lb{position:absolute;left:8px;top:8px;z-index:2;background:rgba(18,17,16,.82);color:var(--gold-2);font:700 10px var(--f-b);letter-spacing:.14em;text-transform:uppercase;padding:4px 8px;border-radius:999px}
@@ -239,7 +239,7 @@ table.tbl{width:100%;border-collapse:collapse;min-width:760px}
 .summary{position:sticky;top:24px;display:grid;gap:14px}
 @media(max-width:1100px){.summary{position:static}}
 .sum-card{background:radial-gradient(120% 120% at 100% 0%,#2c2824,#121110 70%);color:#ddd5c8;border-radius:22px;padding:20px;display:grid;gap:14px;box-shadow:var(--sh)}
-.sum-card .cover{aspect-ratio:1;border-radius:14px;background:#1f1d1a;overflow:hidden;display:grid;place-items:center;color:#5d574f;font:600 26px var(--f-d);letter-spacing:.2em;max-width:100%}
+.sum-card .cover{aspect-ratio:3/4;border-radius:14px;background:#1f1d1a;overflow:hidden;display:grid;place-items:center;color:#5d574f;font:600 26px var(--f-d);letter-spacing:.2em;max-width:100%}
 .sum-card .cover img{width:100%;height:100%;object-fit:cover}
 .sum-card h3{font:600 24px/1.15 var(--f-d);color:#fff;margin:0}
 .sum-card dl{display:grid;grid-template-columns:1fr auto;gap:8px 12px;margin:0;font-size:13px}
