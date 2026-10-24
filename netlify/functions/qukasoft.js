@@ -21,7 +21,11 @@ exports.handler = async event => {
   const bearer = /^Bearer\s+(.+)$/i.exec(header(event.headers, 'authorization'));
   if (!bearer) return reply(401, { success: false, message: 'Önce uygulamadaki hesabında oturum aç.' });
   const apiKey = process.env.QUKASOFT_API_KEY, apiSecret = process.env.QUKASOFT_API_SECRET;
-  if (!apiKey || !apiSecret) return reply(503, { success: false, message: 'Qukasoft anahtarları (QUKASOFT_API_KEY, QUKASOFT_API_SECRET) bu sitede tanımlı değil.' });
+  if (!apiKey || !apiSecret) {
+    // Teşhis: yalnızca değişken ADLARI (değerler asla), ad yazım farkı mı yoksa hiç mi gelmediği anlaşılsın
+    const seen = Object.keys(process.env).filter(k => /quka/i.test(k)).map(k => JSON.stringify(k));
+    return reply(503, { success: false, message: `Qukasoft anahtarları (QUKASOFT_API_KEY, QUKASOFT_API_SECRET) bu sitede tanımlı değil. Görülen: ${seen.join(', ') || 'yok'}.` });
+  }
   try {
     const user = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}` } });
     if (!user.ok) return reply(401, { success: false, message: 'Oturum geçersiz veya süresi dolmuş.' });
