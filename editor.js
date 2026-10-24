@@ -222,21 +222,27 @@
   }
   // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
   // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
-  async function modelImage(du) {
+  // Bu sitenin görsel fonksiyonu (dekupede Photoroom, mankende fal.ai/Gemini, yedekte OpenAI). Yoksa null döner.
+  async function siteImage(body) {
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
+    const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.status === 404 || r.status === 503) return null;
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
+    if (j.engineError) toast(/quota/i.test(j.engineError) ? 'Seçili servisin kotası yok, OpenAI ile üretildi.' : 'Seçili servis üretemedi, OpenAI ile üretildi: ' + j.engineError.split(/[.\n]/)[0]);
+    return j.image;
+  }
+  async function modelImage(du) {
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
     // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
-    const body = { action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
-    const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
-    if (j.geminiError) toast(/quota/i.test(j.geminiError) ? 'Gemini kotası yok (faturalandırma kapalı), OpenAI ile üretildi.' : 'Gemini üretemedi, OpenAI ile üretildi: ' + j.geminiError.split(/[.\n]/)[0]);
-    return ref ? pasteBag(j.image, ref).catch(() => j.image) : j.image;
+    const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } });
+    if (!img) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
+    return ref ? pasteBag(img, ref).catch(() => img) : img;
   }
   async function aiImage(du, action) {
-    if (action === 'model') { const img = await modelImage(du); if (img) return img; }
+    const img = action === 'model' ? await modelImage(du) : await siteImage({ action, image: du });
+    if (img) return img;
     const j = await call('ai-product-image', { method: 'POST', body: { action, image: du } });
     if (!j.image) throw new Error('Görsel hazırlanamadı.'); return j.image;
   }

@@ -54,11 +54,40 @@ async function gemini(key, prompt, images) {
   } finally { clearTimeout(timeout); }
 }
 
+// Mankenli görsel için fal.ai (varsayılan Seedream 4.5 düzenleme modeli; FAL_IMAGE_MODEL ile değiştirilebilir).
+const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/bytedance/seedream/v4.5/edit';
+async function fal(key, prompt, images) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 70000); // OpenAI yedeğine süre kalsın
+  try {
+    const r = await fetch(`https://fal.run/${FAL_MODEL}`, {
+      method: 'POST', headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' }, signal: controller.signal,
+      body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: { width: 2048, height: 2048 }, num_images: 1, sync_mode: true })
+    });
+    const j = await r.json().catch(() => ({}));
+    const url = j?.images?.[0]?.url;
+    if (!r.ok || !url) throw new Error(j?.detail?.[0]?.msg || j?.detail || j?.error || 'fal.ai görsel döndürmedi.');
+    if (url.startsWith('data:')) return url;
+    const img = await fetch(url, { signal: controller.signal }); // sync_mode desteklenmezse CDN bağlantısı gelir
+    return `data:${img.headers.get('content-type') || 'image/png'};base64,${Buffer.from(await img.arrayBuffer()).toString('base64')}`;
+  } finally { clearTimeout(timeout); }
+}
+
+// Dekupe için Photoroom: ürünün piksellerine dokunmadan yalnızca arka planı siler (şeffaf PNG döner).
+async function photoroom(key, mime, bytes) {
+  const form = new FormData();
+  form.append('image_file', new Blob([bytes], { type: mime }), 'product.jpg');
+  form.append('format', 'png');
+  const r = await fetch('https://sdk.photoroom.com/v1/segment', { method: 'POST', headers: { 'x-api-key': key }, body: form, signal: AbortSignal.timeout(30000) });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j?.detail || j?.message || j?.error?.message || `Photoroom ${r.status}`); }
+  return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
+}
+
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return reply(405, { success: false, message: 'Yalnızca POST kabul edilir.' });
   const bearer = /^Bearer\s+(.+)$/i.exec(header(event.headers, 'authorization'));
   if (!bearer) return reply(401, { success: false, message: 'Önce uygulamadaki hesabında oturum aç.' });
-  const apiKey = process.env.OPENAI_API_KEY, geminiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY, geminiKey = process.env.GEMINI_API_KEY, falKey = process.env.FAL_KEY, photoroomKey = process.env.PHOTOROOM_API_KEY;
   try {
     const user = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}` } });
     if (!user.ok) return reply(401, { success: false, message: 'Oturum geçersiz veya süresi dolmuş.' });
@@ -66,7 +95,7 @@ exports.handler = async event => {
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
     const [person, height] = AUDIENCE[body.audience] || AUDIENCE.kadin;
     const kind = String(body.kind || '').replace(/[^\p{L}\p{N} ›/-]/gu, '').slice(0, 120);
-    if (action !== 'original' && !apiKey && !(action === 'model' && geminiKey)) return reply(503, { success: false, message: 'Mankenli görsel servisi için OPENAI_API_KEY Netlify ortam değişkeni eksik.' });
+    if (action !== 'original' && !apiKey && !(action === 'model' && (geminiKey || falKey)) && !(action === 'cutout' && photoroomKey)) return reply(503, { success: false, message: 'Mankenli görsel servisi için OPENAI_API_KEY Netlify ortam değişkeni eksik.' });
     const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
     if (!match) return reply(422, { success: false, message: 'Ürün fotoğrafı okunamadı.' });
     const bytes = Buffer.from(match[2], 'base64');
@@ -79,11 +108,18 @@ exports.handler = async event => {
     const prompt = action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
       : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
-    let geminiError = '';
-    if (action === 'model' && geminiKey) {
-      try { return reply(200, { success: true, action, engine: 'gemini', image: await gemini(geminiKey, prompt, [[match[1], bytes], ...(guideBytes ? [[guideMatch[1], guideBytes]] : [])]) }); }
-      catch (e) { geminiError = e?.name === 'AbortError' ? 'zaman aşımı' : String(e?.message || e); if (!apiKey) return reply(422, { success: false, message: 'Gemini: ' + geminiError }); }
+    // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
+    const refs = [[match[1], bytes], ...(guideBytes ? [[guideMatch[1], guideBytes]] : [])];
+    const engines = action === 'cutout' ? [['photoroom', photoroomKey, () => photoroom(photoroomKey, match[1], bytes)]]
+      : [['fal', falKey, () => fal(falKey, prompt, refs)], ['gemini', geminiKey, () => gemini(geminiKey, prompt, refs)]];
+    const errors = [];
+    for (const [engine, key, run] of engines) {
+      if (!key) continue;
+      try { return reply(200, { success: true, action, engine, image: await run() }); }
+      catch (e) { errors.push(`${engine}: ${e?.name === 'AbortError' || e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)}`); }
     }
+    const engineError = errors.join(' | ');
+    if (errors.length && !apiKey) return reply(422, { success: false, message: engineError });
     // Logo ve yazıların korunması için yüksek girdi sadakati; model reddederse ayarsız tekrar dener.
     const edit = async fidelity => {
       const form = new FormData();
@@ -106,7 +142,7 @@ exports.handler = async event => {
     if (!response.ok && /input_fidelity/i.test(result?.error?.message || '')) [response, result] = await edit(false);
     const image = result?.data?.[0]?.b64_json;
     if (!response.ok || !image) return reply(422, { success: false, message: result?.error?.message || 'Görsel üretilemedi.' });
-    return reply(200, { success: true, action, engine: 'openai', geminiError: geminiError || undefined, image: `data:image/jpeg;base64,${image}` });
+    return reply(200, { success: true, action, engine: 'openai', engineError: engineError || undefined, image: `data:image/jpeg;base64,${image}` });
   } catch (error) {
     return reply(502, { success: false, message: error?.name === 'AbortError' ? 'Görsel üretimi zaman aşımına uğradı.' : 'Görsel servisine bağlanılamadı.' });
   }
