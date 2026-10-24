@@ -36,10 +36,10 @@
             <label class="f"><span>Kendi tarifin (isteğe bağlı, İngilizce daha iyi sonuç verir)</span><textarea id="bncustom" rows="2" placeholder="ör. a velvet armchair in a luxury hotel lobby, warm evening light">${esc(B.custom)}</textarea></label></div></section>
         <section class="step"><div class="step-h"><span class="no">03</span><div><h2>Banner yazıları</h2><p>Qukasoft bu yazıları görselin üstüne kendisi yazar; önizlemede nasıl duracağı görünür.</p></div></div>
           <div class="step-b bn-txt">
-            <label class="f"><span>Başlık</span><input id="bntitle" value="${esc(B.title)}" placeholder="ör. Yeni Sezon Sırt Çantaları"></label>
-            <label class="f"><span>Alt yazı</span><input id="bnsub" value="${esc(B.sub)}" placeholder="ör. Okul ve seyahat için yeni modeller"></label>
-            <label class="f"><span>Düğme</span><input id="bnbtn" value="${esc(B.btn)}" placeholder="ör. İncele"></label>
-            <label class="f"><span>Bağlantı</span><input id="bnlink" value="${esc(B.link)}" placeholder="ör. https://www.clkcanta.com/sirt-cantasi"></label></div></section>
+            <label class="f"><span>Başlık</span><input type="text" id="bntitle" value="${esc(B.title)}" placeholder="ör. Yeni Sezon Sırt Çantaları"></label>
+            <label class="f"><span>Alt yazı</span><input type="text" id="bnsub" value="${esc(B.sub)}" placeholder="ör. Okul ve seyahat için yeni modeller"></label>
+            <label class="f"><span>Düğme</span><input type="text" id="bnbtn" value="${esc(B.btn)}" placeholder="ör. İncele"></label>
+            <label class="f"><span>Bağlantı</span><input type="url" id="bnlink" value="${esc(B.link)}" placeholder="ör. https://www.clkcanta.com/sirt-cantasi"></label></div></section>
         <div class="bn-acts"><button class="btn dark" data-act="bnMake" ${!img || B.busy ? 'disabled' : ''}>${B.busy ? esc(B.busy) : out ? 'Yeniden üret' : 'Görsel üret'}</button><span class="bn-cost">Photoroom AI · görsel başı ~0,10 $</span></div>
       </div>
       <aside class="bn-prev"><div class="sum-card">
@@ -65,21 +65,21 @@
     const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
     return c.toDataURL('image/jpeg', 0.92);
   }
-  async function make(sandbox) {
+  async function make(sandbox, opts = {}) {
     const p = product(); if (!p) return toast('Önce ürün seç.');
     B.busy = sandbox ? 'Deneme üretiliyor…' : 'Photoroom sahne üretiyor… (10-30 sn)'; S.keepScroll = true; render();
     try {
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
       const scene = B.custom.trim() ? 'kendi tarif' : (SCENES.find(s => s[0] === B.scene) || SCENES[0])[1];
       const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'banner', image: await toJpeg(P.img(p)), prompt: promptText(), sandbox: !!sandbox }) });
+        body: JSON.stringify({ action: 'banner', image: await toJpeg(P.img(p)), prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.image) throw new Error(j.message || 'Banner üretilemedi.');
       B.out = { preview: j.image, sandbox: !!j.sandbox, scene, code: p.code };
     } catch (e) { toast(e.message); }
     B.busy = ''; S.keepScroll = true; render();
   }
-  CLK.bannerTest = () => make(true); // ücretsiz, filigranlı deneme (Photoroom sandbox); arayüzde düğmesi yok
+  CLK.bannerTest = opts => make(true, opts); // ücretsiz, filigranlı deneme (Photoroom sandbox); arayüzde düğmesi yok. opts: { layout, model }
   async function approve() {
     const o = B.out; if (!o || o.sandbox) return;
     B.busy = 'Kaydediliyor…'; S.keepScroll = true; render();

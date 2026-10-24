@@ -125,16 +125,22 @@ async function photoroom(key, mime, bytes) {
 // Çıktı tema banner'ı oranında (3:4, 1248×1664); Qukasoft başlık/düğme kutularını alt kısma koyduğu için ürün üstte, alt %30 boş kalır.
 // sandbox: anahtarın başına "sandbox_" eklenir, ücretsiz ve filigranlıdır (parametre denemesi için).
 const BANNER_SIZE = '1248x1664';
-async function photoroomBanner(key, mime, bytes, prompt, sandbox) {
+const BANNER_LAYOUT = { paddingTop: '0.1', paddingLeft: '0.14', paddingRight: '0.14', paddingBottom: '0.34', 'shadow.mode': 'ai.soft' };
+// Yerleşim denemesi için izinli alanlar (panel `layout` ile geçersiz kılabilir); değerler kısa düz metin olmalı
+const LAYOUT_KEYS = ['padding', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
+  'verticalAlignment', 'horizontalAlignment', 'referenceBox', 'scaling', 'shadow.mode', 'background.expandPrompt.mode', 'background.seed'];
+async function photoroomBanner(key, mime, bytes, prompt, sandbox, layout, model) {
   const form = new FormData();
   form.append('imageFile', new Blob([bytes], { type: mime }), 'product.jpg');
   form.append('background.prompt', prompt);
   form.append('outputSize', BANNER_SIZE);
-  form.append('paddingTop', '0.1'); form.append('paddingLeft', '0.14'); form.append('paddingRight', '0.14'); form.append('paddingBottom', '0.34');
-  form.append('shadow.mode', 'ai.soft');
+  const L = { ...BANNER_LAYOUT };
+  Object.entries(layout && typeof layout === 'object' ? layout : {}).forEach(([k, v]) => { if (LAYOUT_KEYS.includes(k)) { if (v === null || v === '') delete L[k]; else if (/^[\w.%-]{1,40}$/.test(String(v))) L[k] = String(v); } });
+  Object.entries(L).forEach(([k, v]) => form.append(k, v));
   form.append('export.format', 'jpeg');
+  const ver = ['3', 'background-studio-beta-2025-03-17'].includes(model) ? model : '3';
   const r = await fetch('https://image-api.photoroom.com/v2/edit', {
-    method: 'POST', headers: { 'x-api-key': (sandbox ? 'sandbox_' : '') + key, 'pr-ai-background-model-version': '3' }, body: form, signal: AbortSignal.timeout(50000)
+    method: 'POST', headers: { 'x-api-key': (sandbox ? 'sandbox_' : '') + key, 'pr-ai-background-model-version': ver }, body: form, signal: AbortSignal.timeout(50000)
   });
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
@@ -195,7 +201,7 @@ exports.handler = async event => {
       if (b.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük.' });
       const p = String(body.prompt || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
       if (p.length < 10) return reply(422, { success: false, message: 'Sahne tarifi çok kısa.' });
-      try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true) }); }
+      try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true, body.layout, body.model) }); }
       catch (e) { return reply(422, { success: false, message: e?.name === 'TimeoutError' ? 'Photoroom zaman aşımı.' : String(e?.message || e) }); }
     }
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
