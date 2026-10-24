@@ -18,7 +18,10 @@
   const extra = (p = {}) => ({ invoiceName: p.invoiceName || '', modelCode: p.modelCode || '', mpn: p.mpn || '', dealerPrice4: p.dealerPrice4 ?? '',
     domestic: p.domestic === undefined ? true : Number(p.domestic) === 1, showcase: p.showcaseStatus === undefined ? true : Number(p.showcaseStatus) === 1, seq: p.seq ?? 0,
     specialCode1: p.specialCode1 || '', specialCode2: p.specialCode2 || '', specialCode3: p.specialCode3 || '',
-    seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || '', slug: p.slug || '' });
+    seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || '', slug: p.slug || '',
+    id: p.id || '', videoText: p.videoText || '', unitId: p.unitId || 1,
+    // İlişkili ürünler ayrı Qukasoft işlemleriyle kaydedilir; yalnızca değiştirilenler (touched) gönderilir
+    similars: [], combines: [], compat: {}, rel: { sim: false, comb: false, combLoaded: false } });
 
   let D = null; // taslak
   function blank() {
@@ -41,6 +44,41 @@
       variants: (Array.isArray(p.variants) ? p.variants : []).map(v => ({ v: [v.value1, v.value2, v.value3].filter(Boolean).join(' / '), b: v.barcode || '', q: Number(v.quantity) || 0 })),
       w, d, h, material, attrs: at, ...extra(p),
       shots, audience: 'kadin', carry: 'capraz', mh: '', waterproof: /^(evet|var|1|true)$/i.test(water), auto: { cutout: true, mark: true } };
+  }
+  // Qukasoft ek işlemleri (bu sitenin qukasoft fonksiyonu üzerinden)
+  async function qk(path, payload = {}) {
+    const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');
+    const r = await fetch('/.netlify/functions/qukasoft', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ path, ...payload }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok || !j.success) throw new Error(j.message || 'Qukasoft işlemi yapılamadı.'); return j.result;
+  }
+  const REF = { units: null, compat: null, err: '' }; // birimler ve uyumluluk değerleri (oturum boyunca bir kez yüklenir)
+  async function loadRefs() {
+    if (REF.units || REF.err) return;
+    try {
+      const u = await qk('unit/lists', { query: { pageStart: 0, pageSize: 50 } }); REF.units = (u?.list || []).map(x => ({ id: +(x.ID ?? x.id), title: x.title || x.name || '' }));
+      const g = await qk('compability/lists', { query: { pageStart: 0, pageSize: 50 } }), groups = g?.list || [], vals = [];
+      for (const gr of groups) { const v = await qk('compability/values', { query: { pageStart: 0, pageSize: 100, compatibilityId: gr.Id ?? gr.id } }); (v?.list || []).forEach(x => vals.push({ id: +x.id, group: gr.name, label: [1, 2, 3, 4, 5].map(i => x['field' + i]).filter(Boolean).join(' · ') })); }
+      REF.compat = vals;
+    } catch (e) { REF.err = e.message; }
+    render();
+  }
+  async function loadCombines() {
+    if (!D || D.isNew || D.rel.combLoaded || !D.id) return; D.rel.combLoaded = true;
+    try { const r = await qk('product/combines', { query: { pageStart: 0, pageSize: 50, mainProductId: D.id } }); D.combines = (r?.list || []).map(x => ({ code: x.combineProductCode, text: x.customText || '' })); S.keepScroll = true; render(); } catch {}
+  }
+  const pname = code => S.products.find(p => p.code === code)?.name || '';
+  // Ürün seçici: kod ya da adla arama (datalist), seçilince listeye eklenir
+  const picker = (id, act, items, textKey) => `<div class="inline" style="gap:8px"><input type="text" id="${id}" list="ed-products" placeholder="Ürün adı ya da kodu yaz, listeden seç"><button class="btn sm" data-act="${act}" data-in="${id}">Ekle</button></div>
+    ${items.length ? `<div class="vrows">${items.map((x, i) => `<div class="vrow rel" data-i="${i}"><span><b>${esc(x.code)}</b> ${esc(pname(x.code))}</span>${textKey ? `<input type="text" data-ck="${i}" value="${esc(x.text)}" placeholder="Kombin metni (ör. Cüzdanıyla al)">` : '<span></span>'}<button data-act="${act}Del" data-i="${i}" aria-label="Çıkar">×</button></div>`).join('')}</div>` : ''}`;
+  const pickCode = v => { v = String(v || '').trim(); return (S.products.find(p => p.code === v.split(' — ')[0]) || S.products.find(p => p.name.toLocaleLowerCase('tr') === v.toLocaleLowerCase('tr')))?.code || ''; };
+  // Kaydetten sonra ilişkili ürünleri Qukasoft'a yazar; her işlemin sonucunu döndürür
+  async function saveRelations() {
+    const out = [], code = D.code.trim();
+    if (D.rel.sim) { try { await qk('product/updateSimilars', { data: { products: [{ code, similarProducts: D.similars.map(c => ({ code: c })) }] } }); D.rel.sim = false; out.push('benzer ürünler'); } catch (e) { out.push('benzer ürünler: ' + e.message); } }
+    if (D.rel.comb) { try { await qk('product/updateCombines', { data: { products: [{ code, combineProducts: D.combines.map(c => ({ code: c.code, customText: c.text, combination: true })) }] } }); D.rel.comb = false; out.push('kombinler'); } catch (e) { out.push('kombinler: ' + e.message); } }
+    const ch = Object.entries(D.compat).filter(([, p]) => p);
+    if (ch.length) { try { await qk('product/updateCompabilities', { data: { products: ch.map(([id, process]) => ({ code, compabilityValueId: +id, process })) } }); D.compat = {}; out.push('uyumluluk'); } catch (e) { out.push('uyumluluk: ' + e.message); } }
+    return out;
   }
   // Mevcut ürünlerden öneriler (marka, model kodu, özellik adları)
   const known = () => {
@@ -147,7 +185,18 @@
           ${fld('Anahtar kelimeler', inp('seoKeywords', 'placeholder="virgülle ayır"'), 'full')}
           ${fld('Sayfa adresi (URL)', inp('slug', 'placeholder="boşsa üründen oluşturulur"'), 'full')}
         </div></div></section>
+      <section class="step"><div class="step-h"><span class="no">07</span><div><h2>İlişkili ürünler ve diğer</h2><p>Benzer ürünler, kombinler, uyumluluk, video ve birim. İlişkiler ürün kaydedildikten sonra Qukasoft'a ayrıca yazılır.</p></div></div>
+        <div class="step-b">
+          ${REF.err ? `<div class="msg err">${esc(REF.err)}</div>` : ''}
+          <div class="f"><span>Benzer ürünler${D.isNew ? '' : ' <em>(Qukasoft mevcut listeyi vermiyor; eklediğin liste kaydedilince geçerli olur)</em>'}</span>${picker('ed-sim', 'edSim', D.similars.map(code => ({ code })), false)}</div>
+          <div class="f"><span>Kombin ürünler</span>${picker('ed-comb', 'edComb', D.combines, true)}</div>
+          <div class="f"><span>Uyumluluk</span>${!REF.compat ? '<p class="hint">Yükleniyor…</p>' : REF.compat.length ? `<div class="vrows">${REF.compat.map(c => `<div class="vrow rel"><span><b>${esc(c.group)}</b> ${esc(c.label)}</span><span></span><select data-cv="${c.id}"><option value="">—</option><option value="insert" ${D.compat[c.id] === 'insert' ? 'selected' : ''}>Ekle</option><option value="delete" ${D.compat[c.id] === 'delete' ? 'selected' : ''}>Çıkar</option></select></div>`).join('')}</div>` : '<p class="hint">Mağazada tanımlı uyumluluk değeri yok. Qukasoft panelinde Uyumluluklar bölümünden tanımlanabilir.</p>'}</div>
+          <div class="fg">
+            ${fld('Birim', `<select data-k="unitId">${(REF.units || [{ id: D.unitId, title: 'Adet' }]).map(u => `<option value="${u.id}" ${+u.id === +D.unitId ? 'selected' : ''}>${esc(u.title)}</option>`).join('')}</select>`)}
+            <div class="f full"><span>Video (YouTube embed kodu ya da bağlantısı)</span><textarea data-k="videoText" rows="2" placeholder="&lt;iframe src=&quot;https://www.youtube.com/embed/…&quot;&gt;&lt;/iframe&gt;">${esc(D.videoText)}</textarea></div>
+          </div></div></section>
     </div>
+    <datalist id="ed-products">${S.products.filter(p => p.code !== D.code).map(p => `<option value="${esc(p.code)} — ${esc(p.name)}">`).join('')}</datalist>
     ${(k => `<datalist id="ed-brands">${[...k.brands.keys()].map(b => `<option value="${esc(b)}">`).join('')}</datalist><datalist id="ed-models">${k.models.map(m => `<option value="${esc(m)}">`).join('')}</datalist><datalist id="ed-attrs">${k.attrs.map(m => `<option value="${esc(m)}">`).join('')}</datalist>`)(known())}
     <aside class="summary"><div class="sum-card"><div class="cover" ${cover ? 'data-act="edGallery" data-i="0" style="cursor:zoom-in"' : ''}>${cover ? `<img src="${esc(cover)}" alt="">` : 'CLK'}</div>${galleryList().length ? `<button class="btn gold" data-act="edGallery" data-i="0">Görselleri aç (${galleryList().length})</button>` : ''}
       <h3>${esc(D.name || 'Adsız ürün')}</h3>
@@ -419,15 +468,16 @@
       dealerPrice4: n(D.dealerPrice4), desi: n(D.desi), type: 0, criticalStockStatus: 1, criticalStockQuantity: +D.critical >= 0 && D.critical !== '' ? +D.critical : RULES.critical,
       invoiceName: D.invoiceName.trim(), modelCode: D.modelCode.trim(), mpn: D.mpn.trim(), domestic: D.domestic ? 1 : 0, showcaseStatus: D.showcase ? 1 : 0, seq: n(D.seq) ?? 0,
       specialCode1: D.specialCode1.trim(), specialCode2: D.specialCode2.trim(), specialCode3: D.specialCode3.trim(),
-      seoTitle: D.seoTitle.trim(), seoDescription: D.seoDescription.trim(), seoKeywords: D.seoKeywords.trim(), slug: D.slug.trim() || undefined };
+      seoTitle: D.seoTitle.trim(), seoDescription: D.seoDescription.trim(), seoKeywords: D.seoKeywords.trim(), slug: D.slug.trim() || undefined,
+      videoText: D.videoText.trim(), unitId: n(D.unitId) || 1 };
     if (D.categoryId) p.categoryId = Number(D.categoryId);
     const k = known(), bid = k.brands.get(D.brand) ?? [...k.brands].find(([b]) => b.toLocaleLowerCase('tr') === String(D.brand).toLocaleLowerCase('tr'))?.[1];
     if (bid) p.brandId = bid;
-    // Özellikler: ölçüler En/Yükseklik/Boy olarak; Malzeme ve Su Geçirmez yalnızca Qukasoft'ta bu adlarla tanımlıysa (tanımsız özellik kaydı bozabilir)
-    const defined = new Set(k.attrs.map(a => a.toLocaleLowerCase('tr'))), attrs = [];
+    // Özellikler: ölçüler En/Yükseklik/Boy olarak, ayrıca Malzeme ve Su Geçirmez (Qukasoft tanımsız niteliği kayıtta kendisi oluşturuyor)
+    const attrs = [];
     Object.entries(DIM_ATTR).forEach(([f, name]) => { if (+D[f] > 0) attrs.push({ name, value: String(+D[f]) }); });
-    if (D.material.trim() && defined.has(MATERIAL_ATTR.toLocaleLowerCase('tr'))) attrs.push({ name: MATERIAL_ATTR, value: D.material.trim() });
-    if (D.waterproof && defined.has(WATER_ATTR.toLocaleLowerCase('tr'))) attrs.push({ name: WATER_ATTR, value: 'Evet' });
+    if (D.material.trim()) attrs.push({ name: MATERIAL_ATTR, value: D.material.trim() });
+    if (D.waterproof) attrs.push({ name: WATER_ATTR, value: 'Evet' });
     D.attrs.forEach(a => { if (a.n.trim() && a.v.trim() && !attrs.some(x => x.name.toLocaleLowerCase('tr') === a.n.trim().toLocaleLowerCase('tr'))) attrs.push({ name: a.n.trim(), value: a.v.trim() }); });
     if (attrs.length || !D.isNew) p.attributes = attrs;
     if (D.variants.length) { p.variant1Name = 'Renk'; p.variants = D.variants.map(v => ({ value1: v.v, barcode: v.b || hex12('CLK-V-'), quantity: +v.q || 0, priceStatus: 0, price: 0 })); p.quantity = p.variants.reduce((a, v) => a + v.quantity, 0); }
@@ -524,7 +574,8 @@
       const urls = [];
       for (const k of order) { const s = D.shots[k]; if (!s) continue; if (s.path) { const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(s.path, 604800); if (error) throw new Error('Fotoğraf bağlantısı oluşturulamadı.'); urls.push(data.signedUrl); } else if (s.url) urls.push(s.url); }
       const j = await call('qukasoft-product-save', { method: 'POST', body: { product: buildProduct(urls) } });
-      say(j.message || 'Qukasoft’a gönderildi.', true); toast(D.isNew ? 'Ürün Qukasoft’a yüklendi' : 'Ürün güncellendi');
+      const rel = await saveRelations(), relErr = rel.filter(r => r.includes(':'));
+      say((j.message || 'Qukasoft’a gönderildi.') + (rel.length ? ` İlişkiler: ${rel.join(', ')}.` : ''), !relErr.length); toast(D.isNew ? 'Ürün Qukasoft’a yüklendi' : 'Ürün güncellendi');
       CLK.loadProducts(true);
     } catch (e) { say(e.message); }
     $$('[data-act="edSend"]').forEach(b => { b.disabled = false; b.textContent = D.isNew ? 'Qukasoft’a yükle' : 'Qukasoft’ta güncelle'; });
@@ -552,6 +603,9 @@
     });
     $$('[data-vk]').forEach(el => el.addEventListener('input', () => { const i = +el.closest('.vrow').dataset.i; const k = el.dataset.vk; D.variants[i][k] = k === 'q' ? (+el.value || 0) : el.value.toLocaleUpperCase('tr'); }));
     $$('[data-ak]').forEach(el => el.addEventListener('input', () => { D.attrs[+el.closest('.vrow').dataset.i][el.dataset.ak] = el.value; }));
+    $$('[data-ck]').forEach(el => el.addEventListener('input', () => { D.combines[+el.dataset.ck].text = el.value; D.rel.comb = true; }));
+    $$('[data-cv]').forEach(el => el.addEventListener('change', () => { D.compat[el.dataset.cv] = el.value; }));
+    loadRefs(); loadCombines();
     $$('[data-auto]').forEach(el => el.addEventListener('change', () => { D.auto[el.dataset.auto] = el.checked; }));
     $$('[data-shot]').forEach(el => el.addEventListener('change', async () => { const f = el.files[0]; if (!f) return; processShot(el.dataset.shot, await fileUrl(f)); }));
     $$('[data-color]').forEach(b => b.addEventListener('click', () => {
@@ -568,6 +622,14 @@
     else if (act === 'edDescAi') aiDesc(el);
     else if (act === 'edDesc') { D.longDescription = autoDesc(); if (!D.shortDescription.trim()) D.shortDescription = autoShort(); S.keepScroll = true; render(); }
     else if (act === 'edVdel') { D.variants.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
+    else if (act === 'edSim' || act === 'edComb') {
+      const code = pickCode($('#' + el.dataset.in)?.value); if (!code) return toast('Listeden bir ürün seç.');
+      if (act === 'edSim') { if (!D.similars.includes(code)) D.similars.push(code); D.rel.sim = true; }
+      else { if (!D.combines.some(c => c.code === code)) D.combines.push({ code, text: '' }); D.rel.comb = true; }
+      S.keepScroll = true; render();
+    }
+    else if (act === 'edSimDel') { D.similars.splice(+el.dataset.i, 1); D.rel.sim = true; S.keepScroll = true; render(); }
+    else if (act === 'edCombDel') { D.combines.splice(+el.dataset.i, 1); D.rel.comb = true; S.keepScroll = true; render(); }
     else if (act === 'edAttrAdd') { D.attrs.push({ n: '', v: '' }); S.keepScroll = true; render(); }
     else if (act === 'edAttrDel') { D.attrs.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else if (act === 'edSeo') { fillSeo(); S.keepScroll = true; render(); }
