@@ -12,10 +12,16 @@
     ['yaz', 'Yaz', 'a bright summer terrace with soft sea view bokeh, white stone surface, airy natural light, fresh premium lifestyle photography']
   ];
   const TAIL = ' No text, no letters, no logos, no people.';
-  const B = (S.ui.bn ||= { q: '', code: '', scene: 'luks', custom: '', title: '', sub: '', btn: 'İncele', link: '', busy: '', out: null, approved: null });
+  // Motorlar: fal.ai Seedream (girdiyi düzenler, ~0,04 $) ya da Photoroom AI arka plan (Plus planı, ~0,10 $)
+  const ENGINES = [['fal', 'Seedream (fal.ai)', '~0,04 $'], ['photoroom', 'Photoroom', '~0,10 $']];
+  const B = (S.ui.bn ||= { q: '', code: '', scene: 'luks', custom: '', title: '', sub: '', btn: 'İncele', link: '', engine: 'fal', busy: '', out: null, approved: null });
+  B.engine ||= 'fal';
   try { if (!B.approved) B.approved = JSON.parse(localStorage.getItem('clk-banner-approved') || 'null'); } catch {}
   const product = () => S.products.find(p => String(p.code) === String(B.code));
-  const promptText = () => (B.custom.trim() || (SCENES.find(s => s[0] === B.scene) || SCENES[0])[2]) + TAIL;
+  const sceneText = () => B.custom.trim() || (SCENES.find(s => s[0] === B.scene) || SCENES[0])[2];
+  // Seedream'e sahne düz gider (sunucu düzenleme istemine sarar; "logo yok" çantanın logosunu sildirebilir)
+  const promptText = () => B.engine === 'fal' ? sceneText() + '.' : sceneText() + TAIL;
+  const engine = () => ENGINES.find(e => e[0] === B.engine) || ENGINES[0];
 
   // Önizleme: Qukasoft'un banner üstüne koyduğu siyah başlık, alt yazı ve düğme kutuları (sitedekiyle aynı yerleşim)
   const overlay = () => `<div class="bn-ov">${B.title ? `<span class="t">${esc(B.title)}</span>` : ''}${B.sub ? `<span class="s">${esc(B.sub)}</span>` : ''}${B.btn ? `<span class="b">${esc(B.btn)}</span>` : ''}</div>`;
@@ -40,11 +46,12 @@
             <label class="f"><span>Alt yazı</span><input type="text" id="bnsub" value="${esc(B.sub)}" placeholder="ör. Okul ve seyahat için yeni modeller"></label>
             <label class="f"><span>Düğme</span><input type="text" id="bnbtn" value="${esc(B.btn)}" placeholder="ör. İncele"></label>
             <label class="f"><span>Bağlantı</span><input type="url" id="bnlink" value="${esc(B.link)}" placeholder="ör. https://www.clkcanta.com/sirt-cantasi"></label></div></section>
-        <div class="bn-acts"><button class="btn dark" data-act="bnMake" ${!img || B.busy ? 'disabled' : ''}>${B.busy ? esc(B.busy) : out ? 'Yeniden üret' : 'Görsel üret'}</button><span class="bn-cost">Photoroom AI · görsel başı ~0,10 $</span></div>
+        <div class="chips" style="margin:0">${ENGINES.map(([k, l, c]) => `<button class="chip" data-act="bnEngine" data-k="${k}" aria-pressed="${B.engine === k}">${l} <b>${c}</b></button>`).join('')}</div>
+        <div class="bn-acts"><button class="btn dark" data-act="bnMake" ${!img || B.busy ? 'disabled' : ''}>${B.busy ? esc(B.busy) : out ? 'Yeniden üret' : 'Görsel üret'}</button><span class="bn-cost">${engine()[1]} · görsel başı ${engine()[2]}</span></div>
       </div>
       <aside class="bn-prev"><div class="sum-card">
         <div class="bn-frame">${out ? `<img src="${esc(out.preview)}" alt="Banner önizleme">` : `<div class="bn-empty">${img ? 'Önizleme burada görünecek' : 'Önce ürün seç'}</div>`}${out ? overlay() : ''}${B.busy ? `<div class="busy">${esc(B.busy)}</div>` : ''}</div>
-        ${out ? `<p class="bn-note">${out.sandbox ? '<b>Deneme (filigranlı, ücretsiz).</b> ' : ''}1248×1664 (3:4) · sahne: ${esc(out.scene)}</p>
+        ${out ? `<p class="bn-note">${out.sandbox ? '<b>Deneme (filigranlı, ücretsiz).</b> ' : ''}1248×1664 (3:4) · ${esc(out.engine || 'Photoroom')} · sahne: ${esc(out.scene)}</p>
           <div class="sum-acts"><button class="btn gold" data-act="bnApprove" ${out.sandbox || out.approved ? 'disabled' : ''}>${out.approved ? 'Onaylandı' : 'Onayla'}</button><button class="btn" data-act="bnDrop">Vazgeç</button></div>` : ''}
         ${B.approved ? `<div class="bn-ok"><b>Onaylanan banner</b><span>${esc(B.approved.title || 'Başlıksız')}${B.approved.link ? ' · ' + esc(B.approved.link) : ''}</span><small>Qukasoft'a yüklenmeyi bekliyor. Claude'a "banner'ı yükle" deyin.</small><a class="btn sm" href="${esc(B.approved.url)}" target="_blank" rel="noopener">Görseli aç</a></div>` : ''}
       </div></aside>
@@ -71,17 +78,29 @@
     x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(c0, l, t, bw, bh, (W - w) / 2, H * 0.68 - h, w, h);
     return c.toDataURL('image/jpeg', 0.92);
   }
+  // Sonuç tam 1248×1664 JPEG'e getirilir (Seedream 1728×2304 döner; oran aynı, kırpma olmaz)
+  async function fit34(src) {
+    const im = await loadImg(src), W = 1248, H = 1664, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'), s = Math.max(W / im.width, H / im.height), w = im.width * s, h = im.height * s;
+    x.drawImage(im, (W - w) / 2, (H - h) / 2, w, h); return c.toDataURL('image/jpeg', 0.92);
+  }
+  const fn = (t, body) => fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.message || 'Banner üretilemedi.'); return j; });
   async function make(sandbox, opts = {}) {
     const p = product(); if (!p) return toast('Önce ürün seç.');
-    B.busy = sandbox ? 'Deneme üretiliyor…' : 'Photoroom sahne üretiyor… (10-30 sn)'; S.keepScroll = true; render();
+    const eng = sandbox ? 'photoroom' : B.engine; // sandbox yalnızca Photoroom'da var
+    B.busy = sandbox ? 'Deneme üretiliyor…' : eng === 'fal' ? 'Seedream sahne üretiyor… (30-90 sn)' : 'Photoroom sahne üretiyor… (10-30 sn)'; S.keepScroll = true; render();
     try {
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
       const scene = B.custom.trim() ? 'kendi tarif' : (SCENES.find(s => s[0] === B.scene) || SCENES[0])[1];
-      const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'banner', image: await placeBag(P.img(p)), prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.image) throw new Error(j.message || 'Banner üretilemedi.');
-      B.out = { preview: j.image, sandbox: !!j.sandbox, scene, code: p.code };
+      let j = await fn(t, { action: 'banner', engine: eng, image: await placeBag(P.img(p)), prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model });
+      if (j.pending) { // fal.ai kuyruğu: 3 sn arayla sor (en çok ~3 dk)
+        const job = j.job;
+        for (let i = 0; i < 60 && j.pending; i++) { await new Promise(ok => setTimeout(ok, 3000)); j = await fn(t, { action: 'falResult', job }); }
+        if (j.pending) throw new Error('Seedream zaman aşımı.');
+      }
+      if (!j.image) throw new Error(j.message || 'Banner üretilemedi.');
+      B.out = { preview: await fit34(j.image), sandbox: !!j.sandbox, scene, code: p.code, engine: eng === 'fal' ? 'Seedream' : 'Photoroom' };
     } catch (e) { toast(e.message); }
     B.busy = ''; S.keepScroll = true; render();
   }
@@ -104,7 +123,8 @@
 
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
-    if (act === 'bnScene') { B.scene = el.dataset.k; B.custom = ''; S.keepScroll = true; render(); }
+    if (act === 'bnEngine') { B.engine = el.dataset.k; S.keepScroll = true; render(); }
+    else if (act === 'bnScene') { B.scene = el.dataset.k; B.custom = ''; S.keepScroll = true; render(); }
     else if (act === 'bnMake') make(false);
     else if (act === 'bnApprove') approve();
     else if (act === 'bnDrop') { B.out = null; S.keepScroll = true; render(); }

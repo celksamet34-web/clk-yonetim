@@ -87,10 +87,10 @@ async function gemini(key, prompt, images) {
 // Üretim Netlify fonksiyon süresini aştığı için kuyruk kullanılır: istek bırakılır, panel sonucu ayrı çağrılarla sorar.
 const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/bytedance/seedream/v4.5/edit';
 const falError = j => { const d = j?.detail; return (Array.isArray(d) ? d[0]?.msg : d) || j?.error || j?.message; };
-async function falSubmit(key, prompt, images) {
+async function falSubmit(key, prompt, images, size = { width: 1920, height: 1920 }) {
   const r = await fetch(`https://queue.fal.run/${FAL_MODEL}`, {
     method: 'POST', headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20000),
-    body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: { width: 1920, height: 1920 }, num_images: 1 })
+    body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: size, num_images: 1 })
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.status_url || !j.response_url) throw new Error(falError(j) || `fal.ai ${r.status}`);
@@ -151,6 +151,8 @@ async function photoroomBanner(key, mime, bytes, prompt, sandbox, layout, model)
   }
   return `data:image/jpeg;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
 }
+// fal.ai banner istemi: ürün yerinde ve aynen kalır, yalnızca beyaz zemin sahneyle değişir, alt üçte bir Qukasoft yazılarına sakin kalır
+const bannerEditPrompt = scene => `Edit this image into a premium ecommerce homepage banner photo. Keep the bag exactly as it is in the image: same position, same size, same angle, same colors, logo, lettering, zippers, straps and details. Do not move, resize, redraw, restyle or crop the bag. Replace only the plain white background with this scene: ${scene} The bag stands naturally on a surface in the scene with a soft realistic contact shadow. Keep the lower third of the image calm and uncluttered (the surface or pedestal under the bag), because text will be placed there. Photorealistic high-end campaign photography, vertical 3:4 composition, exactly one bag, no people, no extra products, no text or letters except what is printed on the bag.`;
 
 // Ürün açıklaması: paneldeki bilgilerden Türkçe, şık bir HTML metin. Bilgi uydurmaması için yalnızca verilen alanlar kullanılır.
 const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
@@ -203,6 +205,13 @@ exports.handler = async event => {
       if (b.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük.' });
       const p = String(body.prompt || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
       if (p.length < 10) return reply(422, { success: false, message: 'Sahne tarifi çok kısa.' });
+      // fal.ai Seedream: panelin yerleştirdiği girdiyi düzenler (yalnızca beyaz zemini sahneyle değiştir). Kuyruk işi döner, panel falResult ile sorar.
+      // Seedream küçük boyutu kabul etmediği için 3:4 ~4 MP (1728×2304) istenir; panel 1248×1664'e küçültür.
+      if (body.engine === 'fal') {
+        if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
+        try { return reply(200, { success: true, action: 'banner', engine: 'fal', pending: true, job: await falSubmit(falKey, bannerEditPrompt(p), [[m[1], b]], { width: 1728, height: 2304 }) }); }
+        catch (e) { return reply(422, { success: false, message: 'fal: ' + (e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)) }); }
+      }
       try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true, body.layout, body.model) }); }
       catch (e) { return reply(422, { success: false, message: e?.name === 'TimeoutError' ? 'Photoroom zaman aşımı.' : String(e?.message || e) }); }
     }
