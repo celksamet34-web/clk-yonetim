@@ -131,11 +131,11 @@ const BANNER_LAYOUT = { referenceBox: 'originalImage', 'shadow.mode': 'ai.soft' 
 // Yerleşim denemesi için izinli alanlar (panel `layout` ile geçersiz kılabilir); değerler kısa düz metin olmalı
 const LAYOUT_KEYS = ['padding', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
   'verticalAlignment', 'horizontalAlignment', 'referenceBox', 'scaling', 'shadow.mode', 'background.expandPrompt.mode', 'background.seed'];
-async function photoroomBanner(key, mime, bytes, prompt, sandbox, layout, model) {
+async function photoroomBanner(key, mime, bytes, prompt, sandbox, layout, model, size = BANNER_SIZE) {
   const form = new FormData();
   form.append('imageFile', new Blob([bytes], { type: mime }), 'product.jpg');
   form.append('background.prompt', prompt);
-  form.append('outputSize', BANNER_SIZE);
+  form.append('outputSize', size);
   const L = { ...BANNER_LAYOUT };
   Object.entries(layout && typeof layout === 'object' ? layout : {}).forEach(([k, v]) => { if (LAYOUT_KEYS.includes(k)) { if (v === null || v === '') delete L[k]; else if (/^[\w.%-]{1,40}$/.test(String(v))) L[k] = String(v); } });
   Object.entries(L).forEach(([k, v]) => form.append(k, v));
@@ -151,8 +151,15 @@ async function photoroomBanner(key, mime, bytes, prompt, sandbox, layout, model)
   }
   return `data:image/jpeg;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
 }
-// fal.ai banner istemi: ürün yerinde ve aynen kalır, yalnızca beyaz zemin sahneyle değişir, alt üçte bir Qukasoft yazılarına sakin kalır
-const bannerEditPrompt = scene => `Edit this image into a premium ecommerce homepage banner photo. Keep the bag exactly as it is in the image: same position, same size, same angle, same colors, logo, lettering, zippers, straps and details. Do not move, resize, redraw, restyle or crop the bag. Replace only the plain white background with this scene: ${scene} The bag stands naturally on a surface in the scene with a soft realistic contact shadow. Keep the lower third of the image calm and uncluttered (the surface or pedestal under the bag), because text will be placed there. Photorealistic high-end campaign photography, vertical 3:4 composition, exactly one bag, no people, no extra products, no text or letters except what is printed on the bag.`;
+// Banner biçimleri: Photoroom çıktı boyutu, Seedream istek boyutu (~4 MP, aynı oran; panel küçültür) ve Qukasoft yazılarının duracağı boş alan tarifi
+const BANNER_FORMATS = {
+  banner: { out: '1248x1664', fal: { width: 1728, height: 2304 }, shape: 'vertical 3:4', zone: 'Keep the lower third of the image calm and uncluttered (the surface or pedestal under the bag), because text will be placed there.' },
+  slider: { out: '1920x850', fal: { width: 3008, height: 1332 }, shape: 'wide panoramic 1920x850 hero banner', zone: 'The bag is on the right side; keep the left half of the image calm, softly lit and uncluttered with only the soft background, because a headline and button will be placed there.' },
+  'slider-m': { out: '1080x1440', fal: { width: 1728, height: 2304 }, shape: 'vertical 3:4 mobile hero banner', zone: 'Keep the lower 40% of the image calm and uncluttered (the surface under the bag), because a headline and button will be placed there.' },
+  kategori: { out: '800x1000', fal: { width: 1792, height: 2240 }, shape: 'vertical 4:5 category tile', zone: 'Keep the composition centered and minimal with generous even space around the bag.' }
+};
+// fal.ai banner istemi: ürün yerinde ve aynen kalır, yalnızca beyaz zemin sahneyle değişir, biçime göre yazı alanı sakin kalır
+const bannerEditPrompt = (scene, f = BANNER_FORMATS.banner) => `Edit this image into a premium ecommerce homepage image. Keep the bag exactly as it is in the image: same position, same size, same angle, same colors, logo, lettering, zippers, straps and details. Do not move, resize, redraw, restyle or crop the bag. Replace only the plain white background with this scene: ${scene} The bag stands naturally on a surface in the scene with a soft realistic contact shadow. ${f.zone} Photorealistic high-end campaign photography, ${f.shape} composition, exactly one bag, no people, no extra products, no text or letters except what is printed on the bag.`;
 
 // Ürün açıklaması: paneldeki bilgilerden Türkçe, şık bir HTML metin. Bilgi uydurmaması için yalnızca verilen alanlar kullanılır.
 const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
@@ -205,14 +212,15 @@ exports.handler = async event => {
       if (b.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük.' });
       const p = String(body.prompt || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
       if (p.length < 10) return reply(422, { success: false, message: 'Sahne tarifi çok kısa.' });
+      const bf = BANNER_FORMATS[body.format] || BANNER_FORMATS.banner;
       // fal.ai Seedream: panelin yerleştirdiği girdiyi düzenler (yalnızca beyaz zemini sahneyle değiştir). Kuyruk işi döner, panel falResult ile sorar.
       // Seedream küçük boyutu kabul etmediği için 3:4 ~4 MP (1728×2304) istenir; panel 1248×1664'e küçültür.
       if (body.engine === 'fal') {
         if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
-        try { return reply(200, { success: true, action: 'banner', engine: 'fal', pending: true, job: await falSubmit(falKey, bannerEditPrompt(p), [[m[1], b]], { width: 1728, height: 2304 }) }); }
+        try { return reply(200, { success: true, action: 'banner', engine: 'fal', pending: true, job: await falSubmit(falKey, bannerEditPrompt(p, bf), [[m[1], b]], bf.fal) }); }
         catch (e) { return reply(422, { success: false, message: 'fal: ' + (e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)) }); }
       }
-      try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true, body.layout, body.model) }); }
+      try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true, body.layout, body.model, bf.out) }); }
       catch (e) { return reply(422, { success: false, message: e?.name === 'TimeoutError' ? 'Photoroom zaman aşımı.' : String(e?.message || e) }); }
     }
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';

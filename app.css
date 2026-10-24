@@ -372,3 +372,9 @@ body{font-size:15.5px;letter-spacing:0}
 .bn-ok{display:grid;gap:6px;border:1px solid rgba(214,189,143,.4);border-radius:14px;padding:14px;color:#ddd5c8}
 .bn-ok b{color:var(--gold-2);font:600 17px var(--f-d)}.bn-ok small{color:#a99f90}
 .bn-ok .btn{justify-self:start}
+.bn-ov.side{left:7%;right:auto;top:0;bottom:0;align-content:center;justify-items:start;max-width:46%}
+.bn-ov.side span{text-align:left}
+.bn-ov.cat{bottom:0;left:0;right:0;padding:10px 6px;background:linear-gradient(0deg,rgba(255,255,255,.95),rgba(255,255,255,.7))}
+.bn-ov.cat span{background:none;color:#121110;font-weight:700;font-size:13px;letter-spacing:.06em}
+.bn-app{display:flex;gap:8px;align-items:center;color:#ddd5c8;text-decoration:none;font-size:13px;padding:4px 0}
+.bn-app span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-2);border:1px solid rgba(214,189,143,.4);border-radius:999px;padding:2px 8px;white-space:nowrap}

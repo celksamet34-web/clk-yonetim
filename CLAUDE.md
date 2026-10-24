@@ -32,7 +32,13 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Ölçü görseli kullanıcı isteğiyle tamamen kaldırıldı (25.10.2026; birkaç tasarım denendi, beğenilmedi). Daha önce yüklenmiş ölçü görselleri ürün açılınca `dropSizeShots` ile listeden çıkarılır, kaydedince Qukasoft'tan da kalkar. Tanıma yalnızca panelin çizdiği zeminlere bakar: üç köşe renksiz gri 107–137 ya da koyu 8–34.
 - Açıklama: "Yapay zekâ ile yaz" (yalnızca verilen bilgiler, övgü sıfatı yok) ya da "Şablonla yaz"; Qukasoft'a HTML (p, h3, ul, li, strong) gider, panelde güvenli önizleme var.
 
-## Banner stüdyosu (views-banner.js)
+## Görsel stüdyosu (views-banner.js, sayfa #banner)
+
+- Biçimler (`FORMATS` / sunucuda `BANNER_FORMATS`): Anasayfa banner 1248×1664, Slider masaüstü 1920×850 (ürün sağda, sol yazıya), Slider mobil 1080×1440, Kategori kutusu 800×1000 (krem stüdyo, yuvarlak fon). Onaylananlar `localStorage` `clk-banner-approvals` listesinde.
+- Qukasoft panelinde: Tasarım › Bannerlar (`/admin/store/banners`, grup 3 = anasayfa 2'li banner), Manşetler (`/admin/store/headlines`, slider; form alanları baslik, link, button_title, aciklama, buyuk_resim, mobile_image), Blok Yönetimi (`/admin/store/modules`: Manşet #4319 1920×850; Öne Çıkan Kategoriler #4317 T52 — demo kategori numaraları 380–391 kalmıştı; Yeni Ürünler #4315; En Çok Satanlar #4316). Kategori görseli: Kataloglar › Kategoriler formunda `resim`. Marka logosu: Kataloglar › Markalar `resim` (25.10.2026'da hiçbirinde logo yok).
+- Qukasoft'a görsel yüklerken dosya seçme penceresi kullanılamaz: banner'da sayfanın `lagBannerUploadSingleFile(file)` fonksiyonu, form dosya alanlarında `DataTransfer` ile dosya verilir. Kaydet'e öğe referansıyla basılır, ardından "Başarılı" uyarısı ve sitede HTML kontrol edilir (ilk koordinatla tıklama kaydetmeden kapatmıştı).
+
+## Banner stüdyosu (eski not)
 
 - Kullanıcı anasayfa banner ve manşetlerini Claude'un yönetmesini istedi (25.10.2026). Kural: **her görsel önce kullanıcıya gösterilir, onaysız yayına çıkmaz.**
 - Anasayfa (clkcanta.com) banner'ları 3:4 (1248×1664). Qukasoft başlık, alt yazı ve düğmeyi görselin alt kısmına siyah kutularla kendisi yazar; panel önizlemesi bunu taklit eder.
