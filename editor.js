@@ -3,7 +3,7 @@
   const { S, $, $$, esc, tl, num, P, RULES, prices, hex12, call, loadCategories, head, views, go, render, sb, toast } = CLK;
   const BUCKET = 'product-images';
   const COLORS = [['SİYAH','#151515'],['LACİVERT','#1f2a44'],['GRİ','#8b9097'],['FÜME','#4a4d52'],['BEJ','#d9c6a8'],['KAHVE','#5b3f2a'],['TABA','#a2642f'],['KIRMIZI','#b2271f'],['BORDO','#6c1b2a'],['PEMBE','#e8a3b6'],['PUDRA','#e9c9c0'],['MOR','#6a4c93'],['MAVİ','#2f6db5'],['YEŞİL','#2e7d4f'],['HAKİ','#6b6b3a'],['TURUNCU','#e07a1f'],['SARI','#e9c440'],['BEYAZ','#f6f6f4'],['KREM','#efe6d2']];
-  const SLOTS = [['front','Ön','Tam karşıdan, çanta ortada'],['model','Manken','Ön çekimden otomatik üretilir'],['back','Arka','Arka yüz ve askılar'],['side','Yan','Derinliği gösteren açı'],['detail','Detay','Logo, fermuar, dikiş'],['inside','İç','Bölmeler açık'],['extra','Ek','İsteğe bağlı'],['olcu','Ölçü','Ön fotoğraftan ölçülerle çizilir']];
+  const SLOTS = [['front','Ön','Tam karşıdan, çanta ortada'],['model','Manken','Ön çekimden otomatik üretilir'],['back','Arka','Arka yüz ve askılar'],['side','Yan','Derinliği gösteren açı'],['detail','Detay','Logo, fermuar, dikiş'],['inside','İç','Bölmeler açık'],['extra','Ek','İsteğe bağlı']];
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
   const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
   const HEIGHTS = { kadin: 170, erkek: 182, 'kiz-cocuk': 135, 'erkek-cocuk': 138 }; // sunucudaki manken boylarıyla aynı
@@ -104,22 +104,27 @@
     if (D && D._key === key) return true;
     if (S.route === 'yeni') { D = blank(); D._key = key; return true; }
     const p = S.products.find(x => String(x.code) === String(S.arg)); if (!p) return false;
-    D = fromProduct(p); D._key = key; placeSizeShot(D); return true;
+    D = fromProduct(p); D._key = key; dropSizeShots(D); return true;
   }
-  // Qukasoft görsel sırasını tutar, hangi görselin hangi kutuya ait olduğunu tutmaz. Ölçü görseli gri zeminli
-  // (eskileri koyu zeminli) çizildiği için köşeleri düz gri ya da koyu olan görsel Ölçü kutusuna taşınır.
-  const SIZE_GRAY = 122;
-  async function placeSizeShot(d) {
-    if (d.shots.olcu) return;
+  // Ölçü görseli kaldırıldı (25.10.2026). Daha önce yüklenenler ürün açılınca listeden çıkarılır, kaydedince Qukasoft'tan da kalkar.
+  // Tanıma yalnızca panelin çizdiği zeminlere bakar (üç köşe): renksiz gri 122 ya da eski tasarımın koyu zemini (#121110'a yakın).
+  // Koyu fonlu gerçek ürün fotoğrafı silinmesin diye eşikler dar tutuldu.
+  async function dropSizeShots(d) {
+    const found = [];
     for (const [k, s] of Object.entries(d.shots)) {
       if (k === 'front' || k === 'model' || !s.url) continue;
       try {
         const im = await loadImg(s.url), c = document.createElement('canvas'); c.width = c.height = 40; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 40, 40);
-        const px = x.getImageData(0, 0, 40, 40).data, rgb = (i, j) => { const p = (j * 40 + i) * 4; return [px[p], px[p + 1], px[p + 2]]; }, at = (i, j) => rgb(i, j).reduce((a, b) => a + b) / 3;
-        const gray = (i, j) => rgb(i, j).every(v => Math.abs(v - SIZE_GRAY) < 16);
-        if ([at(1, 1), at(38, 1), at(1, 38), at(20, 1)].every(v => v < 60) || [gray(1, 1), gray(38, 1), gray(1, 38)].every(Boolean)) { d.shots.olcu = s; delete d.shots[k]; if (D === d) { S.keepScroll = true; render(); } return; }
+        const px = x.getImageData(0, 0, 40, 40).data, rgb = (i, j) => { const p = (j * 40 + i) * 4; return [px[p], px[p + 1], px[p + 2]]; };
+        const flat = (i, j, lo, hi) => { const v = rgb(i, j); return Math.max(...v) - Math.min(...v) < 8 && v.every(n => n >= lo && n <= hi); };
+        const corners = [[1, 1], [38, 1], [1, 38]];
+        if (corners.every(([i, j]) => flat(i, j, 107, 137)) || corners.every(([i, j]) => flat(i, j, 8, 34))) found.push(k);
       } catch {}
     }
+    if (!found.length || D !== d) return;
+    found.forEach(k => delete d.shots[k]);
+    S.keepScroll = true; render();
+    toast(`Ölçü görseli listeden çıkarıldı (${found.length}). Ürünü kaydedince Qukasoft'tan da kalkar.`);
   }
 
   /* ---------- görünüm ---------- */
@@ -237,13 +242,13 @@
   };
   function shot(k, t, h) {
     const s = D.shots[k], src = s?.preview || s?.url;
-    const isModel = k === 'model', isSize = k === 'olcu', auto = isModel || isSize, act = isModel ? 'edModel' : 'edSize';
+    const isModel = k === 'model', auto = isModel, act = 'edModel';
     if (auto && !src && !hasSize()) h = 'Önce ürün ölçülerini gir';
     return `<div class="shot ${src ? 'has' : ''}"><span class="lb ${isModel ? 'auto' : ''}">${t}</span>
       ${src ? `<img src="${esc(src)}" alt="${t}">` : `<div class="empty-s">${CLK.ICONS.cam}<b>${t}</b><span>${h}</span></div>`}
       ${s?.busy ? `<div class="busy">${esc(s.busy)}</div>` : ''}
       ${src ? `<div class="ops">${auto ? `<button data-act="${act}">Yeniden</button>` : `<button data-act="edCut" data-k="${k}">Dekupe</button>`}<button class="x" data-act="edShotDel" data-k="${k}">Sil</button></div>` :
-        auto ? `<div class="ops"><button data-act="${act}" ${D.shots.front ? '' : 'disabled'}>${isModel ? 'Manken üret' : 'Ölçü çiz'}</button></div>` : `<label><input type="file" accept="image/*" capture="environment" data-shot="${k}" hidden></label>`}</div>`;
+        auto ? `<div class="ops"><button data-act="${act}" ${D.shots.front ? '' : 'disabled'}>Manken üret</button></div>` : `<label><input type="file" accept="image/*" capture="environment" data-shot="${k}" hidden></label>`}</div>`;
   }
 
   /* ---------- görsel hazırlama ---------- */
@@ -433,7 +438,6 @@
       const final = await portrait(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
       if (k === 'front' && !D.shots.model && hasSize()) makeModel();
-      if (k === 'front' && !D.shots.olcu && hasSize()) makeSize();
     } catch (e) { s.busy = ''; toast(e.message); }
     render();
   }
@@ -445,104 +449,6 @@
       const img = await aiImage(base, 'model');
       s.preview = await portrait(img, D.auto.mark, modelImage.focus || {}); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
     } catch (e) { delete D.shots.model; toast('Manken görseli üretilemedi: ' + e.message); }
-    render();
-  }
-  // Ölçü görseli: ön fotoğraftaki çantanın çevresine En, Yükseklik ve Derinlik ölçü çizgileri ile santimetreleri çizer (yapay zekâ yok).
-  // Katalog düzeni: sol üstte başlık ve ürün adı, ortada çanta, ince çizgiler ve çentikler, altın küçük başlıklı değerler, altta özet.
-  async function sizeImage(du) {
-    const L = await bagBox(du); if (!L) throw new Error('Çanta ön fotoğrafta ayırt edilemedi.');
-    await Promise.all(['600 40px "Playfair Display"', '600 20px "Lora"'].map(f => document.fonts.load(f).catch(() => {})));
-    const c = document.createElement('canvas'); c.width = PW; c.height = PH; const x = c.getContext('2d');
-    const s = Math.min(PW * 0.56 / L.bw, PH * 0.44 / L.bh), w = L.bw * s, h = L.bh * s, bx = (PW - w) / 2, by = 780 - h / 2;
-    // Gri zemin: çantanın arkasında stüdyo ışığı. Köşeler düz SIZE_GRAY olur (placeSizeShot buna bakar):
-    // ışığın merkezi hep (600, 780), en yakın köşe ~984 px; düz renk 864 px'te başlar. Köşelerin 80 px içine yazı konmaz.
-    const bg = x.createRadialGradient(PW / 2, 780, 40, PW / 2, 780, PH * 0.75); bg.addColorStop(0, '#adadad'); bg.addColorStop(0.4, '#979797'); bg.addColorStop(0.72, `rgb(${SIZE_GRAY},${SIZE_GRAY},${SIZE_GRAY})`);
-    x.fillStyle = bg; x.fillRect(0, 0, PW, PH);
-    // Yer gölgesi: geniş yumuşak hale ve çantanın hemen altında koyu temas gölgesi
-    x.save(); x.filter = 'blur(28px)'; x.fillStyle = 'rgba(0,0,0,.28)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 14, w * 0.55, 34, 0, 0, Math.PI * 2); x.fill(); x.restore();
-    x.save(); x.filter = 'blur(10px)'; x.fillStyle = 'rgba(0,0,0,.45)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 4, w * 0.4, 10, 0, 0, Math.PI * 2); x.fill(); x.restore();
-    x.drawImage(cutBag(L, w, h, 185), bx, by);
-    const gold = '#e3c78f', line = 'rgba(255,255,255,.92)', fmt = v => String(+v).replace('.', ',') + ' cm';
-    const text = (t, px, py, font, color, spacing = '0px', align = 'center') => { x.save(); x.font = font; x.letterSpacing = spacing; x.textAlign = align; x.textBaseline = 'middle'; x.fillStyle = color; x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 8; x.shadowOffsetY = 2; x.fillText(t, px, py); x.restore(); };
-    const seg = (x0, y0, x1, y1, dash) => { x.save(); x.strokeStyle = dash ? 'rgba(255,255,255,.5)' : line; x.lineWidth = dash ? 1.5 : 2.5; x.lineCap = 'round'; if (dash) x.setLineDash([4, 7]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
-    // Ölçü çizgisi: iki ucunda dik çentik, ortasında yazıya boşluk (gap px)
-    const dim = (x0, y0, x1, y1, gap = 0) => {
-      const a = Math.atan2(y1 - y0, x1 - x0), len = Math.hypot(x1 - x0, y1 - y0), ux = Math.cos(a), uy = Math.sin(a), nx = -uy * 14, ny = ux * 14;
-      const g = Math.min(gap, len - 40) / 2, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-      if (g > 0) { seg(x0, y0, mx - ux * g, my - uy * g); seg(mx + ux * g, my + uy * g, x1, y1); } else seg(x0, y0, x1, y1);
-      seg(x0 - nx, y0 - ny, x0 + nx, y0 + ny); seg(x1 - nx, y1 - ny, x1 + nx, y1 + ny);
-    };
-    // Değer bloğu: altın küçük başlık ve altında büyük serif değer; genişliğini döndürür
-    const VAL = '600 40px "Playfair Display", Georgia, serif', CAP = '600 20px "Lora", Georgia, serif';
-    const blockW = (cap, val) => { x.save(); x.font = VAL; const a = x.measureText(val).width; x.font = CAP; x.letterSpacing = '5px'; const b = x.measureText(cap).width; x.restore(); return Math.max(a, b); };
-    const block = (cap, val, px, py, align = 'center') => { text(cap, px, py - 24, CAP, gold, '5px', align); text(val, px, py + 12, VAL, '#fff', '0px', align); };
-    if (+D.w > 0) {
-      const y = by + h + 92, v = fmt(D.w), bw = blockW('EN', v);
-      seg(bx, by + h + 22, bx, y + 22, true); seg(bx + w, by + h + 22, bx + w, y + 22, true);
-      dim(bx, y, bx + w, y, bw + 48); block('EN', v, bx + w / 2, y - 6);
-    }
-    if (+D.h > 0) {
-      const X = bx - 86, v = fmt(D.h), bw = blockW('YÜKSEKLİK', v);
-      seg(bx - 22, by, X - 22, by, true); seg(bx - 22, by + h, X - 22, by + h, true);
-      dim(X, by, X, by + h, bw + 48);
-      x.save(); x.translate(X, by + h / 2); x.rotate(-Math.PI / 2); block('YÜKSEKLİK', v, 0, -6); x.restore();
-    }
-    if (+D.d > 0) {
-      const x0 = bx + w + 34, y0 = by + h - 14, len = Math.min(200, 60 + +D.d * 9), x1 = x0 + len * 0.7, y1 = y0 - len * 0.7, v = fmt(D.d);
-      dim(x0, y0, x1, y1);
-      const bw = blockW('DERİNLİK', v), px = Math.min(x1 + 18, PW - 80 - bw); // sağ kenardan taşmasın
-      block('DERİNLİK', v, px, y1 - 52, 'left');
-    }
-    // Başlık: altın küçük yazı, ince altın çizgi, ürün adı (rozetle çakışmasın diye genişlik sınırlı)
-    text('ÜRÜN ÖLÇÜLERİ', 88, 118, '600 20px "Lora", Georgia, serif', gold, '7px', 'left');
-    x.save(); x.strokeStyle = gold; x.globalAlpha = 0.8; x.lineWidth = 1.5; x.beginPath(); x.moveTo(88, 146); x.lineTo(168, 146); x.stroke(); x.restore();
-    if (D.name) {
-      x.save(); x.font = '600 44px "Playfair Display", Georgia, serif'; let n = D.name.trim(); const max = D.waterproof ? PW - 88 - 330 : PW - 176;
-      if (x.measureText(n).width > max) { while (n.length > 1 && x.measureText(n + '…').width > max) n = n.slice(0, -1); n = n.trimEnd() + '…'; }
-      x.restore(); text(n, 88, 192, '600 44px "Playfair Display", Georgia, serif', '#fff', '0px', 'left');
-    }
-    // Özet: En × Yükseklik × Derinlik
-    const parts = [[D.w, 'EN'], [D.h, 'YÜKSEKLİK'], [D.d, 'DERİNLİK']].filter(([v]) => +v > 0);
-    if (parts.length) {
-      x.save(); x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1; x.beginPath(); x.moveTo(PW / 2 - 220, PH - 228); x.lineTo(PW / 2 + 220, PH - 228); x.stroke(); x.restore();
-      text(parts.map(([v]) => String(+v).replace('.', ',')).join(' × ') + ' cm', PW / 2, PH - 170, '600 54px "Playfair Display", Georgia, serif', '#fff');
-      text(parts.map(([, k]) => k).join('  ×  '), PW / 2, PH - 118, '600 18px "Lora", Georgia, serif', gold, '5px');
-    }
-    if (D.waterproof) waterBadge(x, PW - 165, 165, 115);
-    if (D.auto.mark) { x.save(); x.globalAlpha = 0.22; x.fillStyle = '#fff'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); }
-    return c.toDataURL('image/jpeg', 0.92);
-  }
-  // Su geçirmez rozeti: CLK renkleriyle koyu daire, altın halka, su damlası ve dalgalar
-  function waterBadge(x, cx, cy, r) {
-    const gold = '#b48f55', gold2 = '#d6bd8f';
-    x.save();
-    x.shadowColor = 'rgba(0,0,0,.18)'; x.shadowBlur = 24; x.shadowOffsetY = 8;
-    x.fillStyle = '#121110'; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
-    x.shadowColor = 'transparent';
-    x.strokeStyle = gold; x.lineWidth = 3; x.beginPath(); x.arc(cx, cy, r - 11, 0, Math.PI * 2); x.stroke();
-    x.lineWidth = 1; x.globalAlpha = 0.5; x.beginPath(); x.arc(cx, cy, r - 18, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1;
-    // damla
-    const dy = cy - 36, dh = 46;
-    const g = x.createLinearGradient(cx, dy - dh, cx, dy + dh * 0.6); g.addColorStop(0, gold2); g.addColorStop(1, gold);
-    x.fillStyle = g; x.beginPath(); x.moveTo(cx, dy - dh);
-    x.bezierCurveTo(cx + 10, dy - dh * 0.55, cx + 30, dy - 8, cx + 30, dy + 10); x.arc(cx, dy + 10, 30, 0, Math.PI); x.bezierCurveTo(cx - 30, dy - 8, cx - 10, dy - dh * 0.55, cx, dy - dh); x.fill();
-    x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 4; x.lineCap = 'round'; x.beginPath(); x.arc(cx, dy + 10, 18, Math.PI * 0.62, Math.PI * 0.92); x.stroke();
-    // dalgalar
-    x.strokeStyle = gold; x.lineWidth = 2.5;
-    for (const [oy, wv] of [[dy + 50, 40], [dy + 59, 26]]) { x.beginPath(); for (let i = -wv; i <= wv; i += 2) { const yy = oy + Math.sin(i / 7) * 3; i === -wv ? x.moveTo(cx + i, yy) : x.lineTo(cx + i, yy); } x.stroke(); }
-    // yazı
-    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.font = '600 18px "Playfair Display", Georgia, serif'; x.letterSpacing = '2px'; x.fillText('SU GEÇİRMEZ', cx + 1, cy + 50);
-    x.fillStyle = gold2; x.font = '500 11px "Lora", Georgia, serif'; x.letterSpacing = '4px'; x.fillText('WATERPROOF', cx + 2, cy + 72);
-    x.restore();
-  }
-  async function makeSize() {
-    const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.'); if (!hasSize()) return toast('Önce ürün ölçülerini gir.');
-    const s = (D.shots.olcu = { busy: 'Ölçü görseli çiziliyor…' }); render();
-    try {
-      const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await portrait(src, false);
-      s.preview = await sizeImage(base); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
-    } catch (e) { delete D.shots.olcu; toast('Ölçü görseli çizilemedi: ' + e.message); }
     render();
   }
 
@@ -735,7 +641,6 @@
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : portrait(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
-    else if (act === 'edSize') makeSize();
     else if (act === 'edAud') { D.audience = el.dataset.a; S.keepScroll = true; render(); }
     else if (act === 'edCarry') { D.carry = el.dataset.c; S.keepScroll = true; render(); }
     else if (act === 'edGallery') openGallery(+el.dataset.i || 0);
