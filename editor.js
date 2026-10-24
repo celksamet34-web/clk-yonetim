@@ -94,7 +94,7 @@
           ${fld('Ürün kodu', `<div class="inline">${inp('code', D.isNew ? '' : 'readonly')}${D.isNew ? '<button class="btn sm" data-act="edCode">Yenile</button>' : ''}</div>`)}
           ${fld('Barkod', inp('barcode', 'placeholder="Varsa üretici barkodu"'))}
           ${fld('Kısa açıklama', inp('shortDescription', 'placeholder="Listelerde görünen tek cümle"'), 'full')}
-          <div class="f full"><span>Ürün açıklaması</span><textarea data-k="longDescription" rows="5" placeholder="Malzeme, bölmeler, askı, kullanım…">${esc(D.longDescription)}</textarea><button class="btn sm" data-act="edDesc" style="justify-self:start">Bilgilerden açıklama yaz</button>
+          <div class="f full"><span>Ürün açıklaması</span><textarea data-k="longDescription" rows="5" placeholder="Malzeme, bölmeler, askı, kullanım…">${esc(D.longDescription)}</textarea><div class="inline" style="justify-self:start;gap:8px;flex-wrap:wrap"><button class="btn sm dark" data-act="edDescAi">Yapay zekâ ile yaz</button><button class="btn sm" data-act="edDesc">Şablonla yaz</button></div>
             ${/<\w/.test(D.longDescription) ? `<div class="desc-pv"><span class="desc-pv-h">Sitede böyle görünür</span>${safeHtml(D.longDescription)}</div>` : ''}</div>
           ${fld('Malzeme', inp('material', 'placeholder="ör. Suni deri"'))}
           <label class="toggle full"><input type="checkbox" data-k="active" ${D.active ? 'checked' : ''}> Sitede yayında</label>
@@ -427,6 +427,21 @@
       `<h3>Ürün bilgileri</h3><ul>${info.map(([k, v]) => `<li><strong>${k}:</strong> ${e(v)}</li>`).join('')}</ul>`,
       `<h3>Bakım önerisi</h3><p>${careText()}</p>`].filter(Boolean).join('\n');
   }
+  // Yapay zekâ ile açıklama: yalnızca paneldeki bilgiler gider; hata olursa şablona düşer
+  async function aiDesc(btn) {
+    const [noun] = productKind();
+    const facts = { marka: D.brand, urunAdi: D.name, urunTuru: noun, kategori: D.categoryName, urunKodu: D.code, malzeme: D.material, olculer: sizeLine() && `${sizeLine()} (en × yükseklik × derinlik)`,
+      renkler: D.variants.map(v => v.v.toLocaleLowerCase('tr')), suGecirmez: D.waterproof ? 'evet' : '', tasima: D.carry && CARRY_LABEL[D.carry], kisaAciklama: D.shortDescription };
+    btn.disabled = true; btn.textContent = 'Yazılıyor…';
+    try {
+      const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');
+      const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'describe', facts }) });
+      const j = await r.json().catch(() => ({})); if (!r.ok || !j.long) throw new Error(j.message || 'Yanıt alınamadı');
+      D.longDescription = safeHtml(j.long).replace(/<\/(p|h3|ul|li)>/g, '</$1>\n').trim();
+      if (!D.shortDescription.trim() && j.short) D.shortDescription = j.short;
+    } catch (e) { toast('Yapay zekâ yazamadı, şablon kullanıldı: ' + e.message.split(/[.\n]/)[0]); D.longDescription = autoDesc(); if (!D.shortDescription.trim()) D.shortDescription = autoShort(); }
+    S.keepScroll = true; render();
+  }
   function autoShort() {
     const [noun] = productKind(), size = sizeLine();
     return [[D.brand, D.name].filter(Boolean).join(' '), [D.material, noun].filter(Boolean).join(' '), size, D.waterproof && 'su geçirmez'].filter(Boolean).join(' · ');
@@ -489,6 +504,7 @@
     if (!act.startsWith('ed')) return prevAct?.(act, el, e);
     if (act === 'edCalc') { if (!(+D.buyPrice > 0)) return toast('Önce alış fiyatını gir'); const r = prices(D.buyPrice); Object.assign(D, { listPrice: r.market, salePrice: r.retail, fastSalePrice: r.quick, dealerPrice1: r.d1, dealerPrice2: r.d2, dealerPrice3: r.d3 }); S.keepScroll = true; render(); }
     else if (act === 'edCode') { D.code = hex12('CLK-'); S.keepScroll = true; render(); }
+    else if (act === 'edDescAi') aiDesc(el);
     else if (act === 'edDesc') { D.longDescription = autoDesc(); if (!D.shortDescription.trim()) D.shortDescription = autoShort(); S.keepScroll = true; render(); }
     else if (act === 'edVdel') { D.variants.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }

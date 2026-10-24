@@ -114,6 +114,30 @@ async function photoroom(key, mime, bytes) {
   return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
 }
 
+// Ürün açıklaması: paneldeki bilgilerden Türkçe, şık bir HTML metin. Bilgi uydurmaması için yalnızca verilen alanlar kullanılır.
+const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
+async function describe(key, facts) {
+  const f = Object.fromEntries(Object.entries(facts || {}).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 300) : v]));
+  const sys = 'Sen premium bir Türk çanta markası (CLK Çanta) için e-ticaret metin yazarısın. Akıcı, zarif ve güven veren bir Türkçeyle yazarsın; abartılı reklam dili, ünlem ve emoji kullanmazsın. YALNIZCA verilen bilgileri kullanırsın: bölme sayısı, fermuar türü, garanti, iade, kargo, malzeme kalitesi derecesi gibi verilmeyen hiçbir özellik uydurmazsın. Yanıtı JSON olarak verirsin: {"long": "...", "short": "..."}.';
+  const user = `Ürün bilgileri (JSON): ${JSON.stringify(f)}
+
+"long" için yalnızca şu HTML etiketlerini kullan: <p>, <h3>, <ul>, <li>, <strong>. Yapı:
+1) Ürünün kimliğini ve kullanım alanını anlatan 2 kısa paragraf (ilk paragrafta marka ve ürün adı <strong> ile).
+2) <h3>Öne çıkan özellikler</h3> ve verilen bilgilere dayanan 3-5 madde.
+3) <h3>Ürün bilgileri</h3> ve "<strong>Alan:</strong> değer" biçiminde maddeler (yalnızca verilen alanlar).
+4) <h3>Bakım önerisi</h3> ve malzemeye uygun tek paragraf.
+Toplam 120-200 kelime. "short" için listelerde görünecek, 90 karakteri geçmeyen tek cümle yaz.`;
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25000),
+    body: JSON.stringify({ model: TEXT_MODEL, temperature: 0.7, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.message || `OpenAI ${r.status}`);
+  const out = JSON.parse(j?.choices?.[0]?.message?.content || '{}');
+  if (!out.long) throw new Error('Boş yanıt');
+  return { long: String(out.long), short: String(out.short || '').slice(0, 120) };
+}
+
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return reply(405, { success: false, message: 'Yalnızca POST kabul edilir.' });
   const bearer = /^Bearer\s+(.+)$/i.exec(header(event.headers, 'authorization'));
@@ -127,6 +151,11 @@ exports.handler = async event => {
       if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
       try { return reply(200, { success: true, action: 'model', engine: 'fal', ...(await falPoll(falKey, body.job)) }); }
       catch (e) { return reply(422, { success: false, message: 'fal: ' + String(e?.message || e) }); }
+    }
+    if (body.action === 'describe') {
+      if (!apiKey) return reply(503, { success: false, message: 'OPENAI_API_KEY eksik.' });
+      try { return reply(200, { success: true, ...(await describe(apiKey, body.facts)) }); }
+      catch (e) { return reply(422, { success: false, message: 'Açıklama yazılamadı: ' + String(e?.message || e) }); }
     }
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
     const [person, audienceHeight] = AUDIENCE[body.audience] || AUDIENCE.kadin;
