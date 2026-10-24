@@ -15,7 +15,7 @@
   function blank() {
     return { isNew: true, code: hex12('CLK-'), name: '', barcode: '', brand: 'CLK', categoryId: '', categoryName: '', shortDescription: '', longDescription: '', active: true,
       buyPrice: '', listPrice: '', salePrice: '', fastSalePrice: '', dealerPrice1: '', dealerPrice2: '', dealerPrice3: '', taxRate: RULES.kdv, shipmentPayment: 0,
-      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, audience: 'kadin', carry: 'capraz', mh: '', auto: { cutout: true, mark: true } };
+      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, audience: 'kadin', carry: 'capraz', mh: '', waterproof: false, auto: { cutout: true, mark: true } };
   }
   function fromProduct(p) {
     const imgs = P.imgs(p), shots = {};
@@ -25,7 +25,7 @@
       buyPrice: p.buyPrice ?? '', listPrice: p.listPrice ?? '', salePrice: p.salePrice ?? '', fastSalePrice: p.fastSalePrice ?? '', dealerPrice1: p.dealerPrice1 ?? '', dealerPrice2: p.dealerPrice2 ?? '', dealerPrice3: p.dealerPrice3 ?? '',
       taxRate: Number(p.taxRate ?? RULES.kdv), shipmentPayment: Number(p.shipmentPayment) || 0, desi: p.desi ?? RULES.desi, quantity: P.qty(p),
       variants: (Array.isArray(p.variants) ? p.variants : []).map(v => ({ v: [v.value1, v.value2, v.value3].filter(Boolean).join(' / '), b: v.barcode || '', q: Number(v.quantity) || 0 })),
-      w: '', d: '', h: '', material: '', shots, audience: 'kadin', carry: 'capraz', mh: '', auto: { cutout: true, mark: true } };
+      w: '', d: '', h: '', material: '', shots, audience: 'kadin', carry: 'capraz', mh: '', waterproof: false, auto: { cutout: true, mark: true } };
   }
   function ensure() {
     const key = S.route === 'yeni' ? 'new' : 'e:' + S.arg;
@@ -83,6 +83,7 @@
           <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
           <div class="f"><span>Taşıma şekli</span><div class="chips" style="margin:0">${CARRIES.map(([k, l]) => `<button class="chip" data-act="edCarry" data-c="${k}" aria-pressed="${D.carry === k}">${l}</button>`).join('')}</div></div>
           <div class="fg three">${fld('En (cm)', ninp('w'))}${fld('Yükseklik (cm)', ninp('h'))}${fld('Derinlik (cm)', ninp('d'))}${fld('Manken boyu (cm)', ninp('mh', `placeholder="${HEIGHTS[D.audience]}"`))}</div>
+          <label class="toggle"><input type="checkbox" data-k="waterproof" ${D.waterproof ? 'checked' : ''}> Su geçirmez (ölçü görseline rozet ekler)</label>
           <p class="hint">Ürün ölçüleri girilince çanta mankenin boyuna göre gerçek ölçüsünde gösterilir; ölçü yoksa manken otomatik üretilmez. Seçimi ya da ölçüyü değiştirdikten sonra Manken kutusunda “Yeniden”e bas.</p>
           <div class="row-opts"><label class="toggle"><input type="checkbox" data-auto="cutout" ${D.auto.cutout ? 'checked' : ''}> Otomatik dekupe</label><label class="toggle"><input type="checkbox" data-auto="mark" ${D.auto.mark ? 'checked' : ''}> CLK filigranı</label></div></div></section>
       <section class="step"><div class="step-h"><span class="no">02</span><div><h2>Ürün bilgileri</h2><p>Sitede ve faturada görünecek bilgiler</p></div></div>
@@ -325,7 +326,32 @@
     if (+D.w > 0) { const y = by + h + 70; tick(bx, by + h + 10, bx, y + 16); tick(bx + w, by + h + 10, bx + w, y + 16); arrow(bx, y, bx + w, y); label('En ' + fmt(D.w), bx + w / 2, y); }
     if (+D.h > 0) { const X = bx - 70; tick(bx - 10, by, X - 16, by); tick(bx - 10, by + h, X - 16, by + h); arrow(X, by, X, by + h); label('Yükseklik ' + fmt(D.h), X, by + h / 2, 'center', -Math.PI / 2); }
     if (+D.d > 0) { const x0 = bx + w + 30, y0 = by + h - 10, len = Math.min(220, 60 + +D.d * 10); arrow(x0, y0, x0 + len * 0.7, y0 - len * 0.7); label('Derinlik ' + fmt(D.d), x0 + len * 0.7 + 14, y0 - len * 0.7 - 34, 'left'); }
+    if (D.waterproof) waterBadge(x, N - 165, 165, 115);
     return c.toDataURL('image/jpeg', 0.92);
+  }
+  // Su geçirmez rozeti: CLK renkleriyle koyu daire, altın halka, su damlası ve dalgalar
+  function waterBadge(x, cx, cy, r) {
+    const gold = '#b48f55', gold2 = '#d6bd8f';
+    x.save();
+    x.shadowColor = 'rgba(0,0,0,.18)'; x.shadowBlur = 24; x.shadowOffsetY = 8;
+    x.fillStyle = '#121110'; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+    x.shadowColor = 'transparent';
+    x.strokeStyle = gold; x.lineWidth = 3; x.beginPath(); x.arc(cx, cy, r - 11, 0, Math.PI * 2); x.stroke();
+    x.lineWidth = 1; x.globalAlpha = 0.5; x.beginPath(); x.arc(cx, cy, r - 18, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1;
+    // damla
+    const dy = cy - 36, dh = 46;
+    const g = x.createLinearGradient(cx, dy - dh, cx, dy + dh * 0.6); g.addColorStop(0, gold2); g.addColorStop(1, gold);
+    x.fillStyle = g; x.beginPath(); x.moveTo(cx, dy - dh);
+    x.bezierCurveTo(cx + 10, dy - dh * 0.55, cx + 30, dy - 8, cx + 30, dy + 10); x.arc(cx, dy + 10, 30, 0, Math.PI); x.bezierCurveTo(cx - 30, dy - 8, cx - 10, dy - dh * 0.55, cx, dy - dh); x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 4; x.lineCap = 'round'; x.beginPath(); x.arc(cx, dy + 10, 18, Math.PI * 0.62, Math.PI * 0.92); x.stroke();
+    // dalgalar
+    x.strokeStyle = gold; x.lineWidth = 2.5;
+    for (const [oy, wv] of [[dy + 50, 40], [dy + 59, 26]]) { x.beginPath(); for (let i = -wv; i <= wv; i += 2) { const yy = oy + Math.sin(i / 7) * 3; i === -wv ? x.moveTo(cx + i, yy) : x.lineTo(cx + i, yy); } x.stroke(); }
+    // yazı
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '600 18px "Playfair Display", Georgia, serif'; x.letterSpacing = '2px'; x.fillText('SU GEÇİRMEZ', cx + 1, cy + 50);
+    x.fillStyle = gold2; x.font = '500 11px "Lora", Georgia, serif'; x.letterSpacing = '4px'; x.fillText('WATERPROOF', cx + 2, cy + 72);
+    x.restore();
   }
   async function makeSize() {
     const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.'); if (!hasSize()) return toast('Önce ürün ölçülerini gir.');
