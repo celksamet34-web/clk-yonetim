@@ -5,13 +5,14 @@
   const COLORS = [['SİYAH','#151515'],['LACİVERT','#1f2a44'],['GRİ','#8b9097'],['FÜME','#4a4d52'],['BEJ','#d9c6a8'],['KAHVE','#5b3f2a'],['TABA','#a2642f'],['KIRMIZI','#b2271f'],['BORDO','#6c1b2a'],['PEMBE','#e8a3b6'],['PUDRA','#e9c9c0'],['MOR','#6a4c93'],['MAVİ','#2f6db5'],['YEŞİL','#2e7d4f'],['HAKİ','#6b6b3a'],['TURUNCU','#e07a1f'],['SARI','#e9c440'],['BEYAZ','#f6f6f4'],['KREM','#efe6d2']];
   const SLOTS = [['front','Ön','Tam karşıdan, çanta ortada'],['model','Manken','Ön çekimden otomatik üretilir'],['back','Arka','Arka yüz ve askılar'],['side','Yan','Derinliği gösteren açı'],['detail','Detay','Logo, fermuar, dikiş'],['inside','İç','Bölmeler açık'],['extra','Ek','İsteğe bağlı']];
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
+  const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
   const hexOf = n => (COLORS.find(c => c[0] === String(n).toLocaleUpperCase('tr')) || [0, '#ddd'])[1];
 
   let D = null; // taslak
   function blank() {
     return { isNew: true, code: hex12('CLK-'), name: '', barcode: '', brand: 'CLK', categoryId: '', categoryName: '', shortDescription: '', longDescription: '', active: true,
       buyPrice: '', listPrice: '', salePrice: '', fastSalePrice: '', dealerPrice1: '', dealerPrice2: '', dealerPrice3: '', taxRate: RULES.kdv, shipmentPayment: 0,
-      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, auto: { cutout: true, mark: true } };
+      desi: RULES.desi, quantity: RULES.stock, variants: [], w: '', d: '', h: '', material: '', shots: {}, audience: 'kadin', auto: { cutout: true, mark: true } };
   }
   function fromProduct(p) {
     const imgs = P.imgs(p), shots = {};
@@ -21,7 +22,7 @@
       buyPrice: p.buyPrice ?? '', listPrice: p.listPrice ?? '', salePrice: p.salePrice ?? '', fastSalePrice: p.fastSalePrice ?? '', dealerPrice1: p.dealerPrice1 ?? '', dealerPrice2: p.dealerPrice2 ?? '', dealerPrice3: p.dealerPrice3 ?? '',
       taxRate: Number(p.taxRate ?? RULES.kdv), shipmentPayment: Number(p.shipmentPayment) || 0, desi: p.desi ?? RULES.desi, quantity: P.qty(p),
       variants: (Array.isArray(p.variants) ? p.variants : []).map(v => ({ v: [v.value1, v.value2, v.value3].filter(Boolean).join(' / '), b: v.barcode || '', q: Number(v.quantity) || 0 })),
-      w: '', d: '', h: '', material: '', shots, auto: { cutout: true, mark: true } };
+      w: '', d: '', h: '', material: '', shots, audience: 'kadin', auto: { cutout: true, mark: true } };
   }
   function ensure() {
     const key = S.route === 'yeni' ? 'new' : 'e:' + S.arg;
@@ -75,6 +76,8 @@
     <div class="ed"><div class="steps">
       <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, 1200×1200 kare ve CLK filigranlı hazırlanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
         <div class="step-b"><div class="shots">${SLOTS.map(([k, t, h]) => shot(k, t, h)).join('')}</div>
+          <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
+          <p class="hint">Manken görseli seçilen kişiyle üretilir. En, boy ve yükseklik girilirse çanta mankene göre gerçek ölçüsünde gösterilir. Seçimi değiştirdikten sonra Manken kutusunda “Yeniden”e bas.</p>
           <div class="row-opts"><label class="toggle"><input type="checkbox" data-auto="cutout" ${D.auto.cutout ? 'checked' : ''}> Otomatik dekupe</label><label class="toggle"><input type="checkbox" data-auto="mark" ${D.auto.mark ? 'checked' : ''}> CLK filigranı</label></div></div></section>
       <section class="step"><div class="step-h"><span class="no">02</span><div><h2>Ürün bilgileri</h2><p>Sitede ve faturada görünecek bilgiler</p></div></div>
         <div class="step-b"><div class="fg">
@@ -135,7 +138,18 @@
     if (error) throw new Error('Fotoğraf yüklenemedi.');
     return path;
   }
+  // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
+  // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
+  async function modelImage(du) {
+    const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
+    const body = { action: 'model', image: du, audience: D.audience, size: { w: D.w, d: D.d, h: D.h }, kind: [D.categoryName, D.name].filter(Boolean).join(' · ') };
+    const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.'); return j.image;
+  }
   async function aiImage(du, action) {
+    if (action === 'model') { const img = await modelImage(du); if (img) return img; }
     const j = await call('ai-product-image', { method: 'POST', body: { action, image: du } });
     if (!j.image) throw new Error('Görsel hazırlanamadı.'); return j.image;
   }
@@ -241,6 +255,7 @@
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : square(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
+    else if (act === 'edAud') { D.audience = el.dataset.a; S.keepScroll = true; render(); }
     else if (act === 'edGallery') openGallery(+el.dataset.i || 0);
     else if (act === 'edSend') send(el);
     else if (act === 'edDraft') saveDraft();
