@@ -10,11 +10,18 @@ const AUDIENCE = {
   'erkek-cocuk': ['one Turkish boy child model, around 8 to 10 years old, in modest age-appropriate casual clothing', 138]
 };
 const cm = v => { const n = Number(v); return n > 0 && n < 300 ? Math.round(n) : 0; };
-function scaleText(size, height) {
+// Görüntü modelleri santimetreyi zayıf anlar; ölçüyü mankenin baş boyu ve gövdesi cinsinden de tarif ederiz.
+function scaleText(size, height, child) {
   const w = cm(size?.w), h = cm(size?.h), d = cm(size?.d);
   if (!w && !h) return `Keep the bag at a realistic real-world size relative to a person about ${height} cm tall.`;
+  const head = height / (child ? 6.5 : 7.5), torso = height * 0.3, shoulders = height * (child ? 0.22 : 0.25);
+  const r = v => Math.round(v * 10) / 10;
   const dims = [w && `${w} cm wide`, h && `${h} cm tall`, d && `${d} cm deep`].filter(Boolean).join(', ');
-  return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall. Render the bag at exactly this real size relative to the body (for reference, a ${height} cm person's shoulder width is about ${Math.round(height * 0.24)} cm). Do not enlarge or shrink the bag for styling.`;
+  const rel = [
+    h && `its height is about ${r(h / head)} times the model's head height and about ${Math.round(h / torso * 100)}% of the torso length (shoulder to hip)`,
+    w && `its width is about ${r(w / head)} head heights, about ${Math.round(w / shoulders * 100)}% of the shoulder width`
+  ].filter(Boolean).join('; ');
+  return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; do not enlarge or shrink it for styling, and choose a framing (full body or three-quarter) that makes the size comparison obvious.`;
 }
 
 function reply(statusCode, payload) {
@@ -45,7 +52,7 @@ exports.handler = async event => {
     if (action === 'original') return reply(200, { success: true, action, image: body.image });
     const prompt = action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
-      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
+      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''))} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
     // Logo ve yazıların korunması için yüksek girdi sadakati; model desteklemezse ayarsız tekrar dener.
     const edit = async fidelity => {
       const form = new FormData();

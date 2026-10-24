@@ -37,6 +37,7 @@
   const inp = (k, attrs = '') => `<input type="text" data-k="${k}" value="${esc(D[k] ?? '')}" ${attrs}>`;
   const ninp = (k, attrs = '') => `<input type="number" inputmode="decimal" step="0.01" data-k="${k}" value="${esc(D[k] ?? '')}" ${attrs}>`;
   const isValiz = () => /VAL[İI]Z/i.test(D.categoryName || '');
+  const hasSize = () => +D.w > 0 || +D.h > 0;
   function checks() {
     const c = [['Ürün adı', !!D.name.trim()], ['Kategori', !!D.categoryId || !D.isNew], ['Alış ve satış fiyatı', +D.buyPrice > 0 && +D.salePrice > 0], ['Renk ve stok', D.variants.length > 0 || +D.quantity >= 0], ['Ön fotoğraf', !!D.shots.front], ['En az 4 fotoğraf', Object.keys(D.shots).length >= 4]];
     return c;
@@ -77,7 +78,8 @@
       <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, 1200×1200 kare ve CLK filigranlı hazırlanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
         <div class="step-b"><div class="shots">${SLOTS.map(([k, t, h]) => shot(k, t, h)).join('')}</div>
           <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
-          <p class="hint">Manken görseli seçilen kişiyle üretilir. En, boy ve yükseklik girilirse çanta mankene göre gerçek ölçüsünde gösterilir. Seçimi değiştirdikten sonra Manken kutusunda “Yeniden”e bas.</p>
+          <div class="fg three">${fld('En (cm)', ninp('w'))}${fld('Yükseklik (cm)', ninp('h'))}${fld('Derinlik (cm)', ninp('d'))}</div>
+          <p class="hint">Ürün ölçüleri girilince çanta mankenin boyuna göre gerçek ölçüsünde gösterilir; ölçü yoksa manken otomatik üretilmez. Seçimi ya da ölçüyü değiştirdikten sonra Manken kutusunda “Yeniden”e bas.</p>
           <div class="row-opts"><label class="toggle"><input type="checkbox" data-auto="cutout" ${D.auto.cutout ? 'checked' : ''}> Otomatik dekupe</label><label class="toggle"><input type="checkbox" data-auto="mark" ${D.auto.mark ? 'checked' : ''}> CLK filigranı</label></div></div></section>
       <section class="step"><div class="step-h"><span class="no">02</span><div><h2>Ürün bilgileri</h2><p>Sitede ve faturada görünecek bilgiler</p></div></div>
         <div class="step-b"><div class="fg">
@@ -88,7 +90,7 @@
           ${fld('Barkod', inp('barcode', 'placeholder="Varsa üretici barkodu"'))}
           ${fld('Kısa açıklama', inp('shortDescription', 'placeholder="Listelerde görünen tek cümle"'), 'full')}
           <div class="f full"><span>Ürün açıklaması</span><textarea data-k="longDescription" rows="5" placeholder="Malzeme, bölmeler, askı, kullanım…">${esc(D.longDescription)}</textarea><button class="btn sm" data-act="edDesc" style="justify-self:start">Bilgilerden açıklama yaz</button></div>
-          ${fld('En (cm)', ninp('w'))}${fld('Boy (cm)', ninp('d'))}${fld('Yükseklik (cm)', ninp('h'))}${fld('Malzeme', inp('material', 'placeholder="ör. Suni deri"'))}
+          ${fld('Malzeme', inp('material', 'placeholder="ör. Suni deri"'))}
           <label class="toggle full"><input type="checkbox" data-k="active" ${D.active ? 'checked' : ''}> Sitede yayında</label>
         </div></div></section>
       <section class="step"><div class="step-h"><span class="no">03</span><div><h2>Fiyatlar</h2><p>Alış fiyatını gir; diğerleri kurallara göre dolar, istersen değiştir.</p></div></div>
@@ -112,6 +114,7 @@
   function shot(k, t, h) {
     const s = D.shots[k], src = s?.preview || s?.url;
     const isModel = k === 'model';
+    if (isModel && !src && !hasSize()) h = 'Önce ürün ölçülerini gir';
     return `<div class="shot ${src ? 'has' : ''}"><span class="lb ${isModel ? 'auto' : ''}">${t}</span>
       ${src ? `<img src="${esc(src)}" alt="${t}">` : `<div class="empty-s">${CLK.ICONS.cam}<b>${t}</b><span>${h}</span></div>`}
       ${s?.busy ? `<div class="busy">${esc(s.busy)}</div>` : ''}
@@ -142,7 +145,8 @@
   // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
   async function modelImage(du) {
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
-    const body = { action: 'model', image: du, audience: D.audience, size: { w: D.w, d: D.d, h: D.h }, kind: [D.categoryName, D.name].filter(Boolean).join(' · ') };
+    // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
+    const body = { action: 'model', image: du, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
     const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const j = await r.json().catch(() => ({}));
@@ -160,7 +164,7 @@
       if (D.auto.cutout) { s.busy = 'Arka plan temizleniyor…'; render(); try { base = await aiImage(base, 'cutout'); } catch (e) { toast('Dekupe yapılamadı, orijinal kullanıldı.'); } }
       const final = await square(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
-      if (k === 'front' && !D.shots.model) makeModel();
+      if (k === 'front' && !D.shots.model && hasSize()) makeModel();
     } catch (e) { s.busy = ''; toast(e.message); }
     render();
   }
@@ -195,7 +199,7 @@
     const parts = [];
     if (D.name) parts.push(`${D.name}${D.brand ? ', ' + D.brand + ' kalitesiyle' : ''} günlük kullanım için tasarlandı.`);
     if (D.material) parts.push(`Malzeme: ${D.material}.`);
-    if (+D.w || +D.d || +D.h) parts.push(`Ölçüler: ${[D.w && 'En ' + D.w + ' cm', D.d && 'Boy ' + D.d + ' cm', D.h && 'Yükseklik ' + D.h + ' cm'].filter(Boolean).join(' · ')}.`);
+    if (hasSize()) parts.push(`Ölçüler: ${[D.w && 'En ' + D.w + ' cm', D.h && 'Yükseklik ' + D.h + ' cm', D.d && 'Derinlik ' + D.d + ' cm'].filter(Boolean).join(' · ')}.`);
     if (D.variants.length) parts.push(`Renk seçenekleri: ${D.variants.map(v => v.v.toLocaleLowerCase('tr')).join(', ')}.`);
     return parts.join(' ');
   }
