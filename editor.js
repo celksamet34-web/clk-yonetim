@@ -45,11 +45,21 @@
       w, d, h, material, attrs: at, ...extra(p),
       shots, audience: 'kadin', carry: 'capraz', mh: '', waterproof: /^(evet|var|1|true)$/i.test(water), auto: { cutout: true, mark: true } };
   }
-  // Qukasoft ek işlemleri (bu sitenin qukasoft fonksiyonu üzerinden)
-  async function qk(path, payload = {}) {
-    const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');
-    const r = await fetch('/.netlify/functions/qukasoft', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ path, ...payload }) });
-    const j = await r.json().catch(() => ({})); if (!r.ok || !j.success) throw new Error(j.message || 'Qukasoft işlemi yapılamadı.'); return j.result;
+  // Qukasoft ek işlemleri (bu sitenin qukasoft fonksiyonu üzerinden). Qukasoft aynı anda gelen istekleri
+  // reddedebildiği için istekler sıraya konur; bağlantı hatasında (502) bir kez yeniden denenir.
+  let qkQueue = Promise.resolve();
+  function qk(path, payload = {}) {
+    const run = async () => {
+      const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');
+      for (let attempt = 0; ; attempt++) {
+        const r = await fetch('/.netlify/functions/qukasoft', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ path, ...payload }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j.success) return j.result;
+        if (r.status === 502 && attempt === 0) { await new Promise(ok => setTimeout(ok, 900)); continue; }
+        throw new Error(j.message || 'Qukasoft işlemi yapılamadı.');
+      }
+    };
+    const p = qkQueue.then(run, run); qkQueue = p.catch(() => {}); return p;
   }
   const REF = { units: null, compat: null, err: '' }; // birimler ve uyumluluk değerleri (oturum boyunca bir kez yüklenir)
   async function loadRefs() {
