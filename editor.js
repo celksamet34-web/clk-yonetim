@@ -102,7 +102,20 @@
     if (D && D._key === key) return true;
     if (S.route === 'yeni') { D = blank(); D._key = key; return true; }
     const p = S.products.find(x => String(x.code) === String(S.arg)); if (!p) return false;
-    D = fromProduct(p); D._key = key; return true;
+    D = fromProduct(p); D._key = key; placeSizeShot(D); return true;
+  }
+  // Qukasoft görsel sırasını tutar, hangi görselin hangi kutuya ait olduğunu tutmaz. Ölçü görseli koyu zeminli
+  // çizildiği için köşeleri koyu olan görsel Ölçü kutusuna taşınır.
+  async function placeSizeShot(d) {
+    if (d.shots.olcu) return;
+    for (const [k, s] of Object.entries(d.shots)) {
+      if (k === 'front' || k === 'model' || !s.url) continue;
+      try {
+        const im = await loadImg(s.url), c = document.createElement('canvas'); c.width = c.height = 40; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 40, 40);
+        const px = x.getImageData(0, 0, 40, 40).data, at = (i, j) => { const p = (j * 40 + i) * 4; return (px[p] + px[p + 1] + px[p + 2]) / 3; };
+        if ([at(1, 1), at(38, 1), at(1, 38), at(20, 1)].every(v => v < 60)) { d.shots.olcu = s; delete d.shots[k]; if (D === d) { S.keepScroll = true; render(); } return; }
+      } catch {}
+    }
   }
 
   /* ---------- görünüm ---------- */
