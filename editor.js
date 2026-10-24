@@ -6,6 +6,7 @@
   const SLOTS = [['front','Ön','Tam karşıdan, çanta ortada'],['model','Manken','Ön çekimden otomatik üretilir'],['back','Arka','Arka yüz ve askılar'],['side','Yan','Derinliği gösteren açı'],['detail','Detay','Logo, fermuar, dikiş'],['inside','İç','Bölmeler açık'],['extra','Ek','İsteğe bağlı']];
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
   const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
+  const HEIGHTS = { kadin: 170, erkek: 182, 'kiz-cocuk': 135, 'erkek-cocuk': 138 }; // sunucudaki manken boylarıyla aynı
   const hexOf = n => (COLORS.find(c => c[0] === String(n).toLocaleUpperCase('tr')) || [0, '#ddd'])[1];
 
   let D = null; // taslak
@@ -141,12 +142,32 @@
     if (error) throw new Error('Fotoğraf yüklenemedi.');
     return path;
   }
+  // Ölçek rehberi: görüntü modeli santimetreye uymadığı için çantayı son karedeki gerçek boyutuna biz küçültürüz.
+  // Kare, mankenin başından uyluk ortasına kadar (boyun ~%62'si) görüneceği kadraja göre hesaplanır.
+  async function scaleRef(du) {
+    const im = await loadImg(du), c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    const px = x.getImageData(0, 0, c.width, c.height).data, wmX = c.width - 260, wmY = c.height - 120; // sağ alt: CLK filigranı
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y += 2) for (let i = 0; i < c.width; i += 2) {
+      if (i > wmX && y > wmY) continue;
+      const p = (y * c.width + i) * 4; if (px[p] < 220 || px[p + 1] < 220 || px[p + 2] < 220) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    if (x1 < 0 || (bw < c.width * 0.1 && bh < c.height * 0.1)) return null; // açık renkli ürün ayırt edilemedi
+    const N = 1024, ppc = N * 0.93 / (HEIGHTS[D.audience] * 0.62);
+    const s = Math.min(+D.w > 0 ? +D.w * ppc / bw : Infinity, +D.h > 0 ? +D.h * ppc / bh : Infinity);
+    const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
+    ox.drawImage(c, x0, y0, bw, bh, (N - bw * s) / 2, N * 0.55 - bh * s / 2, bw * s, bh * s);
+    return o.toDataURL('image/jpeg', 0.92);
+  }
   // Manken görseli bu sitenin kendi fonksiyonunda üretilir (kişi seçimi, ölçek, logo koruma).
   // Fonksiyon yoksa ya da anahtarı eksikse eski köprüye düşer.
   async function modelImage(du) {
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
-    const body = { action: 'model', image: du, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
+    const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
+    const body = { action: 'model', image: ref || du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } };
     const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const j = await r.json().catch(() => ({}));
