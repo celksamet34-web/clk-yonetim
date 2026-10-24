@@ -121,6 +121,29 @@ async function photoroom(key, mime, bytes) {
   return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
 }
 
+// Anasayfa banner'ı için Photoroom AI arka plan (Plus planı, görsel başı ~0,10 $): ürün dekupe edilir, arkasına istemdeki sahne üretilir.
+// Çıktı tema banner'ı oranında (3:4, 1248×1664); Qukasoft başlık/düğme kutularını alt kısma koyduğu için ürün üstte, alt %30 boş kalır.
+// sandbox: anahtarın başına "sandbox_" eklenir, ücretsiz ve filigranlıdır (parametre denemesi için).
+const BANNER_SIZE = '1248x1664';
+async function photoroomBanner(key, mime, bytes, prompt, sandbox) {
+  const form = new FormData();
+  form.append('imageFile', new Blob([bytes], { type: mime }), 'product.jpg');
+  form.append('background.prompt', prompt);
+  form.append('outputSize', BANNER_SIZE);
+  form.append('paddingTop', '0.1'); form.append('paddingLeft', '0.14'); form.append('paddingRight', '0.14'); form.append('paddingBottom', '0.34');
+  form.append('shadow.mode', 'ai.soft');
+  form.append('export.format', 'jpeg');
+  const r = await fetch('https://image-api.photoroom.com/v2/edit', {
+    method: 'POST', headers: { 'x-api-key': (sandbox ? 'sandbox_' : '') + key, 'pr-ai-background-model-version': '3' }, body: form, signal: AbortSignal.timeout(50000)
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    const msg = j?.detail || j?.message || j?.error?.message || '';
+    throw new Error(`Photoroom ${r.status}${msg ? ': ' + msg : ''}${r.status === 402 || r.status === 403 ? ' (kredi yok ya da plan AI arka planı kapsamıyor)' : ''}`);
+  }
+  return `data:image/jpeg;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
+}
+
 // Ürün açıklaması: paneldeki bilgilerden Türkçe, şık bir HTML metin. Bilgi uydurmaması için yalnızca verilen alanlar kullanılır.
 const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
 async function describe(key, facts) {
@@ -163,6 +186,17 @@ exports.handler = async event => {
       if (!apiKey) return reply(503, { success: false, message: 'OPENAI_API_KEY eksik.' });
       try { return reply(200, { success: true, ...(await describe(apiKey, body.facts)) }); }
       catch (e) { return reply(422, { success: false, message: 'Açıklama yazılamadı: ' + String(e?.message || e) }); }
+    }
+    if (body.action === 'banner') {
+      if (!photoroomKey) return reply(503, { success: false, message: 'PHOTOROOM_API_KEY eksik.' });
+      const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
+      if (!m) return reply(422, { success: false, message: 'Ürün fotoğrafı okunamadı.' });
+      const b = Buffer.from(m[2], 'base64');
+      if (b.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük.' });
+      const p = String(body.prompt || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
+      if (p.length < 10) return reply(422, { success: false, message: 'Sahne tarifi çok kısa.' });
+      try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true) }); }
+      catch (e) { return reply(422, { success: false, message: e?.name === 'TimeoutError' ? 'Photoroom zaman aşımı.' : String(e?.message || e) }); }
     }
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
     const [person, audienceHeight] = AUDIENCE[body.audience] || AUDIENCE.kadin;

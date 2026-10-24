@@ -14,7 +14,7 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 
 ## Yapı
 
-- Statik site, derleme yok: `index.html`, `app.css`, `core.js` (çekirdek, `CLK` nesnesi, yönlendirme, veri yükleme), `views-main.js`, `views-crm.js`, `editor.js` (ürün ekleme/düzenleme formu ve görsel işlemleri), `_headers` (no-cache).
+- Statik site, derleme yok: `index.html`, `app.css`, `core.js` (çekirdek, `CLK` nesnesi, yönlendirme, veri yükleme), `views-main.js`, `views-crm.js`, `editor.js` (ürün ekleme/düzenleme formu ve görsel işlemleri), `views-banner.js` (Banner stüdyosu), `_headers` (no-cache).
 - Yayın: Netlify sitesi **celikcanta** → https://celikcanta.netlify.app, GitHub `celksamet34-web/clk-yonetim` deposundan.
 - Oturum: Supabase (proje `prkzzaqinfeptmmbkqsd`), yalnızca yayınlanabilir anahtar kodda.
 - Ürün listeleme/kaydetme/kategori çağrıları (`qukasoft-product-list`, `qukasoft-product-save`, `qukasoft-category-list`, `clk-data`) Supabase edge fonksiyonları üzerinden diğer Netlify sitesi **clkcanta**'daki fonksiyonlara gider (o sitenin kodu bu depoda değil; dokunma).
@@ -31,6 +31,13 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Manken: kullanıcı beğendiği yöntemi seçti — Seedream'e ürün fotoğrafı + ölçek rehberi (çanta 0.6 oranında küçültülmüş, baştan uyluk ortasına kadraj) birlikte gider; çerçeve oluşursa panel kırpar. "Elde (yakın çekim)" seçilince manken yerine el çekimi, ölçek el boyuna göre. Çok adımlı ölçülü yöntem denendi ve kaldırıldı. "Sırt" seçilince manken arkadan çekilir (logo kameraya bakar; önden istemde çanta göğse geliyordu), rehberde çanta daha yukarıda (0.45).
 - Ölçü görseli kullanıcı isteğiyle tamamen kaldırıldı (25.10.2026; birkaç tasarım denendi, beğenilmedi). Daha önce yüklenmiş ölçü görselleri ürün açılınca `dropSizeShots` ile listeden çıkarılır, kaydedince Qukasoft'tan da kalkar. Tanıma yalnızca panelin çizdiği zeminlere bakar: üç köşe renksiz gri 107–137 ya da koyu 8–34.
 - Açıklama: "Yapay zekâ ile yaz" (yalnızca verilen bilgiler, övgü sıfatı yok) ya da "Şablonla yaz"; Qukasoft'a HTML (p, h3, ul, li, strong) gider, panelde güvenli önizleme var.
+
+## Banner stüdyosu (views-banner.js)
+
+- Kullanıcı anasayfa banner ve manşetlerini Claude'un yönetmesini istedi (25.10.2026). Kural: **her görsel önce kullanıcıya gösterilir, onaysız yayına çıkmaz.**
+- Anasayfa (clkcanta.com) banner'ları 3:4 (1248×1664). Qukasoft başlık, alt yazı ve düğmeyi görselin alt kısmına siyah kutularla kendisi yazar; panel önizlemesi bunu taklit eder.
+- Görsel: `ai-product-image` `action: 'banner'` → Photoroom `v2/edit` AI arka plan (Plus planı, ~0,10 $/görsel), ürün üstte, alt %34 boş. `sandbox: true` anahtara `sandbox_` öneki ekler: ücretsiz, filigranlı; panelde düğmesi yok, `CLK.bannerTest()` ile çağrılır.
+- Qukasoft API'sinde banner uç noktası yok (API notlarında geçmiyor). Onaylanan banner'ı kullanıcı Qukasoft yönetim paneline giriş yaptıktan sonra Claude tarayıcıdan yükler; kaydetmeden önce sorar. Onaylanan görsel Supabase'e kaydedilir (`banner-*.jpg`, 7 günlük bağlantı, `localStorage` `clk-banner-approved`).
 
 ## Qukasoft API notları (web servis dokümanı v2.3.1)
 
