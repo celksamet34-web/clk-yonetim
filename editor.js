@@ -350,7 +350,7 @@
     // yazı
     x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.font = '600 18px "Playfair Display", Georgia, serif'; x.letterSpacing = '2px'; x.fillText('SU GEÇİRMEZ', cx + 1, cy + 50);
-    x.fillStyle = gold2; x.font = '500 11px "Lora", Georgia, serif'; x.letterSpacing = '4px'; x.fillText('WATERPROOF', cx + 2, cy + 72);
+    x.font = '500 11px "Lora", Georgia, serif'; x.letterSpacing = '4px'; x.fillText('WATERPROOF', cx + 2, cy + 72);
     x.restore();
   }
   async function makeSize() {
