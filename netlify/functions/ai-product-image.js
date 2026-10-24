@@ -21,11 +21,15 @@ function scaleText(size, height, child, scaled) {
     h && `its height is about ${r(h / head)} times the model's head height and about ${Math.round(h / torso * 100)}% of the torso length (shoulder to hip)`,
     w && `its width is about ${r(w / head)} head heights, about ${Math.round(w / shoulders * 100)}% of the shoulder width`
   ].filter(Boolean).join('; ');
+  // Kadraj baştan uyluk ortasına (boyun ~%62'si) olduğunda çantanın karede kaplaması gereken oran
+  const frame = height * (child ? 0.66 : 0.62) / 0.93;
+  const pct = [h && `its height must be about ${Math.round(h / frame * 100)}% of the image height`, w && `its width about ${Math.round(w / frame * 100)}% of the image width`].filter(Boolean).join(' and ');
+  const share = scaled && pct ? ` In the final image ${pct}; the bag must look small relative to the body, never dominant.` : '';
   // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
   const guide = scaled
     ? ' Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle); hands, hair and straps must not cover the bag.'
     : ' Choose a framing (full body or three-quarter) that makes the size comparison obvious.';
-  return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}`;
+  return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}${share}`;
 }
 
 function reply(statusCode, payload) {
