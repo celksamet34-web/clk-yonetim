@@ -162,13 +162,14 @@
     if (x1 < 0 || (bw < c.width * 0.1 && bh < c.height * 0.1)) return null; // açık renkli ürün ayırt edilemedi
     return { c, x0, y0, bw, bh };
   }
-  // Çantayı w×h boyutunda kes: beyaz arka plan şeffaf, kenarlar hafif yumuşatılmış
-  function cutBag(L, w, h) {
+  // Çantayı w×h boyutunda kes: beyaz arka plan şeffaf, kenarlar hafif yumuşatılmış.
+  // thr: bundan açık pikseller arka plan sayılır; koyu zeminde beyaz hale kalmasın diye düşürülebilir.
+  function cutBag(L, w, h, thr = 225) {
     w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
     const bag = document.createElement('canvas'); bag.width = w; bag.height = h; const bx = bag.getContext('2d');
     bx.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, 0, 0, w, h);
     const bd = bx.getImageData(0, 0, w, h), m = document.createElement('canvas'); m.width = w; m.height = h; const mx = m.getContext('2d'), md = mx.createImageData(w, h);
-    for (let p = 0; p < bd.data.length; p += 4) md.data[p + 3] = Math.min(bd.data[p], bd.data[p + 1], bd.data[p + 2]) < 225 ? 255 : 0;
+    for (let p = 0; p < bd.data.length; p += 4) md.data[p + 3] = Math.min(bd.data[p], bd.data[p + 1], bd.data[p + 2]) < thr ? 255 : 0;
     mx.putImageData(md, 0, 0);
     const soft = document.createElement('canvas'); soft.width = w; soft.height = h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(m, 0, 0);
     bx.globalCompositeOperation = 'destination-in'; bx.drawImage(soft, 0, 0);
@@ -313,20 +314,25 @@
   async function sizeImage(du) {
     const L = await bagBox(du); if (!L) throw new Error('Çanta ön fotoğrafta ayırt edilemedi.');
     const N = 1200, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
-    x.fillStyle = '#fff'; x.fillRect(0, 0, N, N);
     const s = Math.min(N * 0.58 / L.bw, N * 0.6 / L.bh), w = L.bw * s, h = L.bh * s, bx = (N - w) / 2 - 40, by = (N - h) / 2 - 50;
-    x.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, bx, by, w, h);
-    const ink = '#121110', fmt = v => String(+v).replace('.', ',') + ' cm';
+    // Koyu zemin: çantanın arkasında hafif ışık, altında yumuşak gölge (koyu çanta zeminde kaybolmasın)
+    const bg = x.createRadialGradient(bx + w / 2, by + h / 2, 40, bx + w / 2, by + h / 2, N * 0.75); bg.addColorStop(0, '#4a4540'); bg.addColorStop(1, '#121110');
+    x.fillStyle = bg; x.fillRect(0, 0, N, N);
+    x.save(); x.filter = 'blur(18px)'; x.fillStyle = 'rgba(0,0,0,.55)'; x.beginPath(); x.ellipse(bx + w / 2, by + h + 8, w * 0.42, 16, 0, 0, Math.PI * 2); x.fill(); x.restore();
+    x.drawImage(cutBag(L, w, h, 185), bx, by);
+    const ink = '#fff', fmt = v => String(+v).replace('.', ',') + ' cm';
     x.strokeStyle = ink; x.fillStyle = ink; x.lineWidth = 3; x.lineCap = 'round';
     const head = (px, py, ang) => { x.beginPath(); x.moveTo(px, py); x.lineTo(px - 18 * Math.cos(ang - 0.45), py - 18 * Math.sin(ang - 0.45)); x.lineTo(px - 18 * Math.cos(ang + 0.45), py - 18 * Math.sin(ang + 0.45)); x.closePath(); x.fill(); };
     const arrow = (x0, y0, x1, y1) => { const a = Math.atan2(y1 - y0, x1 - x0); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); head(x1, y1, a); head(x0, y0, a + Math.PI); };
     const tick = (x0, y0, x1, y1) => { x.save(); x.lineWidth = 1.5; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); };
     const label = (t, px, py, align = 'center', rot = 0) => { x.save(); x.translate(px, py); x.rotate(rot); x.font = '600 34px "Lora", Georgia, serif'; x.textAlign = align; x.textBaseline = 'middle';
-      const m = x.measureText(t).width, ox = align === 'center' ? -m / 2 : align === 'right' ? -m : 0; x.fillStyle = '#fff'; x.fillRect(ox - 10, -24, m + 20, 48); x.fillStyle = ink; x.fillText(t, 0, 0); x.restore(); };
+      const m = x.measureText(t).width, ox = align === 'center' ? -m / 2 : align === 'right' ? -m : 0;
+      x.fillStyle = '#1b1916'; x.beginPath(); x.roundRect(ox - 16, -26, m + 32, 52, 26); x.fill(); x.fillStyle = ink; x.fillText(t, 0, 0); x.restore(); };
     if (+D.w > 0) { const y = by + h + 70; tick(bx, by + h + 10, bx, y + 16); tick(bx + w, by + h + 10, bx + w, y + 16); arrow(bx, y, bx + w, y); label('En ' + fmt(D.w), bx + w / 2, y); }
     if (+D.h > 0) { const X = bx - 70; tick(bx - 10, by, X - 16, by); tick(bx - 10, by + h, X - 16, by + h); arrow(X, by, X, by + h); label('Yükseklik ' + fmt(D.h), X, by + h / 2, 'center', -Math.PI / 2); }
     if (+D.d > 0) { const x0 = bx + w + 30, y0 = by + h - 10, len = Math.min(220, 60 + +D.d * 10); arrow(x0, y0, x0 + len * 0.7, y0 - len * 0.7); label('Derinlik ' + fmt(D.d), x0 + len * 0.7 + 14, y0 - len * 0.7 - 34, 'left'); }
     if (D.waterproof) waterBadge(x, N - 165, 165, 115);
+    if (D.auto.mark) { x.save(); x.globalAlpha = 0.22; x.fillStyle = '#fff'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', N - 40, N - 34); x.restore(); }
     return c.toDataURL('image/jpeg', 0.92);
   }
   // Su geçirmez rozeti: CLK renkleriyle koyu daire, altın halka, su damlası ve dalgalar
@@ -358,7 +364,7 @@
     const s = (D.shots.olcu = { busy: 'Ölçü görseli çiziliyor…' }); render();
     try {
       const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
-      s.preview = await square(await sizeImage(base), D.auto.mark); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
+      s.preview = await sizeImage(base); s.busy = 'Yükleniyor…'; render(); s.path = await upload(s.preview); delete s.busy;
     } catch (e) { delete D.shots.olcu; toast('Ölçü görseli çizilemedi: ' + e.message); }
     render();
   }
