@@ -10,17 +10,16 @@ const AUDIENCE = {
   'erkek-cocuk': ['one Turkish boy child model, around 8 to 10 years old, in modest age-appropriate casual clothing', 138]
 };
 const cm = v => { const n = Number(v); return n > 0 && n < 300 ? Math.round(n) : 0; };
-// Taşıma şekli: ölçülü birleştirmede modele askının nasıl ekleneceği söylenir
+// Taşıma şekli: panelde seçilir, mankenin çantayı nasıl taşıdığı
 const CARRY = {
-  capraz: 'worn crossbody on the chest, with its shoulder strap running diagonally from the top of the bag over the opposite shoulder',
+  capraz: 'worn crossbody on the chest, with its shoulder strap running diagonally over the opposite shoulder',
   omuz: 'hanging at the hip from its strap over the near shoulder',
   el: 'held by its handle in the hand, arm relaxed at the side',
   sirt: 'worn as a backpack on the back, with both shoulder straps over the shoulders'
 };
 // Görüntü modelleri santimetreyi zayıf anlar; ölçüyü mankenin baş boyu ve gövdesi cinsinden de tarif ederiz.
-// mode: 'guide' = ikinci görsel ölçek rehberi, 'text' = rehber yok, kadraj ve oran yazıyla (Seedream rehberi ayrı ürün sanıyor)
-function scaleText(size, height, child, mode) {
-  const scaled = !!mode;
+// scaled: ikinci görsel ölçek rehberi (panel çantayı kadraja göre gerçek boyunda yerleştirdi)
+function scaleText(size, height, child, scaled) {
   const w = cm(size?.w), h = cm(size?.h), d = cm(size?.d);
   if (!w && !h) return `Keep the bag at a realistic real-world size relative to a person about ${height} cm tall.`;
   const head = height / (child ? 6.5 : 7.5), torso = height * 0.3, shoulders = height * (child ? 0.22 : 0.25);
@@ -35,9 +34,7 @@ function scaleText(size, height, child, mode) {
   const pct = [h && `its height must be about ${Math.round(h / frame * 100)}% of the image height`, w && `its width about ${Math.round(w / frame * 100)}% of the image width`].filter(Boolean).join(' and ');
   const share = scaled && pct ? ` In the final image ${pct}; the bag must look small relative to the body, never dominant.` : '';
   // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
-  const guide = mode === 'text'
-    ? ' Framing: one single full-bleed photo showing the model from the top of the head (near the top edge) down to mid-thigh (bottom edge), standing, facing the camera; not a close-up. Use only the one product from the input image, exactly one bag in the picture, worn with its strap across the body or over the shoulder (or held by its handle), front-facing and upright, not tilted; hands, hair and straps must not cover the bag.'
-    : scaled
+  const guide = scaled
     ? ' Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle); hands, hair and straps must not cover the bag.'
     : ' Choose a framing (full body or three-quarter) that makes the size comparison obvious.';
   return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}${share}`;
@@ -72,15 +69,11 @@ async function gemini(key, prompt, images) {
 // Mankenli görsel için fal.ai (varsayılan Seedream 4.5 düzenleme modeli; FAL_IMAGE_MODEL ile değiştirilebilir).
 // Üretim Netlify fonksiyon süresini aştığı için kuyruk kullanılır: istek bırakılır, panel sonucu ayrı çağrılarla sorar.
 const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/bytedance/seedream/v4.5/edit';
-const FAL_SIZE_K = Number(process.env.FAL_SIZE_K) || 0.7; // Seedream çantayı ~1,4 kat büyük çiziyor; denemelerle ayarlandı
 const falError = j => { const d = j?.detail; return (Array.isArray(d) ? d[0]?.msg : d) || j?.error || j?.message; };
-const FAL_T2I = process.env.FAL_T2I_MODEL || 'fal-ai/bytedance/seedream/v4.5/text-to-image'; // çantasız manken
 async function falSubmit(key, prompt, images) {
-  const input = { prompt, image_size: { width: 1920, height: 1920 }, num_images: 1 };
-  if (images.length) input.image_urls = images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`);
-  const r = await fetch(`https://queue.fal.run/${images.length ? FAL_MODEL : FAL_T2I}`, {
+  const r = await fetch(`https://queue.fal.run/${FAL_MODEL}`, {
     method: 'POST', headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20000),
-    body: JSON.stringify(input)
+    body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: { width: 1920, height: 1920 }, num_images: 1 })
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.status_url || !j.response_url) throw new Error(falError(j) || `fal.ai ${r.status}`);
@@ -126,24 +119,9 @@ exports.handler = async event => {
       catch (e) { return reply(422, { success: false, message: 'fal: ' + String(e?.message || e) }); }
     }
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
-    const [person, height] = AUDIENCE[body.audience] || AUDIENCE.kadin;
-    // Ölçülü manken iki adımda üretilir; çantanın boyunu panel ölçüp yerleştirir, model yalnızca askı ve gölgeyi ekler.
-    if (action === 'model' && (body.stage === 'person' || body.stage === 'compose')) {
-      if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
-      const carry = CARRY[body.carry] ? body.carry : 'capraz';
-      try {
-        if (body.stage === 'person') {
-          const tall = Math.round(Number(body.height) || height);
-          const p = `Photorealistic premium ecommerce catalog photo of ${person}, about ${tall} cm tall, standing straight and facing the camera${carry === 'sirt' ? ', seen from behind (back view)' : ''}. The full body is visible from the top of the head to the shoes, with a small margin above the head and below the feet; arms relaxed at the sides${carry === 'el' ? ', the right hand relaxed as if ready to hold a bag' : ''}. Simple modern outfit: plain light-colored top and dark trousers. No bag, no backpack, no straps, nothing held in the hands, nothing on the chest. Minimal bright studio, plain light gray seamless background filling the entire frame edge to edge, soft even lighting, square composition, no text.`;
-          return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, p, []) });
-        }
-        // Yalnızca birleştirilmiş görsel gider: büyük ürün referansı verilince model çantayı ona göre büyütüyordu
-        const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
-        if (!m) return reply(422, { success: false, message: 'Birleştirme görseli okunamadı.' });
-        const p = `This photo shows a person with a small bag already placed at its exact real-world size and position. Edit it minimally so it looks like a real photograph of the person wearing this bag: ${CARRY[carry]}. Keep everything else exactly as it is: the same person, face, pose, clothing, background, framing and image size. The bag must stay exactly the same size and in exactly the same place, with the same shape, color, logo and details: do not move, enlarge, resize, rotate or redraw it. Add only the strap or handle connection, realistic contact shadows and matching lighting. Exactly one bag, no text.`;
-        return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, p, [[m[1], Buffer.from(m[2], 'base64')]]) });
-      } catch (e) { return reply(422, { success: false, message: 'fal: ' + String(e?.message || e) }); }
-    }
+    const [person, audienceHeight] = AUDIENCE[body.audience] || AUDIENCE.kadin;
+    const height = Number(body.height) >= 80 && Number(body.height) <= 220 ? Math.round(Number(body.height)) : audienceHeight; // paneldeki manken boyu
+    const carryText = CARRY[body.carry] || 'naturally wearing or holding the product according to its real use';
     const kind = String(body.kind || '').replace(/[^\p{L}\p{N} ›/-]/gu, '').slice(0, 120);
     if (action !== 'original' && !apiKey && !(action === 'model' && (geminiKey || falKey)) && !(action === 'cutout' && photoroomKey)) return reply(503, { success: false, message: 'Mankenli görsel servisi için OPENAI_API_KEY Netlify ortam değişkeni eksik.' });
     const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
@@ -155,16 +133,14 @@ exports.handler = async event => {
     const guideMatch = action === 'model' && body.scaled === true ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
     const guideBytes = guideMatch ? Buffer.from(guideMatch[2], 'base64') : null;
     if (guideBytes && guideBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Ölçek görseli çok büyük.' });
-    // k: modele söylenen ölçü çarpanı. Modeller çantayı sistematik olarak büyük çizdiği için fal.ai'ye ölçü küçük söylenir.
-    const makePrompt = (mode, k = 1) => action === 'cutout'
+    const prompt = action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
-      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(Object.fromEntries(['w', 'h', 'd'].map(x => [x, (Number(body.size?.[x]) || 0) * k])), height, /cocuk$/.test(body.audience || ''), mode)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background that fills the entire frame edge to edge (a full-bleed photo: no white border, no inset picture, no frame), soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
+      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person}, about ${height} cm tall, with the bag ${carryText}${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true && !!guideBytes)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
     // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
-    const scaled = body.scaled === true, prompt = makePrompt(scaled && guideBytes ? 'guide' : scaled ? 'text' : false);
     const refs = [[match[1], bytes], ...(guideBytes ? [[guideMatch[1], guideBytes]] : [])];
     const errors = [];
     if (action === 'model' && falKey && body.skipFal !== true) {
-      try { return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, makePrompt(scaled ? 'text' : false, FAL_SIZE_K), refs.slice(0, 1)) }); }
+      try { return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, prompt, refs) }); }
       catch (e) { errors.push(`fal: ${e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)}`); }
     }
     const engines = action === 'cutout' ? [['photoroom', photoroomKey, () => photoroom(photoroomKey, match[1], bytes)]]

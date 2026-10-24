@@ -183,33 +183,6 @@
     ox.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, r.x, r.y, r.w, r.h);
     return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag: cutBag(L, r.w, r.h) };
   }
-  // Ölçülü manken: çantasız manken üretilir, Photoroom dekupesiyle boyu piksel olarak ölçülür, gerçek çanta santimetresine
-  // göre küçültülüp taşıma şekline göre yerleştirilir; model yalnızca askı ve gölgeyi ekler, sonra orijinal çanta geri basılır.
-  async function composeModel(du) {
-    const L = await bagBox(du); if (!L) return null;
-    const person = await siteImage({ action: 'model', stage: 'person', audience: D.audience, carry: D.carry, height: mHeight() }); if (!person) return null;
-    const pi = await loadImg(person), W = pi.width, H = pi.height;
-    const k = 768 / Math.max(W, H), sw = Math.round(W * k), sh = Math.round(H * k), sc = document.createElement('canvas'); sc.width = sw; sc.height = sh; sc.getContext('2d').drawImage(pi, 0, 0, sw, sh);
-    const si = await loadImg(await siteImage({ action: 'cutout', image: sc.toDataURL('image/jpeg', 0.9) }));
-    const mc = document.createElement('canvas'); mc.width = sw; mc.height = sh; const mcx = mc.getContext('2d'); mcx.drawImage(si, 0, 0, sw, sh);
-    const a = mcx.getImageData(0, 0, sw, sh).data, on = (i, y) => a[(y * sw + i) * 4 + 3] > 128;
-    if (on(0, 0) && on(sw - 1, 0)) throw new Error('manken dekupe edilemedi'); // şeffaflık yoksa (yedek dekupe) ölçüm yapılamaz
-    let top = -1, bot = -1;
-    for (let y = 0; y < sh && top < 0; y++) for (let i = 0; i < sw; i++) if (on(i, y)) { top = y; break; }
-    for (let y = sh - 1; y >= 0 && bot < 0; y--) for (let i = 0; i < sw; i++) if (on(i, y)) { bot = y; break; }
-    if (top < 0 || bot - top < sh * 0.5) throw new Error('manken boyu ölçülemedi');
-    const rowX = f => { const y = Math.round(top + (bot - top) * f); let s = 0, n = 0; for (let i = 0; i < sw; i++) if (on(i, y)) { s += i; n++; } return n ? s / n / k : W / 2; };
-    const ph = (bot - top) / k, T = top / k, ppc = ph / mHeight();
-    const s = Math.min(+D.w > 0 ? +D.w * ppc / L.bw : Infinity, +D.h > 0 ? +D.h * ppc / L.bh : Infinity), w = L.bw * s, h = L.bh * s, cx = rowX(0.35);
-    // Kişinin sağ eli/omzu görselin solunda kalır
-    const [px, py] = { capraz: [cx, T + ph * 0.36], omuz: [cx - ph * 0.14, T + ph * 0.47 + h / 2], el: [cx - ph * 0.19, T + ph * 0.5 + h / 2], sirt: [cx, T + ph * 0.36] }[D.carry] || [cx, T + ph * 0.36];
-    const rect = { x: px - w / 2, y: py - h / 2, w, h }, bag = cutBag(L, w, h);
-    const cc = document.createElement('canvas'); cc.width = W; cc.height = H; const cx2 = cc.getContext('2d'); cx2.drawImage(pi, 0, 0); cx2.drawImage(bag, rect.x, rect.y);
-    const out = await siteImage({ action: 'model', stage: 'compose', carry: D.carry, image: cc.toDataURL('image/jpeg', 0.9) });
-    if (!out) return null;
-    const f = 1024 / W; // pasteBag 1024'lük karede çalışır
-    return pasteBag(out, { rect: { x: rect.x * f, y: rect.y * f, w: w * f, h: h * f }, bag }).catch(() => out);
-  }
   // Üretilen görselde çantayı bul ve orijinal çanta piksellerini üstüne koy; logo ve detaylar ön fotoğrafla birebir kalır.
   // Model çantayı kaydırıp döndürebildiği ve rengini değiştirebildiği için çanta silüeti (içi 1, çevresi 0) ile
   // gri görüntü arasında normalize korelasyon aranır: önce 1/8 çözünürlükte geniş, sonra 1/4'te dar arama.
@@ -291,24 +264,17 @@
           j = await p.json().catch(() => ({})); if (!p.ok) throw new Error(j.message || 'fal.ai sonucu alınamadı.');
         }
         if (j.pending) throw new Error('fal.ai zaman aşımı');
-      } catch (e) {
-        if (body.stage) throw e; // ölçülü üretimin adımları yalnızca fal.ai ile; çağıran eski yönteme düşer
-        toast('fal.ai üretemedi, OpenAI ile üretiliyor: ' + e.message.split(/[.\n]/)[0]); return siteImage({ ...body, skipFal: true });
-      }
+      } catch (e) { toast('fal.ai üretemedi, OpenAI ile üretiliyor: ' + e.message.split(/[.\n]/)[0]); return siteImage({ ...body, skipFal: true }); }
     }
     if (!j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
     if (j.engineError) toast(/quota|top_up|balance|credit/i.test(j.engineError) ? 'Seçili servisin bakiyesi/kotası yok (' + j.engineError.split(':')[0] + '), OpenAI ile üretildi.' : 'Seçili servis üretemedi, OpenAI ile üretildi: ' + j.engineError.split(/[.\n]/)[0]);
     return j.image;
   }
   async function modelImage(du) {
-    if (hasSize()) {
-      try { const img = await composeModel(du); if (img) return img; }
-      catch (e) { toast('Ölçülü üretim olmadı (' + e.message.split(/[.\n]/)[0] + '), tek adımlı yönteme geçildi.'); }
-    }
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
     const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
     // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
-    const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, size: { w: D.w, d: D.d, h: D.h } });
+    const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, carry: D.carry, height: mHeight(), size: { w: D.w, d: D.d, h: D.h } });
     if (!img) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }
     const out = ref ? await pasteBag(img, ref).catch(() => img) : img;
     return trimBorder(out).catch(() => out);
@@ -332,7 +298,7 @@
   }
   async function makeModel() {
     const f = D.shots.front; if (!f) return toast('Önce ön fotoğrafı ekle.');
-    const s = (D.shots.model = { busy: hasSize() ? 'Manken ölçülü üretiliyor… (1-2 dk)' : 'Manken pozu üretiliyor… (1-2 dk)' }); render();
+    const s = (D.shots.model = { busy: 'Manken pozu üretiliyor… (1-2 dk)' }); render();
     try {
       const src = f.preview || f.url; const base = src.startsWith('data:') ? src : await square(src, false);
       const img = await aiImage(base, 'model');
