@@ -55,22 +55,31 @@ async function gemini(key, prompt, images) {
 }
 
 // Mankenli görsel için fal.ai (varsayılan Seedream 4.5 düzenleme modeli; FAL_IMAGE_MODEL ile değiştirilebilir).
+// Üretim Netlify fonksiyon süresini aştığı için kuyruk kullanılır: istek bırakılır, panel sonucu ayrı çağrılarla sorar.
 const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/bytedance/seedream/v4.5/edit';
-async function fal(key, prompt, images) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 70000); // OpenAI yedeğine süre kalsın
-  try {
-    const r = await fetch(`https://fal.run/${FAL_MODEL}`, {
-      method: 'POST', headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' }, signal: controller.signal,
-      body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: { width: 2048, height: 2048 }, num_images: 1, sync_mode: true })
-    });
-    const j = await r.json().catch(() => ({}));
-    const url = j?.images?.[0]?.url;
-    if (!r.ok || !url) throw new Error(j?.detail?.[0]?.msg || j?.detail || j?.error || 'fal.ai görsel döndürmedi.');
-    if (url.startsWith('data:')) return url;
-    const img = await fetch(url, { signal: controller.signal }); // sync_mode desteklenmezse CDN bağlantısı gelir
-    return `data:${img.headers.get('content-type') || 'image/png'};base64,${Buffer.from(await img.arrayBuffer()).toString('base64')}`;
-  } finally { clearTimeout(timeout); }
+const falError = j => { const d = j?.detail; return (Array.isArray(d) ? d[0]?.msg : d) || j?.error || j?.message; };
+async function falSubmit(key, prompt, images) {
+  const r = await fetch(`https://queue.fal.run/${FAL_MODEL}`, {
+    method: 'POST', headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20000),
+    body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: { width: 1920, height: 1920 }, num_images: 1 })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.status_url || !j.response_url) throw new Error(falError(j) || `fal.ai ${r.status}`);
+  return { status: j.status_url, result: j.response_url };
+}
+const isFalQueue = u => typeof u === 'string' && u.startsWith('https://queue.fal.run/'); // anahtarı yalnızca fal kuyruğuna gönder
+async function falPoll(key, job) {
+  if (!isFalQueue(job?.status) || !isFalQueue(job?.result)) throw new Error('Geçersiz iş bilgisi.');
+  const H = { Authorization: `Key ${key}` };
+  const s = await fetch(job.status, { headers: H, signal: AbortSignal.timeout(10000) }).then(r => r.json()).catch(() => ({}));
+  if (s.status !== 'COMPLETED') return { pending: true, state: s.status || 'BİLİNMİYOR' };
+  if (s.error) throw new Error(s.error);
+  const j = await fetch(job.result, { headers: H, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => ({}));
+  const url = j?.images?.[0]?.url; if (!url) throw new Error(falError(j) || 'fal.ai görsel döndürmedi.');
+  // Küçükse veriyi biz taşırız; Netlify yanıt sınırını (6 MB) aşacaksa panel görseli doğrudan fal CDN'inden alır.
+  const img = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const buf = Buffer.from(await img.arrayBuffer());
+  return { image: buf.length < 4 * 1024 * 1024 ? `data:${img.headers.get('content-type') || 'image/png'};base64,${buf.toString('base64')}` : url };
 }
 
 // Dekupe için Photoroom: ürünün piksellerine dokunmadan yalnızca arka planı siler (şeffaf PNG döner).
@@ -92,6 +101,11 @@ exports.handler = async event => {
     const user = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}` } });
     if (!user.ok) return reply(401, { success: false, message: 'Oturum geçersiz veya süresi dolmuş.' });
     const body = JSON.parse(event.body || '{}');
+    if (body.action === 'falResult') {
+      if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
+      try { return reply(200, { success: true, action: 'model', engine: 'fal', ...(await falPoll(falKey, body.job)) }); }
+      catch (e) { return reply(422, { success: false, message: 'fal: ' + String(e?.message || e) }); }
+    }
     const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
     const [person, height] = AUDIENCE[body.audience] || AUDIENCE.kadin;
     const kind = String(body.kind || '').replace(/[^\p{L}\p{N} ›/-]/gu, '').slice(0, 120);
@@ -110,9 +124,13 @@ exports.handler = async event => {
       : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person} naturally wearing or holding the product according to its real use${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
     // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
     const refs = [[match[1], bytes], ...(guideBytes ? [[guideMatch[1], guideBytes]] : [])];
-    const engines = action === 'cutout' ? [['photoroom', photoroomKey, () => photoroom(photoroomKey, match[1], bytes)]]
-      : [['fal', falKey, () => fal(falKey, prompt, refs)], ['gemini', geminiKey, () => gemini(geminiKey, prompt, refs)]];
     const errors = [];
+    if (action === 'model' && falKey && body.skipFal !== true) {
+      try { return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, prompt, refs) }); }
+      catch (e) { errors.push(`fal: ${e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)}`); }
+    }
+    const engines = action === 'cutout' ? [['photoroom', photoroomKey, () => photoroom(photoroomKey, match[1], bytes)]]
+      : [['gemini', geminiKey, () => gemini(geminiKey, prompt, refs)]];
     for (const [engine, key, run] of engines) {
       if (!key) continue;
       try { return reply(200, { success: true, action, engine, image: await run() }); }

@@ -227,8 +227,20 @@
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
     const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) return null;
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
+    let j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.message || (r.status === 504 ? 'Sunucu zaman aşımına uğradı.' : 'Görsel hazırlanamadı.'));
+    if (j.pending) { // fal.ai kuyruğu: sonuç hazır olana kadar 3 sn arayla sor (en çok ~3 dk)
+      const job = j.job;
+      try {
+        for (let i = 0; i < 60 && j.pending; i++) {
+          await new Promise(ok => setTimeout(ok, 3000));
+          const p = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'falResult', job }) });
+          j = await p.json().catch(() => ({})); if (!p.ok) throw new Error(j.message || 'fal.ai sonucu alınamadı.');
+        }
+        if (j.pending) throw new Error('fal.ai zaman aşımı');
+      } catch (e) { toast('fal.ai üretemedi, OpenAI ile üretiliyor: ' + e.message.split(/[.\n]/)[0]); return siteImage({ ...body, skipFal: true }); }
+    }
+    if (!j.image) throw new Error(j.message || 'Görsel hazırlanamadı.');
     if (j.engineError) toast(/quota|top_up|balance|credit/i.test(j.engineError) ? 'Seçili servisin bakiyesi/kotası yok (' + j.engineError.split(':')[0] + '), OpenAI ile üretildi.' : 'Seçili servis üretemedi, OpenAI ile üretildi: ' + j.engineError.split(/[.\n]/)[0]);
     return j.image;
   }
