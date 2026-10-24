@@ -7,7 +7,7 @@
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
   const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
   const HEIGHTS = { kadin: 170, erkek: 182, 'kiz-cocuk': 135, 'erkek-cocuk': 138 }; // sunucudaki manken boylarıyla aynı
-  const CARRIES = [['capraz','Çapraz / göğüs'],['omuz','Omuz'],['el','Elde'],['sirt','Sırt']];
+  const CARRIES = [['capraz','Çapraz / göğüs'],['omuz','Omuz'],['el','Elde (yakın çekim)'],['sirt','Sırt']];
   const mHeight = () => (+D.mh >= 80 && +D.mh <= 220 ? +D.mh : HEIGHTS[D.audience]);
   const hexOf = n => (COLORS.find(c => c[0] === String(n).toLocaleUpperCase('tr')) || [0, '#ddd'])[1];
 
@@ -272,7 +272,8 @@
   }
   async function modelImage(du) {
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
-    const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
+    // "Elde" seçiminde manken yok, yakın çekim el: kadraj rehberi uymaz, ölçek el boyuna göre yazıyla verilir
+    const ref = hasSize() && D.carry !== 'el' ? await scaleRef(du).catch(() => null) : null;
     // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
     const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, carry: D.carry, height: mHeight(), size: { w: D.w, d: D.d, h: D.h } });
     if (!img) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }

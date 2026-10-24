@@ -17,6 +17,16 @@ const CARRY = {
   el: 'held by its handle in the hand, arm relaxed at the side',
   sirt: 'worn as a backpack on the back, with both shoulder straps over the shoulders'
 };
+// "Elde" seçiminde manken yerine yakın çekim el: kimin eli ve ölçek için el boyu (bilekten parmak ucuna, cm)
+const HAND = { kadin: ["a woman's hand", 17.5], erkek: ["a man's hand", 19], 'kiz-cocuk': ["a young girl's hand", 14], 'erkek-cocuk': ["a young boy's hand", 14.5] };
+function handPrompt(audience, size) {
+  const [who, hand] = HAND[audience] || HAND.kadin, w = cm(size?.w), h = cm(size?.h), d = cm(size?.d), r = v => Math.round(v * 10) / 10;
+  const dims = [w && `${w} cm wide`, h && `${h} cm tall`, d && `${d} cm deep`].filter(Boolean).join(', ');
+  const scale = w || h
+    ? ` True scale is critical: the bag is ${dims} and the hand is about ${hand} cm long from wrist to fingertip, so ${[h && `the bag's height is about ${r(h / hand)} times the hand length`, w && `its width about ${r(w / hand)} times the hand length`].filter(Boolean).join(' and ')}. Render the bag at exactly this real size relative to the hand; never enlarge or shrink it for styling.`
+    : ' Keep the bag at a realistic real-world size relative to the hand.';
+  return `Create a photorealistic premium ecommerce close-up product photo of the exact bag in the reference photo, held by its handle in ${who}. Show only the hand, wrist and a little of the forearm entering the frame from above or the side; no face, no full body. Preserve the bag's exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions; never redraw, reinterpret, replace, correct or invent a logo or text. The bag hangs naturally from the hand, front-facing and upright, with the logo side facing the camera, flat, sharp and not covered by the fingers.${scale} Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, exactly one bag, no text.`;
+}
 // Görüntü modelleri santimetreyi zayıf anlar; ölçüyü mankenin baş boyu ve gövdesi cinsinden de tarif ederiz.
 // scaled: ikinci görsel ölçek rehberi (panel çantayı kadraja göre gerçek boyunda yerleştirdi)
 function scaleText(size, height, child, scaled) {
@@ -130,10 +140,10 @@ exports.handler = async event => {
     if (bytes.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük. Daha küçük bir görsel seç.' });
     if (action === 'original') return reply(200, { success: true, action, image: body.image });
     // Ölçek rehberi ikinci görsel olarak gider; ilk görsel (ürün) en yüksek sadakatle korunur
-    const guideMatch = action === 'model' && body.scaled === true ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
+    const guideMatch = action === 'model' && body.scaled === true && body.carry !== 'el' ?/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
     const guideBytes = guideMatch ? Buffer.from(guideMatch[2], 'base64') : null;
     if (guideBytes && guideBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Ölçek görseli çok büyük.' });
-    const prompt = action === 'cutout'
+    const prompt = action === 'model' && body.carry === 'el' ? handPrompt(body.audience, body.size) : action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
       : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person}, about ${height} cm tall, with the bag ${carryText}${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true && !!guideBytes)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
     // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
