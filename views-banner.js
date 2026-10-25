@@ -145,9 +145,14 @@
     const pc = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(arr.length * p))];
     const L = pc(xs, 0.02), R = pc(xs, 0.98), T = pc(ys, 0.02), Bt = pc(ys, 0.99);
     const bx = L * k, by = T * k, bw = (R - L + 1) * k, bh = (Bt - T + 1) * k, s = Math.min(bw / geo.w, bh / geo.h);
-    const nw = geo.w * s, nh = geo.h * s; return { x: bx + bw / 2 - nw / 2, y: by + bh - nh, w: nw, h: nh };
+    const nw = geo.w * s, nh = geo.h * s, box = { x: bx + bw / 2 - nw / 2, y: by + bh - nh, w: nw, h: nh };
+    // Silme adımı bazen sahnenin büyük bir kısmını (masa, ışık) değiştiriyor ve kutu şişiyor: planlanandan çok farklıysa kullanılmaz
+    const dx = Math.abs((box.x + box.w / 2) - (geo.x + geo.w / 2)) / W, dy = Math.abs((box.y + box.h) - (geo.y + geo.h)) / H;
+    return s >= 0.6 && s <= 1.4 && dx <= 0.2 && dy <= 0.2 ? box : null;
   }
   CLK.bannerBox = productBox; CLK.bannerPlace = placeBag; CLK.bannerFormats = FORMATS; // denemeler için
+  // Son önizlemede ürünü planlanan konuma (ya da verilen kutuya) yeniden yerleştirir; üretim yapmaz
+  CLK.bannerRecompose = async over => { const o = B.out; if (!o?.empty) return toast('Yeniden yerleştirilecek sahne yok.'); o.preview = await composeProduct(o.empty, fmt(o.format), { ...o.geo, ...(over || {}) }); o.approved = false; S.keepScroll = true; render(); };
 
   // Sonuç biçimin tam boyutunda JPEG'e getirilir (Seedream daha büyük ama aynı oranda döner)
   async function fitTo(src, f) {
@@ -176,8 +181,9 @@
         const empty = await fitTo((await run({ ...base, mode: 'remove', image: fitted })).image, f);
         B.busy = 'Ürün fotoğrafı yerleştiriliyor…'; render();
         const box = await productBox(fitted, empty, f, placed.geo);
-        if (!box) toast('Ürünün yeri bulunamadı, ilk yerleşim kullanıldı; görseli kontrol et.');
-        B.out = { preview: await composeProduct(empty, f, { ...placed.geo, ...(box || {}) }), format: f[0], sandbox: false, scene, code: p.code, engine: 'Seedream sahne + ürün fotoğrafı' };
+        if (!box) toast('Ürünün yeri güvenilir bulunamadı, planlanan konum kullanıldı; görseli kontrol et.');
+        // empty ve placed bellekte tutulur: ürünü yeniden yerleştirmek için tekrar üretim gerekmesin (CLK.bannerRecompose)
+        B.out = { preview: await composeProduct(empty, f, { ...placed.geo, ...(box || {}) }), format: f[0], sandbox: false, scene, code: p.code, engine: 'Seedream sahne + ürün fotoğrafı', empty, geo: placed.geo, box: !!box };
       } else B.out = { preview: fitted, format: f[0], sandbox: !!j.sandbox, scene, code: p.code, engine: 'Photoroom' };
     } catch (e) { toast(e.message); }
     B.busy = ''; S.keepScroll = true; render();
