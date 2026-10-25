@@ -22,7 +22,7 @@
     ['kategori', 'Kategori kutusu', 800, 1000, { w: 0.68, h: 0.6, bottom: 0.82, cx: 0.5 }]
   ];
   // Motorlar: fal.ai Seedream (girdiyi düzenler, ~0,04 $) ya da Photoroom AI arka plan (Plus planı, ~0,10 $)
-  const ENGINES = [['fal', 'Seedream (fal.ai)', '~0,04 $'], ['photoroom', 'Photoroom', '~0,10 $']];
+  const ENGINES = [['fal', 'Seedream (fal.ai)', '~0,08 $'], ['photoroom', 'Photoroom', '~0,10 $']]; // Seedream: sahne + silme, iki üretim
   const B = (S.ui.bn ||= { q: '', code: '', scene: 'luks', custom: '', title: '', sub: '', btn: 'İncele', link: '', engine: 'fal', format: 'banner', busy: '', out: null, approved: null, approvals: [] });
   B.engine ||= 'fal'; B.format ||= 'banner'; B.approvals ||= [];
   try { if (!B.approvals.length) B.approvals = JSON.parse(localStorage.getItem('clk-banner-approvals') || '[]'); } catch {}
@@ -124,6 +124,25 @@
     return O.toDataURL('image/jpeg', 0.92);
   }
   CLK.bannerCompose = composeProduct; // denemeler için
+  // Ürünlü ve ürünsüz sahne farkından modelin ürünü çizdiği kutu (1/4 çözünürlükte, beklenen yere en çok örtüşen bölge).
+  // Ürün fotoğrafı bu kutuya oranı korunarak sığdırılır, alt kenarı kutunun altına, ortası kutunun ortasına gelir. Bulunamazsa ilk yerleşim kalır.
+  async function productBox(withDu, emptyDu, f, geo) {
+    const [, , W, H] = f, k = 4, w = Math.round(W / k), h = Math.round(H / k);
+    const px = async du => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(await loadImg(du), 0, 0, w, h); return c.getContext('2d').getImageData(0, 0, w, h).data; };
+    const a = await px(withDu), b = await px(emptyDu), on = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) on[i] = Math.abs(a[i * 4] - b[i * 4]) + Math.abs(a[i * 4 + 1] - b[i * 4 + 1]) + Math.abs(a[i * 4 + 2] - b[i * 4 + 2]) > 70 ? 1 : 0;
+    // Beklenen bölge (ilk yerleşim, her yönde yarısı kadar genişletilmiş) içindeki en büyük bağlı bölge
+    const ex = { l: (geo.x - geo.w * 0.5) / k, r: (geo.x + geo.w * 1.5) / k, t: (geo.y - geo.h * 0.5) / k, b: (geo.y + geo.h * 1.5) / k };
+    const seen = new Uint8Array(w * h), q = new Int32Array(w * h); let best = null;
+    for (let s = 0; s < w * h; s++) { if (!on[s] || seen[s]) continue; let qh = 0, qt = 0, l = w, r = 0, t = h, bb = 0, inside = 0; q[qt++] = s; seen[s] = 1;
+      while (qh < qt) { const i = q[qh++], x = i % w, y = (i - x) / w; if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > bb) bb = y; if (x >= ex.l && x <= ex.r && y >= ex.t && y <= ex.b) inside++;
+        for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (j >= 0 && j < w * h && on[j] && !seen[j]) { seen[j] = 1; q[qt++] = j; } }
+      if (!best || inside > best.inside) best = { inside, l, r, t, b: bb }; }
+    if (!best || best.inside * k * k < geo.w * geo.h * 0.15) return null; // fark çok küçük: ürün silinmemiş ya da bulunamadı
+    const bx = best.l * k, by = best.t * k, bw = (best.r - best.l + 1) * k, bh = (best.b - best.t + 1) * k, s = Math.min(bw / geo.w, bh / geo.h);
+    const nw = geo.w * s, nh = geo.h * s; return { x: bx + bw / 2 - nw / 2, y: by + bh - nh, w: nw, h: nh };
+  }
+  CLK.bannerBox = productBox; CLK.bannerPlace = placeBag; CLK.bannerFormats = FORMATS; // denemeler için
 
   // Sonuç biçimin tam boyutunda JPEG'e getirilir (Seedream daha büyük ama aynı oranda döner)
   async function fitTo(src, f) {
@@ -141,17 +160,20 @@
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
       const scene = B.custom.trim() ? 'kendi tarif' : (SCENES.find(s => s[0] === B.scene) || SCENES[0])[1];
       const placed = await placeBag(P.img(p), f);
-      // Seedream yalnızca sahneyi üretir (mode: 'scene'); Photoroom ürünü yeniden çizmediği için ürünle birlikte üretir
-      let j = await fn(t, { action: 'banner', format: f[0], engine: eng, mode: eng === 'fal' ? 'scene' : undefined, image: placed.du, prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model });
-      if (j.pending) { // fal.ai kuyruğu: 3 sn arayla sor (en çok ~3 dk)
-        const job = j.job;
-        for (let i = 0; i < 60 && j.pending; i++) { await new Promise(ok => setTimeout(ok, 3000)); j = await fn(t, { action: 'falResult', job }); }
-        if (j.pending) throw new Error('Seedream zaman aşımı.');
-      }
-      if (!j.image) throw new Error(j.message || 'Görsel üretilemedi.');
-      B.busy = 'Ürün fotoğrafı yerleştiriliyor…'; render();
+      // fal.ai kuyruğu: iş bırakılır, sonuç 3 sn arayla sorulur (en çok ~3 dk)
+      const run = async body => { let j = await fn(t, body); if (j.pending) { const job = j.job; for (let i = 0; i < 60 && j.pending; i++) { await new Promise(ok => setTimeout(ok, 3000)); j = await fn(t, { action: 'falResult', job }); } if (j.pending) throw new Error('Seedream zaman aşımı.'); } if (!j.image) throw new Error(j.message || 'Görsel üretilemedi.'); return j; };
+      const base = { action: 'banner', format: f[0], engine: eng, prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model };
+      const j = await run({ ...base, image: placed.du });
       const fitted = await fitTo(j.image, f);
-      B.out = { preview: eng === 'fal' ? await composeProduct(fitted, f, placed.geo) : fitted, format: f[0], sandbox: !!j.sandbox, scene, code: p.code, engine: eng === 'fal' ? 'Seedream sahne + ürün fotoğrafı' : 'Photoroom' };
+      if (eng === 'fal') {
+        // Seedream ürünü yeniden çizip logoyu değiştirebiliyor: ürün sahneden silinir, farktan bulunan yere ürün fotoğrafı konur
+        B.busy = 'Ürün sahneden siliniyor… (30-90 sn)'; render();
+        const empty = await fitTo((await run({ ...base, mode: 'remove', image: fitted })).image, f);
+        B.busy = 'Ürün fotoğrafı yerleştiriliyor…'; render();
+        const box = await productBox(fitted, empty, f, placed.geo);
+        if (!box) toast('Ürünün yeri bulunamadı, ilk yerleşim kullanıldı; görseli kontrol et.');
+        B.out = { preview: await composeProduct(empty, f, { ...placed.geo, ...(box || {}) }), format: f[0], sandbox: false, scene, code: p.code, engine: 'Seedream sahne + ürün fotoğrafı' };
+      } else B.out = { preview: fitted, format: f[0], sandbox: !!j.sandbox, scene, code: p.code, engine: 'Photoroom' };
     } catch (e) { toast(e.message); }
     B.busy = ''; S.keepScroll = true; render();
   }
