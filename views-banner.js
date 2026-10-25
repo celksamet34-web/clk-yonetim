@@ -130,16 +130,21 @@
     const [, , W, H] = f, k = 4, w = Math.round(W / k), h = Math.round(H / k);
     const px = async du => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(await loadImg(du), 0, 0, w, h); return c.getContext('2d').getImageData(0, 0, w, h).data; };
     const a = await px(withDu), b = await px(emptyDu), on = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) on[i] = Math.abs(a[i * 4] - b[i * 4]) + Math.abs(a[i * 4 + 1] - b[i * 4 + 1]) + Math.abs(a[i * 4 + 2] - b[i * 4 + 2]) > 70 ? 1 : 0;
+    // Eşik 110: yumuşak gölge ve duvardaki ışık farkı girmesin (70'te kutu tavana kadar uzuyordu)
+    for (let i = 0; i < w * h; i++) on[i] = Math.abs(a[i * 4] - b[i * 4]) + Math.abs(a[i * 4 + 1] - b[i * 4 + 1]) + Math.abs(a[i * 4 + 2] - b[i * 4 + 2]) > 110 ? 1 : 0;
     // Beklenen bölge (ilk yerleşim, her yönde yarısı kadar genişletilmiş) içindeki en büyük bağlı bölge
     const ex = { l: (geo.x - geo.w * 0.5) / k, r: (geo.x + geo.w * 1.5) / k, t: (geo.y - geo.h * 0.5) / k, b: (geo.y + geo.h * 1.5) / k };
     const seen = new Uint8Array(w * h), q = new Int32Array(w * h); let best = null;
-    for (let s = 0; s < w * h; s++) { if (!on[s] || seen[s]) continue; let qh = 0, qt = 0, l = w, r = 0, t = h, bb = 0, inside = 0; q[qt++] = s; seen[s] = 1;
-      while (qh < qt) { const i = q[qh++], x = i % w, y = (i - x) / w; if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > bb) bb = y; if (x >= ex.l && x <= ex.r && y >= ex.t && y <= ex.b) inside++;
+    for (let s = 0; s < w * h; s++) { if (!on[s] || seen[s]) continue; let qh = 0, qt = 0, inside = 0; q[qt++] = s; seen[s] = 1;
+      while (qh < qt) { const i = q[qh++], x = i % w, y = (i - x) / w; if (x >= ex.l && x <= ex.r && y >= ex.t && y <= ex.b) inside++;
         for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (j >= 0 && j < w * h && on[j] && !seen[j]) { seen[j] = 1; q[qt++] = j; } }
-      if (!best || inside > best.inside) best = { inside, l, r, t, b: bb }; }
+      if (!best || inside > best.inside) best = { inside, pix: q.slice(0, qt) }; }
     if (!best || best.inside * k * k < geo.w * geo.h * 0.15) return null; // fark çok küçük: ürün silinmemiş ya da bulunamadı
-    const bx = best.l * k, by = best.t * k, bw = (best.r - best.l + 1) * k, bh = (best.b - best.t + 1) * k, s = Math.min(bw / geo.w, bh / geo.h);
+    // Kutu uç noktalardan değil yüzdeliklerden (yanlarda %2, üstte %2, altta %1): dağınık kenar pikselleri kutuyu büyütmesin
+    const xs = [], ys = []; for (const i of best.pix) { xs.push(i % w); ys.push((i - (i % w)) / w); } xs.sort((m, n) => m - n); ys.sort((m, n) => m - n);
+    const pc = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(arr.length * p))];
+    const L = pc(xs, 0.02), R = pc(xs, 0.98), T = pc(ys, 0.02), Bt = pc(ys, 0.99);
+    const bx = L * k, by = T * k, bw = (R - L + 1) * k, bh = (Bt - T + 1) * k, s = Math.min(bw / geo.w, bh / geo.h);
     const nw = geo.w * s, nh = geo.h * s; return { x: bx + bw / 2 - nw / 2, y: by + bh - nh, w: nw, h: nh };
   }
   CLK.bannerBox = productBox; CLK.bannerPlace = placeBag; CLK.bannerFormats = FORMATS; // denemeler için
