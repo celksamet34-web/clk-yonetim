@@ -159,6 +159,9 @@ const BANNER_FORMATS = {
   kategori: { out: '800x1000', fal: { width: 1792, height: 2240 }, shape: 'vertical 4:5 category tile', zone: 'Keep the composition centered and minimal with generous even space around the bag.' }
 };
 // fal.ai banner istemi: ürün yerinde ve aynen kalır, yalnızca beyaz zemin sahneyle değişir, biçime göre yazı alanı sakin kalır
+// Yalnızca sahne: model ürünü yeniden çizince logoyu değiştiriyor (DADA → DACA, YEFA → VIP) ve açısını bozuyordu (doğrulandı).
+// Bu yüzden model ürünü hiç çizmez; ürünün durduğu yerde boş bir yüzey bırakır, panel ürün fotoğrafını oraya birebir yerleştirir.
+const sceneOnlyPrompt = (scene, f = BANNER_FORMATS.banner) => `Use this image only as a layout reference for framing. Create a photorealistic ${f.shape} scene: ${scene} Keep the same camera framing and perspective. Remove the product completely: do not draw any bag, backpack, suitcase or other product anywhere in the image. Exactly where the product stands in the reference, leave an empty, clean, flat surface (floor, table top or pedestal top) at the same height, naturally lit, with nothing on it, because the real product photo will be placed there afterwards. ${f.zone.replace('The bag is on the right side', 'The empty product spot is on the right side')} Photorealistic high-end campaign photography, no people, no text, no letters, no logos.`;
 // Ürün tek çanta ya da çok parçalı set (ör. 3'lü valiz) olabilir: "tek çanta" demek seti teke indiriyordu (doğrulandı), parça sayısı korunur
 const bannerEditPrompt = (scene, f = BANNER_FORMATS.banner) => `Edit this image into a premium ecommerce homepage image. The product may be a single bag or a set of several pieces (for example a set of suitcases); keep every piece exactly as it is in the image: same number of pieces, same position, same size, same angle, same colors, logo, lettering, zippers, wheels, handles, straps and details. Do not add, remove, merge, move, resize, redraw, restyle or crop any piece. Replace only the plain white background with this scene: ${scene} The product stands naturally on a surface in the scene with a soft realistic contact shadow. ${f.zone} Photorealistic high-end campaign photography, ${f.shape} composition, no people, no extra products beyond those in the image, no text or letters except what is printed on the product.`;
 
@@ -206,7 +209,7 @@ exports.handler = async event => {
       catch (e) { return reply(422, { success: false, message: 'Açıklama yazılamadı: ' + String(e?.message || e) }); }
     }
     if (body.action === 'banner') {
-      if (!photoroomKey) return reply(503, { success: false, message: 'PHOTOROOM_API_KEY eksik.' });
+      if (body.engine !== 'fal' && !photoroomKey) return reply(503, { success: false, message: 'PHOTOROOM_API_KEY eksik.' });
       const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
       if (!m) return reply(422, { success: false, message: 'Ürün fotoğrafı okunamadı.' });
       const b = Buffer.from(m[2], 'base64');
@@ -218,7 +221,7 @@ exports.handler = async event => {
       // Seedream küçük boyutu kabul etmediği için 3:4 ~4 MP (1728×2304) istenir; panel 1248×1664'e küçültür.
       if (body.engine === 'fal') {
         if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
-        try { return reply(200, { success: true, action: 'banner', engine: 'fal', pending: true, job: await falSubmit(falKey, bannerEditPrompt(p, bf), [[m[1], b]], bf.fal) }); }
+        try { return reply(200, { success: true, action: 'banner', engine: 'fal', pending: true, job: await falSubmit(falKey, body.mode === 'scene' ? sceneOnlyPrompt(p, bf) : bannerEditPrompt(p, bf), [[m[1], b]], bf.fal) }); }
         catch (e) { return reply(422, { success: false, message: 'fal: ' + (e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)) }); }
       }
       try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true, body.layout, body.model, bf.out) }); }

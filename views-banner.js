@@ -61,7 +61,7 @@
       </div>
       <aside class="bn-prev"><div class="sum-card">
         <div class="bn-frame" style="aspect-ratio:${out ? `${fmt(out.format)[2]}/${fmt(out.format)[3]}` : `${fw}/${fh}`}">${out ? `<img src="${esc(out.preview)}" alt="Önizleme">` : `<div class="bn-empty">${img ? 'Önizleme burada görünecek' : 'Önce ürün seç'}</div>`}${out ? overlay(out.format) : ''}${B.busy ? `<div class="busy">${esc(B.busy)}</div>` : ''}</div>
-        ${out ? `<p class="bn-note">${out.sandbox ? '<b>Deneme (filigranlı, ücretsiz).</b> ' : ''}${esc(fmt(out.format)[1])} ${fmt(out.format)[2]}×${fmt(out.format)[3]} · ${esc(out.engine || 'Photoroom')} · sahne: ${esc(out.scene)} · ${out.match ? `orijinal ürün yerleştirildi (eşleşme %${out.match})` : '<b>orijinal ürün yerleştirilemedi, logoyu kontrol et</b>'}</p>
+        ${out ? `<p class="bn-note">${out.sandbox ? '<b>Deneme (filigranlı, ücretsiz).</b> ' : ''}${esc(fmt(out.format)[1])} ${fmt(out.format)[2]}×${fmt(out.format)[3]} · ${esc(out.engine || 'Photoroom')} · sahne: ${esc(out.scene)}</p>
           <div class="sum-acts"><button class="btn gold" data-act="bnApprove" ${out.sandbox || out.approved ? 'disabled' : ''}>${out.approved ? 'Onaylandı' : 'Onayla'}</button><button class="btn" data-act="bnDrop">Vazgeç</button></div>` : ''}
         ${B.approvals.length ? `<div class="bn-ok"><b>Onaylananlar</b><small>Qukasoft'a yüklenmeyi bekliyor. Claude'a "onaylananları yükle" deyin.</small>
           ${B.approvals.slice(0, 12).map(a => `<a class="bn-app" href="${esc(a.url)}" target="_blank" rel="noopener"><span>${esc(fmt(a.format)[1])}</span>${esc(a.title || 'Başlıksız')}</a>`).join('')}</div>` : ''}
@@ -90,44 +90,41 @@
     x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(c0, l, t, bw, bh, W * L.cx - w / 2, H * L.bottom - h, w, h);
     return { du: c.toDataURL('image/jpeg', 0.92), geo: { c0, l, t, bw, bh, x: W * L.cx - w / 2, y: H * L.bottom - h, w, h } };
   }
-  // Model logoyu ve küçük yazıları değiştirebiliyor (ör. valiz etiketi YEFA → VIP, doğrulandı) ve ürünü biraz büyütüp kaydırıyor.
-  // Bu yüzden orijinal ürün dokusu sonuçta aranır (gri tonda maskeli normalize korelasyon; önce 1/8 çözünürlükte geniş, sonra 1/2'de dar)
-  // ve bulunan yere orijinal pikseller yumuşak kenarlı maskeyle yapıştırılır. Eşleşme zayıfsa sonuç olduğu gibi kalır.
-  async function restoreProduct(outDu, f, geo) {
-    const [, , W, H] = f, out = await loadImg(outDu), O = document.createElement('canvas'); O.width = W; O.height = H;
-    const ox = O.getContext('2d'); ox.drawImage(out, 0, 0, W, H);
-    const grayOf = (cv, k) => { const w = Math.round(cv.width / k), h = Math.round(cv.height / k), t = document.createElement('canvas'); t.width = w; t.height = h; t.getContext('2d').drawImage(cv, 0, 0, w, h); const d = t.getContext('2d').getImageData(0, 0, w, h).data, g = new Float32Array(w * h); for (let i = 0; i < g.length; i++) g[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11; return { w, h, g }; };
-    // Şablon: ürünün gri tonu ve maskesi (beyaz zemin dışı), verilen boyutta; nokta listesi (x, y, gri)
-    const tpl = (pw, ph, step) => { const w = Math.max(4, Math.round(pw)), h = Math.max(4, Math.round(ph)), t = document.createElement('canvas'); t.width = w; t.height = h; const tx = t.getContext('2d'); tx.drawImage(geo.c0, geo.l, geo.t, geo.bw, geo.bh, 0, 0, w, h);
-      const d = tx.getImageData(0, 0, w, h).data, pts = []; for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) { const q = (y * w + x) * 4; if (d[q] < 225 || d[q + 1] < 225 || d[q + 2] < 225) pts.push(x, y, d[q] * 0.3 + d[q + 1] * 0.59 + d[q + 2] * 0.11); } return { w, h, pts }; };
-    const ncc = (G, T, px, py) => { let n = 0, sa = 0, saa = 0, st = 0, stt = 0, sat = 0; const p = T.pts;
-      for (let q = 0; q < p.length; q += 3) { const x = px + p[q], y = py + p[q + 1]; if (x < 0 || y < 0 || x >= G.w || y >= G.h) return -1; const a = G.g[y * G.w + x], v = p[q + 2]; n++; sa += a; saa += a * a; st += v; stt += v * v; sat += a * v; }
-      const va = saa - sa * sa / n, vt = stt - st * st / n; return n > 20 && va > 0 && vt > 0 ? (sat - sa * st / n) / Math.sqrt(va * vt) : -1; };
-    let best = { s: -1 };
-    const G8 = grayOf(O, 8);
-    for (let sc = 0.8; sc <= 1.5; sc += 0.05) {
-      const T = tpl(geo.w * sc / 8, geo.h * sc / 8, 1), cx = (geo.x + geo.w / 2) / 8, cy = (geo.y + geo.h / 2) / 8, rx = W * 0.2 / 8, ry = H * 0.2 / 8;
-      for (let y = Math.round(cy - ry); y <= cy + ry; y++) for (let x = Math.round(cx - rx); x <= cx + rx; x++) { const s = ncc(G8, T, Math.round(x - T.w / 2), Math.round(y - T.h / 2)); if (s > best.s) best = { s, sc, cx: x * 8, cy: y * 8 }; }
-    }
-    const G2 = grayOf(O, 2), coarse = best; best = { s: -1 };
-    for (let sc = coarse.sc - 0.05; sc <= coarse.sc + 0.05; sc += 0.01) {
-      const T = tpl(geo.w * sc / 2, geo.h * sc / 2, 3);
-      for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++) { const x = Math.round(coarse.cx / 2) + dx, y = Math.round(coarse.cy / 2) + dy, s = ncc(G2, T, Math.round(x - T.w / 2), Math.round(y - T.h / 2)); if (s > best.s) best = { s, sc, cx: x * 2, cy: y * 2 }; }
-    }
-    if (!(best.s > 0.6)) return { du: outDu, score: best.s, pasted: false };
-    // Yapıştırma: ürün kesiti bulunan boyutta, beyaz zemin maskesi 1,5 px yumuşatılmış
-    const w = Math.round(geo.w * best.sc), h = Math.round(geo.h * best.sc), px = Math.round(best.cx - w / 2), py = Math.round(best.cy - h / 2);
+  // Ürünü sahneye birebir yerleştirir: model yalnızca sahneyi üretir (ürün yerinde boş yüzey), ürün fotoğrafı tuvaldeki yerine konur.
+  // Kesme: beyaz/açık gri zemin kenarlardan dolgu ile bulunur (ürünün içindeki beyaz parçalar korunur); kapalı ve saf beyaz büyük
+  // boşluklar (sap arası) da zemin sayılır. Kenar 1 px aşındırılıp yumuşatılır (koyu sahnede beyaz hale kalmasın).
+  // Gölge: her sütunda ürünün en alt pikselinin altına koyu leke, iki katman bulanık (setlerde her parçanın altına düşer).
+  async function composeProduct(sceneDu, f, geo) {
+    const [, , W, H] = f, sc = await loadImg(sceneDu), O = document.createElement('canvas'); O.width = W; O.height = H;
+    const ox = O.getContext('2d'); ox.drawImage(sc, 0, 0, W, H);
+    const w = Math.max(2, Math.round(geo.w)), h = Math.max(2, Math.round(geo.h)), px = Math.round(geo.x), py = Math.round(geo.y);
     const P = document.createElement('canvas'); P.width = w; P.height = h; const pc = P.getContext('2d'); pc.drawImage(geo.c0, geo.l, geo.t, geo.bw, geo.bh, 0, 0, w, h);
-    const pd = pc.getImageData(0, 0, w, h), M = document.createElement('canvas'); M.width = w; M.height = h; const mc = M.getContext('2d'), md = mc.createImageData(w, h);
-    // Zemin sayılan: beyaz ya da açık renksiz gri (ürün fotoğrafındaki tekerlek/taban gölgesi; yapıştırılınca beyaz leke bırakıyordu)
-    const bg = (r, g, b) => { const lo = Math.min(r, g, b), hi = Math.max(r, g, b); return lo >= 232 || (lo >= 170 && hi - lo < 20); };
-    for (let q = 0; q < pd.data.length; q += 4) md.data[q + 3] = bg(pd.data[q], pd.data[q + 1], pd.data[q + 2]) ? 0 : 255;
-    mc.putImageData(md, 0, 0); const soft = document.createElement('canvas'); soft.width = w; soft.height = h; const sc2 = soft.getContext('2d'); sc2.filter = 'blur(1.5px)'; sc2.drawImage(M, 0, 0);
+    const id = pc.getImageData(0, 0, w, h), d = id.data, N = w * h;
+    const bgAt = i => { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], lo = Math.min(r, g, b), hi = Math.max(r, g, b); return lo >= 232 || (lo >= 170 && hi - lo < 20); };
+    const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
+    const push = i => { if (!bg[i] && bgAt(i)) { bg[i] = 1; q[qt++] = i; } };
+    for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); } for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+    while (qh < qt) { const i = q[qh++], x = i % w; if (x > 0) push(i - 1); if (x < w - 1) push(i + 1); if (i >= w) push(i - w); if (i < N - w) push(i + w); }
+    // Kapalı saf beyaz bölgeler (≥248, 400 pikselden büyük): sap arası gibi boşluklar
+    const seen = new Uint8Array(N), white = i => Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) >= 248;
+    for (let s = 0; s < N; s++) { if (bg[s] || seen[s] || !white(s)) continue; qh = qt = 0; q[qt++] = s; seen[s] = 1;
+      while (qh < qt) { const i = q[qh++], x = i % w; for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (j >= 0 && j < N && !bg[j] && !seen[j] && white(j)) { seen[j] = 1; q[qt++] = j; } }
+      if (qt > 400) for (let k = 0; k < qt; k++) bg[q[k]] = 1; }
+    const M = document.createElement('canvas'); M.width = w; M.height = h; const mc = M.getContext('2d'), md = mc.createImageData(w, h);
+    for (let i = 0; i < N; i++) { const x = i % w, inner = !bg[i] && (x === 0 || !bg[i - 1]) && (x === w - 1 || !bg[i + 1]) && (i < w || !bg[i - w]) && (i >= N - w || !bg[i + w]); md.data[i * 4 + 3] = inner ? 255 : 0; }
+    mc.putImageData(md, 0, 0);
+    const soft = document.createElement('canvas'); soft.width = w; soft.height = h; const sx = soft.getContext('2d'); sx.filter = 'blur(1.2px)'; sx.drawImage(M, 0, 0);
     pc.globalCompositeOperation = 'destination-in'; pc.drawImage(soft, 0, 0);
+    // Temas gölgesi: sütun başına en alt ürün pikseli
+    const S2 = document.createElement('canvas'); S2.width = W; S2.height = H; const s2 = S2.getContext('2d'); s2.fillStyle = '#000';
+    for (let x = 0; x < w; x += 2) { let yb = -1; for (let y = h - 1; y >= 0; y--) if (!bg[y * w + x]) { yb = y; break; } if (yb > h * 0.5) s2.fillRect(px + x, py + yb - 3, 2, 8); }
+    ox.save(); ox.globalAlpha = 0.28; ox.filter = 'blur(22px)'; ox.drawImage(S2, 0, 6); ox.restore();
+    ox.save(); ox.globalAlpha = 0.55; ox.filter = 'blur(6px)'; ox.drawImage(S2, 0, 0); ox.restore();
     ox.drawImage(P, px, py);
-    return { du: O.toDataURL('image/jpeg', 0.92), score: best.s, pasted: true };
+    return O.toDataURL('image/jpeg', 0.92);
   }
-  CLK.bannerRestore = restoreProduct; // denemeler için
+  CLK.bannerCompose = composeProduct; // denemeler için
+
   // Sonuç biçimin tam boyutunda JPEG'e getirilir (Seedream daha büyük ama aynı oranda döner)
   async function fitTo(src, f) {
     const [, , W, H] = f, im = await loadImg(src), c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -144,17 +141,17 @@
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
       const scene = B.custom.trim() ? 'kendi tarif' : (SCENES.find(s => s[0] === B.scene) || SCENES[0])[1];
       const placed = await placeBag(P.img(p), f);
-      let j = await fn(t, { action: 'banner', format: f[0], engine: eng, image: placed.du, prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model });
+      // Seedream yalnızca sahneyi üretir (mode: 'scene'); Photoroom ürünü yeniden çizmediği için ürünle birlikte üretir
+      let j = await fn(t, { action: 'banner', format: f[0], engine: eng, mode: eng === 'fal' ? 'scene' : undefined, image: placed.du, prompt: promptText(), sandbox: !!sandbox, layout: opts.layout, model: opts.model });
       if (j.pending) { // fal.ai kuyruğu: 3 sn arayla sor (en çok ~3 dk)
         const job = j.job;
         for (let i = 0; i < 60 && j.pending; i++) { await new Promise(ok => setTimeout(ok, 3000)); j = await fn(t, { action: 'falResult', job }); }
         if (j.pending) throw new Error('Seedream zaman aşımı.');
       }
       if (!j.image) throw new Error(j.message || 'Görsel üretilemedi.');
-      B.busy = 'Orijinal ürün yerleştiriliyor…'; render();
-      const fixed = await restoreProduct(await fitTo(j.image, f), f, placed.geo);
-      if (!fixed.pasted) toast('Ürün sonuçta bulunamadı, logo ve yazıları gözle kontrol et.');
-      B.out = { preview: fixed.du, format: f[0], sandbox: !!j.sandbox, scene, code: p.code, engine: eng === 'fal' ? 'Seedream' : 'Photoroom', match: fixed.pasted ? Math.round(fixed.score * 100) : 0 };
+      B.busy = 'Ürün fotoğrafı yerleştiriliyor…'; render();
+      const fitted = await fitTo(j.image, f);
+      B.out = { preview: eng === 'fal' ? await composeProduct(fitted, f, placed.geo) : fitted, format: f[0], sandbox: !!j.sandbox, scene, code: p.code, engine: eng === 'fal' ? 'Seedream sahne + ürün fotoğrafı' : 'Photoroom' };
     } catch (e) { toast(e.message); }
     B.busy = ''; S.keepScroll = true; render();
   }
