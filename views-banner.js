@@ -119,7 +119,9 @@
     const w = Math.round(geo.w * best.sc), h = Math.round(geo.h * best.sc), px = Math.round(best.cx - w / 2), py = Math.round(best.cy - h / 2);
     const P = document.createElement('canvas'); P.width = w; P.height = h; const pc = P.getContext('2d'); pc.drawImage(geo.c0, geo.l, geo.t, geo.bw, geo.bh, 0, 0, w, h);
     const pd = pc.getImageData(0, 0, w, h), M = document.createElement('canvas'); M.width = w; M.height = h; const mc = M.getContext('2d'), md = mc.createImageData(w, h);
-    for (let q = 0; q < pd.data.length; q += 4) md.data[q + 3] = (pd.data[q] < 232 || pd.data[q + 1] < 232 || pd.data[q + 2] < 232) ? 255 : 0;
+    // Zemin sayılan: beyaz ya da açık renksiz gri (ürün fotoğrafındaki tekerlek/taban gölgesi; yapıştırılınca beyaz leke bırakıyordu)
+    const bg = (r, g, b) => { const lo = Math.min(r, g, b), hi = Math.max(r, g, b); return lo >= 232 || (lo >= 170 && hi - lo < 20); };
+    for (let q = 0; q < pd.data.length; q += 4) md.data[q + 3] = bg(pd.data[q], pd.data[q + 1], pd.data[q + 2]) ? 0 : 255;
     mc.putImageData(md, 0, 0); const soft = document.createElement('canvas'); soft.width = w; soft.height = h; const sc2 = soft.getContext('2d'); sc2.filter = 'blur(1.5px)'; sc2.drawImage(M, 0, 0);
     pc.globalCompositeOperation = 'destination-in'; pc.drawImage(soft, 0, 0);
     ox.drawImage(P, px, py);
