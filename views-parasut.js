@@ -4,7 +4,7 @@
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const D = (S.ui.ps ||= { tab: 'urun', q: '', f: 'bekleyen', yukleniyor: false, hata: '', veri: null, isliyor: '' });
   const GERI = { gonderildi: ['Siteye geçti', 'ok'], gonderiliyor: ['Gönderiliyor', 'info'], eslesme_yok: ['Ürün eşleşmemiş', 'warn'], hata: ['Hata', 'bad'], atla: ['Atlandı', 'off'] };
-  const DURUM = { aktarildi: ['Paraşüt\'te', 'ok'], aktariliyor: ['Aktarılıyor', 'info'], eslesme_yok: ['Ürün seçilmemiş', 'warn'], musteri_yok: ['Müşteri seçilmemiş', 'warn'], hata: ['Hata', 'bad'], iptal: ['İptal', 'off'], iptal_kontrol: ['İptal, faturayı kontrol et', 'bad'] };
+  const DURUM = { aktarildi: ['Paraşüt\'te', 'ok'], aktariliyor: ['Aktarılıyor', 'info'], kargo_bekliyor: ['Kargo bekliyor', 'off'], eslesme_yok: ['Ürün seçilmemiş', 'warn'], musteri_yok: ['Müşteri seçilmemiş', 'warn'], hata: ['Hata', 'bad'], iptal: ['İptal', 'off'], iptal_kontrol: ['İptal, faturayı kontrol et', 'bad'] };
 
   async function hepsi(tablo, sutun) {
     const out = [];
@@ -93,7 +93,7 @@
     const V = D.veri, q = D.q.trim().toLocaleLowerCase('tr');
     const uyan = (...s) => !q || s.join(' ').toLocaleLowerCase('tr').includes(q);
     const uB = V.urun.filter(u => !u.parasut_id).length, mB = V.musteri.filter(m => !m.parasut_id).length;
-    const sB = V.siparis.filter(s => !['aktarildi', 'iptal'].includes(s.durum)).length;
+    const sB = V.siparis.filter(s => !['aktarildi', 'iptal', 'kargo_bekliyor'].includes(s.durum)).length;
     let govde = '';
     if (D.tab === 'urun') {
       const L = V.urun.filter(u => (D.f === 'hepsi' || (D.f === 'bekleyen' ? !u.parasut_id : u.parasut_id)) && uyan(u.site_ad, u.parasut_ad, u.oneri_ad, u.site_anahtar));
@@ -112,7 +112,7 @@
         <div class="es-bas"><b>Paraşüt'ten siteye aktarılanlar</b><span>son ${num(V.geri.length)} kayıt</span></div>
         ${V.geri.filter(g => uyan(g.musteri, g.belge, g.site_ref)).map(satirGeri).join('') || '<p class="empty">Henüz aktarım yok.</p>'}`;
     } else {
-      govde = V.siparis.filter(s => uyan(s.musteri, s.kod)).map(satirSiparis).join('') || '<p class="empty">Henüz siteden yeni sipariş gelmedi.</p>';
+      govde = `<p class="es-ip">Siparişler sitede <b>Kargolandı</b> ya da <b>Teslim edildi</b> olunca Paraşüt'e aktarılır; eksik ürünü ondan önce siparişten çıkarın.</p>` + (V.siparis.filter(s => uyan(s.musteri, s.kod)).map(satirSiparis).join('') || '<p class="empty">Henüz siteden yeni sipariş gelmedi.</p>');
     }
     const son = V.ayar.son_calisma, sonL = V.ayar.son_liste;
     return head('Paraşüt', 'Eşleştirme', alt, acts) + `
