@@ -124,7 +124,14 @@
     if (!D.bas || !D.son || D.bas > D.son) { D.durum = 'Tarihleri kontrol edin: başlangıç bitişten önce olmalı.'; render(); return; }
     D.yukleniyor = true; D.durum = 'Paraşüt\'ten güncel bilgiler alınıyor…'; render();
     try {
-      if (D.veri?.id !== m.id) D.veri = { id: m.id, ...(await ekstreAl(m.id)) };
+      if (D.veri?.id !== m.id) {
+        // Paraşüt'te silinmiş eski kayıt seçildiyse aynı adlı öteki kayıt denenir
+        const adaylar = [m, ...D.musteriler.filter(x => x !== m && x.ad.toLocaleUpperCase('tr') === m.ad.toLocaleUpperCase('tr'))];
+        for (const [i, a] of adaylar.entries()) {
+          try { D.veri = { id: a.id, ...(await ekstreAl(a.id)) }; break; }
+          catch (e) { if (!/404/.test(e.message) || i === adaylar.length - 1) throw e; }
+        }
+      }
       blob = await ciz(D.veri, D.bas, D.son);
       if (D.resim) URL.revokeObjectURL(D.resim);
       D.resim = URL.createObjectURL(blob);
