@@ -508,3 +508,10 @@ body{font-size:15.5px;letter-spacing:0}
 @media (max-width:640px){.ul-sat{grid-template-columns:auto 1fr auto}.ul-sat .t{grid-column:2;grid-row:2;font-size:12px}.ul-sat .no{grid-column:2;grid-row:1}.ul-sat .tt{grid-column:3;grid-row:1/3}}
 .ul-tablo tr.ul-grup td{text-align:left;padding:16px 6px 7px;border-bottom:2px solid #1d2433;font-size:14px;white-space:normal}
 .ul-tablo tr.ul-grup span{float:right;color:var(--muted);font-size:13px}
+.ul-ara{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600;position:relative}
+.ul-ara input{font:inherit;font-size:16px;min-height:var(--tap);padding:11px 14px;border:1px solid var(--line-2);border-radius:13px;background:#fff;color:var(--ink,#1d2433);width:100%;box-sizing:border-box}
+.ul-oneri{display:grid;border:1px solid var(--line-2);border-radius:13px;background:#fff;overflow:hidden;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(20,24,40,.08)}
+.ul-oneri button{all:unset;cursor:pointer;padding:12px 14px;font-size:15px;font-weight:500;color:var(--ink,#1d2433);border-bottom:1px solid var(--line-2)}
+.ul-oneri button:last-child{border-bottom:0}
+.ul-oneri button:hover,.ul-oneri button:focus-visible{background:#f3f5f9}
+.ul-oneri span{padding:12px 14px;font-weight:400}
