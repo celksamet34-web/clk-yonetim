@@ -155,7 +155,7 @@
       const l = await fonksiyon('liste').catch(e => ({ hata: e.message }));
       const r = await fonksiyon('calis');
       const p = r.parasut || {}, k = r.kontrol || {};
-      const parca = [`Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`, ...(r.silinen?.iptal ? [`Paraşüt'te silinen ${num(r.silinen.iptal)} faturanın site siparişi iptal edildi`] : []),
+      const parca = [`Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`, ...(r.silinen?.iptal ? [`Paraşüt'te silinen ${num(r.silinen.iptal)} kayıt sitede geri alındı`] : []),
         k.hata ? 'bakiye kontrolü olmadı' : k.farkli ? `${num(k.farkli)} müşteride bakiye farkı` : `${num(k.toplam || 0)} müşterinin bakiyesi aynı`];
       const hata = [l.hata && 'listeler: ' + l.hata, r.hata && 'site → Paraşüt: ' + r.hata, p.hata && 'Paraşüt → site: ' + p.hata, r.silinen?.hata && 'iptaller: ' + r.silinen.hata].filter(Boolean);
       S.esitleniyor = false;
