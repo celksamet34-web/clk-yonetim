@@ -3,7 +3,7 @@
   const { sb, S, $, $$, esc, tl, num, dtt, toast, head, skel, errBox, views, render } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const D = (S.ui.ps ||= { tab: 'urun', q: '', f: 'bekleyen', yukleniyor: false, hata: '', veri: null, isliyor: '' });
-  const GERI = { gonderildi: ['Siteye geçti', 'ok'], gonderiliyor: ['Gönderiliyor', 'info'], eslesme_yok: ['Ürün eşleşmemiş', 'warn'], hata: ['Hata', 'bad'], atla: ['Atlandı', 'off'] };
+  const GERI = { gonderildi: ['Siteye geçti', 'ok'], gonderiliyor: ['Gönderiliyor', 'info'], eslesme_yok: ['Ürün eşleşmemiş', 'warn'], hata: ['Hata', 'bad'], atla: ['Atlandı', 'off'], iptal: ['Sitede iptal edildi', 'off'] };
   const DURUM = { aktarildi: ['Paraşüt\'te', 'ok'], aktariliyor: ['Aktarılıyor', 'info'], kargo_bekliyor: ['Kargo bekliyor', 'off'], eslesme_yok: ['Ürün seçilmemiş', 'warn'], musteri_yok: ['Müşteri seçilmemiş', 'warn'], hata: ['Hata', 'bad'], iptal: ['İptal', 'off'], iptal_kontrol: ['İptal, faturayı kontrol et', 'bad'] };
 
   async function hepsi(tablo, sutun) {
@@ -155,9 +155,9 @@
       const l = await fonksiyon('liste').catch(e => ({ hata: e.message }));
       const r = await fonksiyon('calis');
       const p = r.parasut || {}, k = r.kontrol || {};
-      const parca = [`Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`,
+      const parca = [`Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`, ...(r.silinen?.iptal ? [`Paraşüt'te silinen ${num(r.silinen.iptal)} faturanın site siparişi iptal edildi`] : []),
         k.hata ? 'bakiye kontrolü olmadı' : k.farkli ? `${num(k.farkli)} müşteride bakiye farkı` : `${num(k.toplam || 0)} müşterinin bakiyesi aynı`];
-      const hata = [l.hata && 'listeler: ' + l.hata, r.hata && 'site → Paraşüt: ' + r.hata, p.hata && 'Paraşüt → site: ' + p.hata].filter(Boolean);
+      const hata = [l.hata && 'listeler: ' + l.hata, r.hata && 'site → Paraşüt: ' + r.hata, p.hata && 'Paraşüt → site: ' + p.hata, r.silinen?.hata && 'iptaller: ' + r.silinen.hata].filter(Boolean);
       S.esitleniyor = false;
       toast((hata.length ? 'Eşitlendi, sorun var: ' + hata.join('; ') + ' · ' : 'Eşitlendi · ') + parca.join(' · '));
     } catch (err) { S.esitleniyor = false; toast('Eşitlenemedi: ' + err.message); }
