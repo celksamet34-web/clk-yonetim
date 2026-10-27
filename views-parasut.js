@@ -1,6 +1,6 @@
 /* CLK Yönetim — Paraşüt eşleştirme: site ürünü → Paraşüt set ürünü, site müşterisi → Paraşüt müşterisi, aktarılan siparişler */
 (() => {
-  const { sb, S, $, $$, esc, tl, num, dtt, toast, head, skel, errBox, views, render } = CLK;
+  const { sb, S, $, $$, esc, tl, num, dtt, toast, head, skel, errBox, views, render, araKutu } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const D = (S.ui.ps ||= { tab: 'urun', q: '', f: 'bekleyen', yukleniyor: false, hata: '', veri: null, isliyor: '' });
   const GERI = { gonderildi: ['Siteye geçti', 'ok'], gonderiliyor: ['Gönderiliyor', 'info'], eslesme_yok: ['Ürün eşleşmemiş', 'warn'], hata: ['Hata', 'bad'], atla: ['Atlandı', 'off'], iptal: ['Sitede iptal edildi', 'off'] };
@@ -60,7 +60,7 @@
     const sec = m.parasut_ad || m.oneri_ad || '';
     return `<div class="es-row ${m.parasut_id ? 'ok' : ''}" data-k="${esc(m.site_ad)}">
       <div class="es-site"><b>${esc(m.unvan || m.ad)}</b><small>${esc([m.unvan ? m.ad : '', m.eposta].filter(Boolean).join(' · '))}${m.parasut_id ? '' : m.oneri_ad ? ' · öneri' : ''}</small></div>
-      <input list="es-pmus" class="es-in" value="${esc(sec)}" placeholder="Paraşüt müşterisi seç">
+      ${araKutu('esm-' + String(m.site_ad).replace(/[^\w-]/g, '_'), D.veri.pMusteri, sec, 'esMus', { sinif: 'es-in', yer: 'Paraşüt müşterisi ara' })}
       <button class="btn sm ${m.parasut_id ? '' : 'dark'}" data-act="esMus">${m.parasut_id ? 'Kaydedildi' : 'Onayla'}</button></div>`;
   };
   // bakiye kontrolü: site bakiyesi Paraşüt bakiyesinin tersi olmalı (Paraşüt'te borç +, sitede -)
@@ -123,7 +123,7 @@
         ${govde}
         ${sonL?.zaman ? `<p class="es-ip">Listeler ${dtt(sonL.zaman)} tarihinde yenilendi: Paraşüt'te ${num(sonL.parasut_urun)} ürün, ${num(sonL.parasut_musteri)} müşteri.</p>` : ''}</div>
       <datalist id="es-purun">${V.pUrun.map(p => `<option value="${esc(p.ad)}">`).join('')}</datalist>
-      <datalist id="es-pmus">${V.pMusteri.map(p => `<option value="${esc(p.ad)}">`).join('')}</datalist>`;
+`;
   };
   views.bind_eslestirme = () => {
     const q = $('#esq'); q?.addEventListener('input', () => { D.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });

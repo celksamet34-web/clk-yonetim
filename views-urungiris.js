@@ -1,7 +1,7 @@
 /* CLK Yönetim — Ürün Giriş: tedarikçi fişi (fotoğraf ya da PDF) yüklenir, yapay zekâ satırları okur, kontrol edilip Paraşüt'e alış faturası olarak girilir.
    CLK ÇANTA dışındaki alıcılara giden gruplar ayrıca satış faturası olur. Fiş görselleri clk-N numarasıyla arşivde durur. */
 (() => {
-  const { sb, S, $, esc, toast, head, views, render } = CLK;
+  const { sb, S, $, esc, toast, head, views, render, araKutu, araSec } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   const D = (S.ui.ug ||= { yuklendi: false, hata: '', firmalar: [], fisler: [], urunler: null, musteriler: [], urunEsl: new Map(), musEsl: new Map(),
@@ -418,7 +418,7 @@ Kurallar:
       const at = g.satirlar.reduce((a, r) => a + r.adet * r.fiyat, 0), tt = g.satirlar.reduce((a, r, i) => a + r.adet * sayi(st.fiyatlar[i]), 0);
       const tamam = g.satirlar.every((_, i) => sayi(st.fiyatlar[i]) > 0);
       return `<div class="ug-satis"><div class="ug-satis-ust"><div><b>Fişte: ${esc(g.ad)}</b></div>
-          <select id="${p}-m" data-ugs="${esc(k)}" data-alan="musteri" class="${st.musteri ? '' : 'wp-req'}" aria-label="Müşteri"><option value="">Müşteri seçin</option>${D.musteriler.map(m => `<option value="${esc(m.id)}" ${String(m.id) === String(st.musteri) ? 'selected' : ''}>${esc(m.ad)}</option>`).join('')}</select></div>
+          ${araKutu(p + '-m', D.musteriler, D.musteriler.find(m => String(m.id) === String(st.musteri))?.ad || '', 'ugsMus', { sinif: st.musteri ? '' : 'wp-req', ek: `data-k="${esc(k)}"` })}</div>
         <div class="ul-tablo"><table class="ug-tablo"><thead><tr><th>Adet</th><th>Ürün</th><th>Alış</th><th>Satış fiyatı</th><th>Kâr</th><th>Tutar</th></tr></thead><tbody>${g.satirlar.map((r, i) => { const sf = sayi(st.fiyatlar[i]); return `<tr><td>${r.adet}</td><td class="l">${esc(r.parasutAd || r.urun)}</td><td>${tl(r.fiyat)}</td>
           <td><input id="${p}-${i}" data-ugs="${esc(k)}" data-i="${i}" class="ug-fiyat" inputmode="decimal" value="${esc(st.fiyatlar[i] ?? '')}" aria-label="Satış fiyatı"></td><td class="${karDusuk(r.fiyat, sf) ? 'ug-dusuk' : 'ug-kar'}">${karYuzde(r.fiyat, sf)}</td><td>${tl(r.adet * sf)}</td></tr>`; }).join('')}</tbody></table></div>
         <div class="ug-toplam"><span>Kâr <b class="${tamam && karDusuk(at, tt) ? 'ug-dusuk' : ''}">${tamam ? tl(tt - at) + ' · ' + karYuzde(at, tt) : '–'}</b></span><span>Satış toplamı <b>${tl(tt)}</b></span></div>
@@ -531,6 +531,7 @@ Kurallar:
     $('#ugArsivAra')?.addEventListener('input', e => { D.arsivAra = e.target.value; S.keepScroll = true; render(); });
   };
 
+  araSec.ugsMus = (m, kutu) => { const st = D.satis[kutu.dataset.k]; if (st) st.musteri = m.id; };
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     const id = el.dataset.id, f = id && D.fisler.find(x => x.id === id);

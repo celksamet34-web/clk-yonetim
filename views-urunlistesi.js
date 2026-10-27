@@ -1,9 +1,9 @@
 /* CLK Yönetim — ürün listesi: müşteri ve Paraşüt'teki bir ya da birkaç satışı seçilir (her satış kendi tarihiyle ayrı bölüm), ürünler sevkiyat ve kontrol listesi olarak yazdırılır */
 (() => {
-  const { sb, S, $, esc, toast, head, views, render } = CLK;
+  const { sb, S, $, esc, toast, head, views, render, araKutu, araSec } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const FIRMA = ['CLK ÇANTA', 'Birlik Mah. 873 Sk. No:2/A Esenler / İstanbul', '0534 077 88 67', 'www.clkcanta.com'];
-  const D = (S.ui.ul ||= { musteriler: null, musteri: '', ara: '', satislar: null, secili: [], okunan: {}, gruplar: [], kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
+  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, secili: [], okunan: {}, gruplar: [], kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
   const tlE = v => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₺';
   const trT = d => d ? String(d).split('-').reverse().join('.') : '';
   const sayi = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
@@ -135,27 +135,14 @@
   const grupHtml = g => { const b = D.gruplar[g] || {}, l = D.kalemler.filter(k => k.g === g);
     return `<tr class="ul-grup"><td colspan="5"><b>${g + 1}. satış</b> · ${esc(trT(b.tarih))}${b.no ? ' · ' + esc(b.no) : ''}<span>${l.length} kalem · ${adet(l)} adet · ${tlE(toplam(l))}</span></td></tr>`; };
 
-  const buyukH = v => String(v || '').toLocaleUpperCase('tr').replace(/\s+/g, ' ').trim();
   const secilenAd = () => D.musteriler?.find(m => m.id === D.musteri)?.ad || '';
-  // yazılan her kelime adın içinde geçmeli; seçili müşterinin adı kutudaysa liste kapanır
-  function oneriler() {
-    const q = buyukH(D.ara);
-    if (!q || !D.musteriler || q === buyukH(secilenAd())) return [];
-    const k = q.split(' ');
-    return D.musteriler.filter(m => { const a = buyukH(m.ad); return k.every(x => a.includes(x)); })
-      .sort((a, b) => buyukH(b.ad).startsWith(q) - buyukH(a.ad).startsWith(q)).slice(0, 12);
-  }
-
   views.urunlistesi = () => {
     if (!D.musteriler) musteriler().catch(e => { D.durum = 'Müşteri listesi alınamadı: ' + e.message; D.musteriler = []; render(); });
     const sat = D.satislar;
     return `${head('Paraşüt', 'Ürün listesi', 'Müşteriyi ve Paraşüt\'teki bir ya da birkaç satışı seçin, her satış kendi tarihiyle ayrı bölümde listelenir; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
       <div class="card">
         <div class="ek-form ul-sec">
-          <div class="ek-mus ul-ara"><label for="ulAra">Müşteri</label>
-            <input id="ulAra" type="search" autocomplete="off" placeholder="${D.musteriler ? 'Müşteri adı yazın (' + D.musteriler.length + ' müşteri)' : 'Müşteriler yükleniyor…'}" value="${esc(D.ara)}">
-            ${oneriler().length ? `<div class="ul-oneri" role="listbox">${oneriler().map(m => `<button type="button" role="option" data-act="ulMusSec" data-id="${esc(m.id)}">${esc(m.ad)}</button>`).join('')}</div>` : D.ara.trim() && D.musteriler && !secilenAd() ? '<div class="ul-oneri"><span>Eşleşen müşteri yok</span></div>' : ''}
-          </div>
+          <div class="ek-mus ara-alan"><label for="ulAra">Müşteri</label>${araKutu('ulAra', D.musteriler, secilenAd(), 'ulMus', { yer: D.musteriler ? 'Müşteri adı yazın (' + D.musteriler.length + ' müşteri)' : 'Müşteriler yükleniyor…' })}</div>
         </div>
         ${!D.musteri ? '' : !sat ? '<p class="ek-durum">Satışlar yükleniyor…</p>' : !sat.length ? '<p class="ek-durum">Bu müşterinin satışı yok.</p>' : `
         <div class="ul-sat-bas"><b>Satışlar</b><span>${D.secili.length ? D.secili.length + ' seçili' : 'Bir ya da birkaç fatura seçin'}</span>
@@ -183,9 +170,6 @@
   };
 
   views.bind_urunlistesi = () => {
-    const ara = $('#ulAra');
-    ara?.addEventListener('input', () => { D.ara = ara.value; clearTimeout(ara.t); ara.t = setTimeout(() => { S.keepScroll = true; render(); }, 150); });
-    ara?.addEventListener('keydown', e => { if (e.key === 'Enter') { const m = oneriler()[0]; if (m) { e.preventDefault(); musteriSec(m.id); } } });
     $('#ulSatlar')?.addEventListener('change', e => { S.keepScroll = true; sec([...document.querySelectorAll('#ulSatlar input:checked')].map(x => x.value)); });
     $('#ulBMusteri')?.addEventListener('input', e => { D.bilgi.musteri = e.target.value; });
     $('#ulBNo')?.addEventListener('input', e => { D.bilgi.no = e.target.value; });
@@ -199,15 +183,11 @@
     });
   };
 
-  function musteriSec(id) {
-    const m = D.musteriler.find(x => x.id === id); if (!m) return;
-    D.ara = m.ad; D.kalemler = []; S.keepScroll = true; document.activeElement?.blur(); satislariAl(id);
-  }
+  araSec.ulMus = m => { D.kalemler = []; satislariAl(m.id); };
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'ulYazdir') yazdir(sayfaHtml());
     else if (act === 'ulIndir') { indir(); toast('Liste indirildi'); }
-    else if (act === 'ulMusSec') musteriSec(el.dataset.id);
     else if (act === 'ulSon') { S.keepScroll = true; sec(D.satislar.filter(x => x[5] === 'invoice').slice(0, +el.dataset.n).map(x => x[0])); }
     else if (act === 'ulTemizle') { S.keepScroll = true; sec([]); }
     else if (act === 'ulEkle') { D.kalemler.push({ urun: '', miktar: 1, fiyat: 0, tutar: 0, g: D.kalemler.at(-1)?.g ?? 0 }); S.keepScroll = true; render(); }

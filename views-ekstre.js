@@ -1,6 +1,6 @@
 /* CLK Yönetim — müşteri ekstresi: Paraşüt'ten anında okunur, WhatsApp için resim olarak hazırlanır */
 (() => {
-  const { sb, S, $, esc, tl, toast, head, views, render } = CLK;
+  const { sb, S, $, esc, tl, toast, head, views, render, araKutu, araSec } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const gun = d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
   const ilk = () => { const d = new Date(); d.setMonth(d.getMonth() - 3); d.setDate(1); return gun(d); };
@@ -146,11 +146,10 @@
     return `${head('Paraşüt', 'Müşteri ekstresi', 'Müşteriyi ve tarihleri seçin. Bilgiler her seferinde Paraşüt\'ten anında alınır; resmi WhatsApp\'tan gönderin.')}
       <div class="card">
         <div class="ek-form">
-          <label class="ek-mus">Müşteri<input id="ekAd" type="text" list="ekListe" value="${esc(D.ad)}" placeholder="Müşteri adı yazın" autocomplete="off"></label>
+          <div class="ek-mus ara-alan"><label for="ekAd">Müşteri</label>${araKutu('ekAd', D.musteriler, D.ad, 'ekMus', { yer: D.musteriler ? 'Müşteri adı yazın' : 'Müşteriler yükleniyor…' })}</div>
           <label>Başlangıç<input id="ekBas" type="date" value="${esc(D.bas)}"></label>
           <label>Bitiş<input id="ekSon" type="date" value="${esc(D.son)}"></label>
         </div>
-        <datalist id="ekListe">${(D.musteriler || []).map(m => `<option value="${esc(m.ad)}">`).join('')}</datalist>
         <div class="ek-dug">
           <button class="btn dark" data-act="ekHazirla" ${D.yukleniyor ? 'disabled' : ''}>${D.yukleniyor ? 'Hazırlanıyor…' : 'Ekstreyi hazırla'}</button>
           <button class="btn ek-wa" data-act="ekPaylas" ${D.resim && !D.yukleniyor ? '' : 'disabled'}>WhatsApp'ta paylaş</button>
@@ -165,8 +164,7 @@
     const ad = $('#ekAd'), bas = $('#ekBas'), son = $('#ekSon');
     // müşteri ya da tarih değişince eski resim geçersiz olur
     const sifirla = () => { if (D.resim) { URL.revokeObjectURL(D.resim); D.resim = ''; blob = null; S.keepScroll = true; render(); } };
-    ad?.addEventListener('input', () => { D.ad = ad.value; });
-    ad?.addEventListener('change', () => { D.ad = ad.value; if (secili()?.id !== D.veri?.id) sifirla(); });
+    araSec.ekMus = m => { D.ad = m.ad; if (m.id !== D.veri?.id) sifirla(); };
     bas?.addEventListener('change', () => { D.bas = bas.value; sifirla(); });
     son?.addEventListener('change', () => { D.son = son.value; sifirla(); });
   };

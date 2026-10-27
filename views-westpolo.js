@@ -1,6 +1,6 @@
 /* CLK Yönetim — West Polo: Han Dericilik PDF faturası okunur, kâr oranıyla CLK-WEST satış faturası ve WEST POLO alış faturası doğrudan Paraşüt'e girilir */
 (() => {
-  const { sb, S, $, esc, toast, head, views, render } = CLK;
+  const { sb, S, $, esc, toast, head, views, render, araKutu, araSec } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   const bugun = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
@@ -141,7 +141,7 @@
       <div class="card">
         <div class="ek-form wp-form">
           <label>Kâr oranı (%)<input id="wpKar" inputmode="decimal" placeholder="örn. 15" value="${esc(D.kar)}" class="${Number.isNaN(k) ? 'wp-req' : ''}"></label>
-          <label class="ek-mus">Müşteri (Paraşüt)<select id="wpMusteri" class="${D.musteri ? '' : 'wp-req'}">${D.musteriler?.length ? `<option value="">Müşteri seçin (${D.musteriler.length})</option>${D.musteriler.map(m => `<option value="${esc(m.id)}" ${m.id === D.musteri ? 'selected' : ''}>${esc(m.ad)}</option>`).join('')}` : '<option value="">Müşteriler yükleniyor…</option>'}</select></label>
+          <div class="ek-mus ara-alan"><label for="wpMusteri">Müşteri (Paraşüt)</label>${araKutu('wpMusteri', D.musteriler, D.musteriler?.find(m => m.id === D.musteri)?.ad || '', 'wpMus', { sinif: D.musteri ? '' : 'wp-req', yer: D.musteriler ? 'Müşteri adı yazın (' + D.musteriler.length + ' müşteri)' : 'Müşteriler yükleniyor…' })}</div>
           <label>Satış tarihi<input id="wpTarih" type="date" value="${esc(D.tarih)}"></label>
           <label>Fatura sıra (CLK-WEST)<input id="wpSira" inputmode="numeric" value="${esc(D.sira)}" placeholder="${D.gecmis ? '' : 'alınıyor…'}"></label>
           <label>Fatura ismi<input id="wpIsim" value="${esc(D.isim)}"></label>
@@ -177,9 +177,10 @@
     drop?.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('on'); e.dataTransfer.files[0] && oku(e.dataTransfer.files[0]); });
     const alan = (id, k, olay = 'input') => $(id)?.addEventListener(olay, e => { D[k] = e.target.value; D.uyari = ''; S.keepScroll = true; render(); });
     alan('#wpKar', 'kar'); alan('#wpSira', 'sira'); alan('#wpIsim', 'isim');
-    alan('#wpMusteri', 'musteri', 'change'); alan('#wpTarih', 'tarih', 'change');
+    alan('#wpTarih', 'tarih', 'change');
   };
 
+  araSec.wpMus = m => { D.musteri = m.id; D.uyari = ''; };
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'wpGonder') gonder(false);

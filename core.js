@@ -172,6 +172,48 @@ window.CLK = (() => {
     S.route = r; S.arg = arg; try { history.replaceState(null, '', '#' + r); } catch {}
     render(); window.scrollTo({ top: 0 });
   }
+  // müşteri arama kutusu: yazdıkça eşleşenler hemen altta listelenir, dokununca seçilir.
+  // araKutu(id, liste[{id, ad}], seçiliAd, grup, ek) — seçim CLK.araSec[grup](kayıt, kutu) ile sayfaya bildirilir
+  const ARA = {}, araSec = {};
+  const buyukH = v => String(v || '').toLocaleUpperCase('tr').replace(/\s+/g, ' ').trim();
+  function eslesen(liste, q) {
+    const k = buyukH(q).split(' ').filter(Boolean);
+    if (!k.length) return [];
+    const bas = buyukH(q);
+    return (liste || []).filter(m => { const a = buyukH(m.ad); return k.every(x => a.includes(x)); })
+      .sort((a, b) => buyukH(b.ad).startsWith(bas) - buyukH(a.ad).startsWith(bas) || a.ad.localeCompare(b.ad, 'tr')).slice(0, 12);
+  }
+  function araKutu(id, liste, seciliAd, grup, { yer = 'Müşteri adı yazın', sinif = '', ek = '' } = {}) {
+    const st = ARA[id] ||= { q: null, acik: false };
+    const deger = st.q ?? seciliAd ?? '';
+    const sonuc = st.acik ? eslesen(liste, st.q) : [];
+    st.sonuc = sonuc; st.liste = liste;
+    const altta = !st.acik || !buyukH(st.q) ? '' : !liste ? '<div class="ara-oneri"><span>Liste yükleniyor…</span></div>'
+      : sonuc.length ? `<div class="ara-oneri" role="listbox">${sonuc.map((m, i) => `<button type="button" role="option" data-ara-sec="${i}">${esc(m.ad)}</button>`).join('')}</div>`
+      : '<div class="ara-oneri"><span>Eşleşen kayıt yok</span></div>';
+    return `<div class="ara-kutu" data-ara="${esc(id)}" data-ara-grup="${esc(grup)}" ${ek}><input id="${esc(id)}" class="${sinif}" type="search" autocomplete="off" placeholder="${esc(yer)}" value="${esc(deger)}">${altta}</div>`;
+  }
+  function araSecildi(kutu, m) {
+    const st = ARA[kutu.dataset.ara]; st.q = m.ad; st.acik = false;
+    document.activeElement?.blur(); S.keepScroll = true;
+    araSec[kutu.dataset.araGrup]?.(m, kutu); render();
+  }
+  document.addEventListener('input', e => {
+    const kutu = e.target.closest?.('.ara-kutu'); if (!kutu || e.target.tagName !== 'INPUT') return;
+    const st = ARA[kutu.dataset.ara]; st.q = e.target.value; st.acik = true;
+    clearTimeout(st.t); st.t = setTimeout(() => { S.keepScroll = true; render(); }, 120);
+  });
+  document.addEventListener('keydown', e => {
+    const kutu = e.target.closest?.('.ara-kutu'); if (!kutu || e.key !== 'Enter') return;
+    const st = ARA[kutu.dataset.ara], ilk = eslesen(st.liste, st.q)[0];
+    if (ilk && st.acik) { e.preventDefault(); araSecildi(kutu, ilk); }
+  });
+  document.addEventListener('click', e => {
+    const b = e.target.closest?.('[data-ara-sec]'); if (!b) return;
+    const kutu = b.closest('.ara-kutu'), m = ARA[kutu.dataset.ara]?.sonuc?.[+b.dataset.araSec];
+    if (m) { e.preventDefault(); e.stopPropagation(); araSecildi(kutu, m); }
+  }, true);
+
   let raf = 0, sonDegisim = 0;
   function render() { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }
   // açık bir seçim listesi arka plandaki yüklemelerin yeniden çizimiyle kapanmasın: seçim yapılana ya da liste bırakılana kadar beklenir
@@ -216,5 +258,5 @@ window.CLK = (() => {
   }
   function prefetch() { loadProducts(); loadOrders(); loadUsers(); loadBalance(); }
 
-  return { sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
+  return { araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
 })();
