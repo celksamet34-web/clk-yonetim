@@ -114,7 +114,8 @@
     return new Promise(res => c.toBlob(res, 'image/png'));
   }
 
-  const secili = () => D.musteriler?.find(m => m.ad.toLocaleUpperCase('tr') === D.ad.trim().toLocaleUpperCase('tr'));
+  // Paraşüt'te aynı adın büyük/küçük harfli iki kaydı olabiliyor: önce birebir eşleşen seçilir
+  const secili = () => D.musteriler?.find(m => m.ad === D.ad.trim()) || D.musteriler?.find(m => m.ad.toLocaleUpperCase('tr') === D.ad.trim().toLocaleUpperCase('tr'));
   const dosyaAdi = () => `ekstre-${(D.veri?.ad || 'musteri').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}-${D.son}.png`;
 
   async function hazirla() {
