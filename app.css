@@ -388,3 +388,14 @@ body{font-size:15.5px;letter-spacing:0}
 .es-sip{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line-2)}
 .es-sip .es-not{color:var(--warn)}.es-bas{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:14px 0 8px;border-top:1px solid var(--line)}.es-bas>span{color:var(--muted);font-size:13px;flex:1}.es-kirmizi{color:var(--bad)}.es-sag{display:flex;flex-direction:column;align-items:flex-end;gap:6px;white-space:nowrap}
 @media (max-width:640px){.es-row{grid-template-columns:1fr auto}.es-row .es-site{grid-column:1/-1}}
+/* müşteri ekstresi */
+.ek-form{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:end}
+.ek-form label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.ek-form input[type=date]{font:inherit;font-size:16px;min-height:var(--tap);padding:11px 14px;border:1px solid var(--line-2);border-radius:13px;background:#fff;color:inherit;width:100%;box-sizing:border-box;min-width:0}
+@media (max-width:640px){.ek-form{grid-template-columns:1fr 1fr}.ek-form .ek-mus{grid-column:1/-1}}
+.ek-dug{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn.ek-wa{background:#1fa855;border-color:#1fa855;color:#fff}
+.ek-durum{font-size:14px;margin:10px 0 0}
+.ek-on{text-align:center;margin-top:14px}
+.ek-on img{max-width:100%;border:1px solid var(--line);border-radius:8px}
+.ek-bos{color:var(--muted);padding:24px 0;margin:0}
