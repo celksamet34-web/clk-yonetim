@@ -137,9 +137,10 @@ window.CLK = (() => {
     esitle: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg>',
     ekstre: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h3"/></svg>',
     urunlistesi: '<svg viewBox="0 0 24 24"><path d="M9 5h11M9 12h11M9 19h11"/><path d="M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2"/></svg>',
+    stokkart: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h8M8 16h5"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
-  const NAV = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urunlistesi', 'Ürün listesi'], ['ekstre', 'Ekstre']];
+  const NAV = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['ekstre', 'Müşteri ekstresi']];
   const views = {};
   // Paraşüt ↔ site eşitlemesini hemen çalıştırır (saatlik görevi beklemeden); işleyişi views-parasut.js'te
   const esitleBtn = () => `<button class="esitle" data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${ICONS.esitle}<span>${S.esitleniyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</span></button>`;
@@ -147,7 +148,7 @@ window.CLK = (() => {
     const nav = NAV.map(([k, l]) => `<button data-go="${k}" ${S.route === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
     const more = ['siparisler', 'musteriler', 'cari'].includes(S.route);
     const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['yeni', 'Ekle'], ['siparisler', 'Sipariş'], ['daha', 'Daha']].map(([k, l]) => {
-      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urunlistesi', 'ekstre'].includes(S.route));
+      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urunlistesi', 'stokkart', 'ekstre'].includes(S.route));
       const ic = k === 'yeni' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
       return `<button data-go="${k}" class="${k === 'yeni' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
     }).join('');
@@ -158,7 +159,7 @@ window.CLK = (() => {
       <header class="mtop"><div class="logo">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
-      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urunlistesi', 'Ürün listesi'], ['ekstre', 'Ekstre']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
+      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
   }
   const head = (eyebrow, title, sub, acts = '') => `<div class="page-h"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="acts">${acts}</div></div>`;
   const skel = () => `<div class="card"><div class="skel" style="height:110px"></div><div class="skel" style="height:240px;margin-top:14px"></div></div>`;
