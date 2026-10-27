@@ -405,3 +405,15 @@ body{font-size:15.5px;letter-spacing:0}
 .nav .esitle[disabled] svg,.sheet-in .esitle[disabled] svg{animation:esd 1.2s linear infinite}
 @keyframes esd{to{transform:rotate(360deg)}}
 .mtop-acts{display:flex;gap:8px}
+/* Ürün listesi */
+.ek-form select,.ek-form input:not([type]){font:inherit;font-size:16px;min-height:var(--tap);padding:11px 14px;border:1px solid var(--line-2);border-radius:13px;background:#fff;color:inherit;width:100%;box-sizing:border-box;min-width:0}
+.ul-ozet{display:flex;gap:22px;flex-wrap:wrap;margin:16px 0 10px;font-size:14px;color:var(--muted)}
+.ul-ozet b{display:block;font-size:19px;color:var(--ink,inherit)}
+.ul-tablo{overflow-x:auto}
+.ul-tablo table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+.ul-tablo th{text-align:right;font-size:12px;color:var(--muted);font-weight:600;padding:6px 6px;border-bottom:1px solid var(--line-2)}
+.ul-tablo th:first-child{text-align:left}
+.ul-tablo td{padding:5px 6px;border-bottom:1px solid var(--line-2);text-align:right;white-space:nowrap}
+.ul-tablo input{font:inherit;width:90px;padding:7px 9px;border:1px solid var(--line-2);border-radius:9px;text-align:right;background:#fff}
+.ul-tablo .ul-urun input{width:100%;min-width:240px;text-align:left}
+.ek-form.ul-sec{grid-template-columns:1fr 1fr}
