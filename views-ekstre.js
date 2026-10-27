@@ -33,13 +33,14 @@
     for (const [t, no, v] of m.iade || []) h.push({ t, s: 1, ack: 'İade' + (no ? ' · ' + no : ''), a: 0, b: v });
     for (const [t, tur, v, vade, seri, hesap] of m.odeme || [])
       h.push({ t, s: 2, v: vade, ack: tur === 'c' ? `Çek${seri ? ' no ' + seri : ''}${vade ? ' · vade ' + trE(vade) : ''}` : (hesap || 'Tahsilat'), cek: tur === 'c', a: 0, b: v });
+    for (const [t, ack, v] of m.verilen || []) h.push({ t, s: 3, ack: 'Tarafımızdan ödeme · ' + ack, a: v, b: 0 });
     h.sort((x, y) => x.t.localeCompare(y.t) || x.s - y.s || String(x.v || '').localeCompare(String(y.v || '')));
     const fark = m.bakiye - h.reduce((s, x) => s + x.a - x.b, 0);
     const devir = fark + h.filter(x => x.t < bas).reduce((s, x) => s + x.a - x.b, 0);
     const satirlar = []; let kal = devir;
     for (const x of h.filter(x => x.t >= bas && x.t <= son)) { kal += x.a - x.b; satirlar.push({ ...x, kal }); }
     const alim = satirlar.reduce((s, x) => s + x.a, 0), odeme = satirlar.reduce((s, x) => s + x.b, 0);
-    return { devir, satirlar, alim, odeme, sonBakiye: devir + alim - odeme };
+    return { devir, satirlar, alim, odeme, verilenVar: satirlar.some(x => x.s === 3), sonBakiye: devir + alim - odeme };
   }
 
   // ekstre resmi: CLK Çanta Panel'deki ile aynı (WhatsApp için 1080 px genişlik)
@@ -69,7 +70,7 @@
     yaz(fazla ? 'fazla ödemeniz' : 'bize olan borcunuz', P + 30, 352, { z: 20, renk: '#fff' });
     yaz(tlE(Math.abs(r.sonBakiye)), W - P - 30, 348, { b: 800, z: 46, r: true, renk: fazla ? '#7ee2a8' : '#fff' });
     const kw = (W - 2 * P - 24) / 3;
-    [[`${trE(bas)} öncesinden kalan`, r.devir, true], ['Bu dönemki satış faturaları', r.alim], ['Bu dönemki ödemeleriniz', r.odeme, false, '#1a7f4b']].forEach(([t, v, kal, renk], i) => {
+    [[`${trE(bas)} öncesinden kalan`, r.devir, true], [r.verilenVar ? 'Bu dönemki fatura ve borç kayıtları' : 'Bu dönemki satış faturaları', r.alim], ['Bu dönemki ödemeleriniz', r.odeme, false, '#1a7f4b']].forEach(([t, v, kal, renk], i) => {
       const x = P + i * (kw + 12);
       kutu(x, 402, kw, 92, 12, null, '#dde2ea');
       yaz(t, x + 18, 436, { z: 16, renk: '#5b6475' });
