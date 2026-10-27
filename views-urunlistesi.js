@@ -1,9 +1,9 @@
-/* CLK Yönetim — ürün listesi: müşteri ve Paraşüt'teki bir ya da birkaç satışı seçilir (aynı ürünler birleşir), ürünler sevkiyat ve kontrol listesi olarak yazdırılır */
+/* CLK Yönetim — ürün listesi: müşteri ve Paraşüt'teki bir ya da birkaç satışı seçilir (her satış kendi tarihiyle ayrı bölüm), ürünler sevkiyat ve kontrol listesi olarak yazdırılır */
 (() => {
   const { sb, S, $, esc, toast, head, views, render } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const FIRMA = ['CLK ÇANTA', 'Birlik Mah. 873 Sk. No:2/A Esenler / İstanbul', '0534 077 88 67', 'www.clkcanta.com'];
-  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, secili: [], okunan: {}, kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
+  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, secili: [], okunan: {}, gruplar: [], kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
   const tlE = v => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₺';
   const trT = d => d ? String(d).split('-').reverse().join('.') : '';
   const sayi = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
@@ -31,7 +31,7 @@
     catch (e) { D.durum = 'Satışlar alınamadı: ' + e.message; D.satislar = []; }
     D.yukleniyor = ''; render();
   }
-  // seçilen faturalar sırayla okunur (Paraşüt aynı anda gelen girişleri reddediyor), aynı ürün + aynı fiyat tek satırda toplanır
+  // seçilen faturalar sırayla okunur (Paraşüt aynı anda gelen girişleri reddediyor); her satış eski tarihten yeniye ayrı bölüm olur
   async function secimiOku() {
     const secim = D.secili.slice();
     D.yukleniyor = 'satis'; render();
@@ -43,20 +43,15 @@
         if (D.secili.join() !== secim.join()) return;
       }
       const fat = secim.map(id => D.okunan[id]).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
-      const bir = new Map();
-      for (const v of fat) for (const [urun, miktar, fiyat, tutar] of v.kalemler) {
-        const k = urun + '|' + fiyat, x = bir.get(k);
-        if (x) { x.miktar = yuvarla(x.miktar + miktar); x.tutar = yuvarla(x.tutar + tutar); }
-        else bir.set(k, { urun, miktar, fiyat, tutar });
-      }
-      D.kalemler = [...bir.values()];
+      D.gruplar = fat.map(v => ({ no: v.no || '', tarih: v.tarih || '' }));
+      D.kalemler = fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar]) => ({ urun, miktar, fiyat, tutar, g })));
       D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no).filter(Boolean).join(', '), tarih: fat.at(-1)?.tarih || '' };
-      D.durum = fat.length ? `${fat.length} fatura, ${D.kalemler.length} kalem${fat.length > 1 ? ' (aynı ürünler birleştirildi)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
+      D.durum = fat.length ? `${fat.length} satış, ${D.kalemler.length} kalem${fat.length > 1 ? ' (her satış tarihiyle ayrı bölümde)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
     } catch (e) { D.durum = 'Satış okunamadı: ' + e.message; }
     finally { if (D.secili.join() === secim.join()) { D.yukleniyor = ''; render(); } }
   }
   function sec(ids) {
-    D.secili = ids; D.kalemler = [];
+    D.secili = ids; D.kalemler = []; D.gruplar = [];
     if (ids.length) secimiOku(); else { D.durum = ''; render(); }
   }
 
@@ -65,8 +60,10 @@
 
   // West Polo'daki "Sevkiyat ve kontrol listesi" tasarımı (A4, kontrol kutulu)
   // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, miktar, fiyat, tutar}])
-  function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && [D.bilgi.no.includes(',') ? 'Faturalar' : 'Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler) {
+  function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && [D.bilgi.no.includes(',') ? 'Faturalar' : 'Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler, gruplar = D.gruplar) {
     const satirlar = kalemler.filter(k => k.urun);
+    const bolumler = gruplar.length > 1 ? gruplar.map((b, g) => ({ b, g, l: satirlar.filter(k => k.g === g) })).filter(x => x.l.length) : [{ l: satirlar }];
+    const satirYaz = l => l.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}</td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('');
     const logo = new URL('logo-clk.png', location.href).href;
     return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title> </title><style>
     *{box-sizing:border-box}
@@ -92,7 +89,7 @@
     th.l,td.l{text-align:left} td.n{color:#999;width:22px;text-align:left} td.u{font-weight:500;white-space:normal}
     th.k,td.k{text-align:center;width:50px} table.liste{font-size:10px}
     .kutu{display:inline-block;width:17px;height:17px;border:1.6px solid #111;border-radius:3px;background:#fff;vertical-align:middle}
-    tr{break-inside:avoid} .alt{display:flex;justify-content:flex-end;margin-top:14px;break-inside:avoid}
+    tr{break-inside:avoid} tr.grup td{background:#fff!important;border-bottom:1.2px solid #111;padding:14px 5px 5px;text-align:left;font-size:11px;letter-spacing:.04em;break-after:avoid} tr.grup b{font-weight:700;text-transform:uppercase;letter-spacing:.14em} tr.grup span{float:right;color:#555;font-size:9.5px} .alt{display:flex;justify-content:flex-end;margin-top:14px;break-inside:avoid}
     .toplam{min-width:260px;border-top:1.5px solid #111} .toplam div{display:flex;justify-content:space-between;align-items:baseline;padding:6px 2px} .toplam div+div{border-top:.5px solid #bbb}
     .toplam span{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#555} .toplam .buyuk b{font-size:19px;font-weight:400}
     .imza{display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:22px;margin-top:26px;break-inside:avoid}
@@ -107,7 +104,7 @@
     <div class="baslik"><h1 class="serif"><small>Sevkiyat ve kontrol listesi</small>${esc(baslik)}</h1>
       <div class="meta">${bilgiler.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>
     <table class="liste"><thead><tr><th class="l" colspan="2">Ürün</th><th>Miktar</th><th>Birim</th><th>Br. fiyat</th><th>Tutar</th><th class="k">Kontrol</th></tr></thead><tbody>
-    ${satirlar.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}</td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('')}
+    ${bolumler.map(({ b, g, l }) => (b ? `<tr class="grup"><td colspan="7"><b>${g + 1}. satış</b> · ${esc(trT(b.tarih))}${b.no ? ' · ' + esc(b.no) : ''}<span>${l.length} kalem · ${adet(l)} adet · ${tlE(toplam(l))}</span></td></tr>` : '') + satirYaz(l)).join('')}
     </tbody></table>
     <div class="alt"><div class="toplam"><div><span>Kalem</span><b>${satirlar.length}</b></div><div><span>Toplam adet</span><b>${adet(satirlar)}</b></div>
       <div class="buyuk"><span>Genel toplam</span><b class="serif">${tlE(toplam(satirlar))}</b></div></div></div>
@@ -122,7 +119,7 @@
     f.srcdoc = html;
     f.onload = () => { setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300); };
   }
-  CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler));
+  CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler, []));
   function indir() {
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([sayfaHtml()], { type: 'text/html' })), download: `urun-listesi-${(D.bilgi.musteri || 'musteri').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}${D.bilgi.tarih ? '-' + D.bilgi.tarih : ''}.html` });
     document.body.append(a); a.click(); a.remove();
@@ -135,10 +132,13 @@
     <td class="num">${tlE(k.tutar)}</td>
     <td><button class="btn sm" data-act="ulSil" data-i="${i}" aria-label="Satırı sil">×</button></td></tr>`;
 
+  const grupHtml = g => { const b = D.gruplar[g] || {}, l = D.kalemler.filter(k => k.g === g);
+    return `<tr class="ul-grup"><td colspan="5"><b>${g + 1}. satış</b> · ${esc(trT(b.tarih))}${b.no ? ' · ' + esc(b.no) : ''}<span>${l.length} kalem · ${adet(l)} adet · ${tlE(toplam(l))}</span></td></tr>`; };
+
   views.urunlistesi = () => {
     if (!D.musteriler) musteriler().catch(e => { D.durum = 'Müşteri listesi alınamadı: ' + e.message; D.musteriler = []; render(); });
     const sat = D.satislar;
-    return `${head('Paraşüt', 'Ürün listesi', 'Müşteriyi ve Paraşüt\'teki bir ya da birkaç satışı seçin, aynı ürünler tek satırda toplanır; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
+    return `${head('Paraşüt', 'Ürün listesi', 'Müşteriyi ve Paraşüt\'teki bir ya da birkaç satışı seçin, her satış kendi tarihiyle ayrı bölümde listelenir; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
       <div class="card">
         <div class="ek-form ul-sec">
           <label class="ek-mus">Müşteri<select id="ulMusteri">${D.musteriler ? `<option value="">Müşteri seçin (${D.musteriler.length})</option>${D.musteriler.map(m => `<option value="${esc(m.id)}" ${m.id === D.musteri ? 'selected' : ''}>${esc(m.ad)}</option>`).join('')}` : '<option value="">Müşteriler yükleniyor…</option>'}</select></label>
@@ -159,7 +159,7 @@
         </div>
         <div class="ul-ozet"><span>Kalem <b>${D.kalemler.length}</b></span><span>Toplam adet <b>${adet()}</b></span><span>Genel toplam <b>${tlE(toplam())}</b></span></div>
         <div class="ul-tablo"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Br. fiyat</th><th>Tutar</th><th></th></tr></thead>
-          <tbody id="ulGovde">${D.kalemler.map(satirHtml).join('')}</tbody></table></div>
+          <tbody id="ulGovde">${D.kalemler.map((k, i) => (D.gruplar.length > 1 && (i === 0 || D.kalemler[i - 1].g !== k.g) ? grupHtml(k.g) : '') + satirHtml(k, i)).join('')}</tbody></table></div>
         <div class="ek-dug">
           <button class="btn dark" data-act="ulYazdir">Yazdır</button>
           <button class="btn" data-act="ulIndir">Dosya olarak indir</button>
@@ -189,7 +189,7 @@
     else if (act === 'ulIndir') { indir(); toast('Liste indirildi'); }
     else if (act === 'ulSon') { S.keepScroll = true; sec(D.satislar.filter(x => x[5] === 'invoice').slice(0, +el.dataset.n).map(x => x[0])); }
     else if (act === 'ulTemizle') { S.keepScroll = true; sec([]); }
-    else if (act === 'ulEkle') { D.kalemler.push({ urun: '', miktar: 1, fiyat: 0, tutar: 0 }); S.keepScroll = true; render(); }
+    else if (act === 'ulEkle') { D.kalemler.push({ urun: '', miktar: 1, fiyat: 0, tutar: 0, g: D.kalemler.at(-1)?.g ?? 0 }); S.keepScroll = true; render(); }
     else if (act === 'ulSil') { D.kalemler.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else prevAct?.(act, el, e);
   };
