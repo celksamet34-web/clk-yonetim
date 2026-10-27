@@ -172,13 +172,19 @@ window.CLK = (() => {
     S.route = r; S.arg = arg; try { history.replaceState(null, '', '#' + r); } catch {}
     render(); window.scrollTo({ top: 0 });
   }
-  let raf = 0;
+  let raf = 0, sonDegisim = 0;
   function render() { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }
+  // açık bir seçim listesi arka plandaki yüklemelerin yeniden çizimiyle kapanmasın: seçim yapılana ya da liste bırakılana kadar beklenir
+  document.addEventListener('change', () => { sonDegisim = performance.now(); }, true);
   function draw() {
-    const app = $('#app');
+    const app = $('#app'), ae = document.activeElement;
+    if (S.user && ae?.tagName === 'SELECT' && app.contains(ae) && performance.now() - sonDegisim > 400) {
+      if (!ae.bekleyen) { ae.bekleyen = true; const devam = () => { ae.removeEventListener('blur', devam); ae.removeEventListener('change', devam); render(); }; ae.addEventListener('blur', devam); ae.addEventListener('change', devam); }
+      return;
+    }
     if (!S.user) { app.className = ''; app.innerHTML = views.auth(); views.bindAuth(); return; }
     const v = views[S.route] || views.panel;
-    const keepScroll = window.scrollY, focusId = document.activeElement?.id, sel = document.activeElement?.selectionStart;
+    const keepScroll = window.scrollY, focusId = ae?.tagName === 'SELECT' ? '' : ae?.id, sel = document.activeElement?.selectionStart;
     app.className = ''; app.innerHTML = shell(v());
     views['bind_' + S.route]?.();
     if (focusId) { const f = document.getElementById(focusId); if (f) { f.focus(); try { f.setSelectionRange(sel, sel); } catch {} } }
