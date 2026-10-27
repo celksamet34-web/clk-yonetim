@@ -399,3 +399,9 @@ body{font-size:15.5px;letter-spacing:0}
 .ek-on{text-align:center;margin-top:14px}
 .ek-on img{max-width:100%;border:1px solid var(--line);border-radius:8px}
 .ek-bos{color:var(--muted);padding:24px 0;margin:0}
+
+.nav .esitle{margin-top:6px;border:1px solid rgba(214,189,143,.35);color:var(--gold-2)}
+.nav .esitle[disabled],.sheet-in .esitle[disabled],.mtop button[disabled]{opacity:.6;cursor:wait}
+.nav .esitle[disabled] svg,.sheet-in .esitle[disabled] svg{animation:esd 1.2s linear infinite}
+@keyframes esd{to{transform:rotate(360deg)}}
+.mtop-acts{display:flex;gap:8px}

@@ -25,7 +25,7 @@ window.CLK = (() => {
   const num = n => new Intl.NumberFormat('tr-TR').format(Math.round(Number(n) || 0));
   const dt = s => { const d = new Date(String(s || '').replace(' ', 'T')); return isNaN(d) ? '—' : d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }); };
   const dtt = s => { const d = new Date(String(s || '').replace(' ', 'T')); return isNaN(d) ? '—' : d.toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); };
-  function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 2800); }
+  function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), Math.max(2800, String(m).length * 70)); }
 
   /* ürün yardımcıları */
   const P = {
@@ -134,11 +134,14 @@ window.CLK = (() => {
     more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
     banner: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/></svg>',
     eslestirme: '<svg viewBox="0 0 24 24"><path d="M4 7h11l-3-3M20 17H9l3 3"/></svg>',
+    esitle: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg>',
     ekstre: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h3"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
   const NAV = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['ekstre', 'Ekstre']];
   const views = {};
+  // Paraşüt ↔ site eşitlemesini hemen çalıştırır (saatlik görevi beklemeden); işleyişi views-parasut.js'te
+  const esitleBtn = () => `<button class="esitle" data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${ICONS.esitle}<span>${S.esitleniyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</span></button>`;
   function shell(content) {
     const nav = NAV.map(([k, l]) => `<button data-go="${k}" ${S.route === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
     const more = ['siparisler', 'musteriler', 'cari'].includes(S.route);
@@ -149,12 +152,12 @@ window.CLK = (() => {
     }).join('');
     return `<div class="shell">
       <aside class="side"><div class="logo">CLK<small>ÇANTA · YÖNETİM</small></div>
-        <nav class="nav">${nav}<button class="add" data-go="yeni">${ICONS.plus}<span>Yeni ürün</span></button></nav>
+        <nav class="nav">${nav}<button class="add" data-go="yeni">${ICONS.plus}<span>Yeni ürün</span></button>${esitleBtn()}</nav>
         <div class="foot"><b>${esc(S.user?.email || '')}</b><button class="link" data-act="logout">Çıkış yap</button></div></aside>
-      <header class="mtop"><div class="logo">CLK</div><button data-act="logout">Çıkış</button></header>
+      <header class="mtop"><div class="logo">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
-      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['ekstre', 'Ekstre']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}</div></div></div>`;
+      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['ekstre', 'Ekstre']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
   }
   const head = (eyebrow, title, sub, acts = '') => `<div class="page-h"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="acts">${acts}</div></div>`;
   const skel = () => `<div class="card"><div class="skel" style="height:110px"></div><div class="skel" style="height:240px;margin-top:14px"></div></div>`;

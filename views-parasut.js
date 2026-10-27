@@ -147,9 +147,29 @@
     toast('Kaydedildi'); S.keepScroll = true; render();
   }
 
+  // menüdeki "Şimdi eşitle": listeler (müşteri, ürün) → siteden Paraşüt'e → Paraşüt'ten siteye → bakiye kontrolü
+  async function esitle() {
+    if (S.esitleniyor) return;
+    S.esitleniyor = true; render(); toast('Eşitleniyor… (1–2 dakika sürebilir)');
+    try {
+      const l = await fonksiyon('liste').catch(e => ({ hata: e.message }));
+      const r = await fonksiyon('calis');
+      const p = r.parasut || {}, k = r.kontrol || {};
+      const parca = [`Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`,
+        k.hata ? 'bakiye kontrolü olmadı' : k.farkli ? `${num(k.farkli)} müşteride bakiye farkı` : `${num(k.toplam || 0)} müşterinin bakiyesi aynı`];
+      const hata = [l.hata && 'listeler: ' + l.hata, r.hata && 'site → Paraşüt: ' + r.hata, p.hata && 'Paraşüt → site: ' + p.hata].filter(Boolean);
+      S.esitleniyor = false;
+      toast((hata.length ? 'Eşitlendi, sorun var: ' + hata.join('; ') + ' · ' : 'Eşitlendi · ') + parca.join(' · '));
+    } catch (err) { S.esitleniyor = false; toast('Eşitlenemedi: ' + err.message); }
+    // açık sayfalar yeni bilgiyle yenilenir
+    if (S.ui.ek) { S.ui.ek.musteriler = null; if (S.route === 'ekstre' && S.ui.ek.resim) views.onAct('ekHazirla'); }
+    if (S.route === 'eslestirme') await yukle(); else { D.veri = null; render(); }
+  }
+
   const prevAct = views.onAct;
   views.onAct = async (act, el, e) => {
-    if (act === 'esYukle') yukle();
+    if (act === 'esitle') esitle();
+    else if (act === 'esYukle') yukle();
     else if (act === 'esUrun') kaydet(el, 'sp_urun_eslesme', 'site_anahtar', D.veri.pUrunAd);
     else if (act === 'esMus') kaydet(el, 'sp_musteri_eslesme', 'site_ad', D.veri.pMusAd);
     else if (act === 'esListe' || act === 'esCalis' || act === 'esKontrol') {
