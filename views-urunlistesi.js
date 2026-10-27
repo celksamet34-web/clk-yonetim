@@ -42,13 +42,13 @@
     D.yukleniyor = ''; render();
   }
 
-  const toplam = () => yuvarla(D.kalemler.reduce((a, k) => a + (Number(k.tutar) || 0), 0));
-  const adet = () => D.kalemler.reduce((a, k) => a + (Number(k.miktar) || 0), 0);
+  const toplam = (l = D.kalemler) => yuvarla(l.reduce((a, k) => a + (Number(k.tutar) || 0), 0));
+  const adet = (l = D.kalemler) => l.reduce((a, k) => a + (Number(k.miktar) || 0), 0);
 
   // West Polo'daki "Sevkiyat ve kontrol listesi" tasarımı (A4, kontrol kutulu)
-  function sayfaHtml() {
-    const bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && ['Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean);
-    const satirlar = D.kalemler.filter(k => k.urun);
+  // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, miktar, fiyat, tutar}])
+  function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && ['Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler) {
+    const satirlar = kalemler.filter(k => k.urun);
     const logo = new URL('logo-clk.png', location.href).href;
     return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title> </title><style>
     *{box-sizing:border-box}
@@ -86,24 +86,25 @@
       <div class="susleme"><i></i><b></b><i></i></div>
       <div class="iletisim">${FIRMA.slice(1).map(l => `<span>${esc(l)}</span>`).join('')}</div></div>
     <div class="cizgi"></div>
-    <div class="baslik"><h1 class="serif"><small>Sevkiyat ve kontrol listesi</small>Ürün Listesi</h1>
+    <div class="baslik"><h1 class="serif"><small>Sevkiyat ve kontrol listesi</small>${esc(baslik)}</h1>
       <div class="meta">${bilgiler.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>
     <table class="liste"><thead><tr><th class="l" colspan="2">Ürün</th><th>Miktar</th><th>Birim</th><th>Br. fiyat</th><th>Tutar</th><th class="k">Kontrol</th></tr></thead><tbody>
     ${satirlar.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}</td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('')}
     </tbody></table>
-    <div class="alt"><div class="toplam"><div><span>Kalem</span><b>${satirlar.length}</b></div><div><span>Toplam adet</span><b>${adet()}</b></div>
-      <div class="buyuk"><span>Genel toplam</span><b class="serif">${tlE(toplam())}</b></div></div></div>
+    <div class="alt"><div class="toplam"><div><span>Kalem</span><b>${satirlar.length}</b></div><div><span>Toplam adet</span><b>${adet(satirlar)}</b></div>
+      <div class="buyuk"><span>Genel toplam</span><b class="serif">${tlE(toplam(satirlar))}</b></div></div></div>
     <div class="imza"><div>Sayan / kolileyen</div><div>Koli sayısı</div><div>Tarih / imza</div></div>
     <div class="not">Eksik veya hatalı ürünleriniz için lütfen bizimle iletişime geçiniz: <b>${esc(FIRMA[2])}</b></div>
     <div class="son serif">Diğer ürünlerimiz için web sitemizi ziyaret etmeyi unutmayın · <b>${esc(FIRMA[3])}</b></div></td></tr></tbody></table></body></html>`;
   }
   // gizli çerçevede açılıp yazdırma penceresi gelir (telefonda PDF olarak kaydedilebilir)
-  function yazdir() {
+  function yazdir(html = sayfaHtml()) {
     const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0' });
     document.body.append(f);
-    f.srcdoc = sayfaHtml();
+    f.srcdoc = html;
     f.onload = () => { setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300); };
   }
+  CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler));
   function indir() {
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([sayfaHtml()], { type: 'text/html' })), download: `urun-listesi-${(D.bilgi.musteri || 'musteri').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}${D.bilgi.tarih ? '-' + D.bilgi.tarih : ''}.html` });
     document.body.append(a); a.click(); a.remove();
@@ -164,7 +165,7 @@
 
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
-    if (act === 'ulYazdir') yazdir();
+    if (act === 'ulYazdir') yazdir(sayfaHtml());
     else if (act === 'ulIndir') { indir(); toast('Liste indirildi'); }
     else if (act === 'ulEkle') { D.kalemler.push({ urun: '', miktar: 1, fiyat: 0, tutar: 0 }); S.keepScroll = true; render(); }
     else if (act === 'ulSil') { D.kalemler.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
