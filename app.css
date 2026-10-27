@@ -456,3 +456,40 @@ body{font-size:15.5px;letter-spacing:0}
 .wp-uyari{background:#fef0c7;color:#7a2e0e;padding:10px 12px;border-radius:10px;font-size:14px;margin-bottom:6px}
 .wp-h{font-size:17px;margin:0 0 8px}.wp-hata{color:#b42318}
 .wp-notlar{white-space:normal!important;text-align:left!important;font-size:12px;color:var(--muted);min-width:180px}
+/* Ürün Giriş */
+.ug-menu{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.ug-rozet{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:#b54708;color:#fff;font-size:12px;text-align:center;vertical-align:middle}
+.ug-filtre{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+.ug-secilen{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.ug-secilen span{background:#f3f3f1;border-radius:8px;padding:4px 8px;font-size:13px}
+.ug-x{border:0;background:none;font-size:18px;line-height:1;cursor:pointer;color:var(--muted);padding:2px 6px}
+.ug-fis{margin-bottom:14px}.ug-soru-var{box-shadow:inset 3px 0 0 #f79009}
+.ug-fis-ust{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.ug-fis-ust h3{margin:0;font-size:17px}
+.ug-meta{font-size:12.5px;color:var(--muted)}
+.ug-pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;background:#f3f3f1}
+.ug-pill.p-okundu{background:#fef0c7;color:#7a2e0e}.ug-pill.p-hata{background:#fdeee8;color:#b42318}.ug-pill.p-kaydedildi{background:#e7f6ee;color:#18794e}
+.ug-no{margin-top:8px;font-size:14px}.ug-no b{font-size:16px}
+.ug-fotolar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.ug-foto{border:1px solid var(--line-2);border-radius:10px;padding:0;background:#fafaf8;cursor:zoom-in;overflow:hidden;width:96px;height:120px;display:grid;place-items:center;font-size:11px;color:var(--muted);text-align:center}
+.ug-foto img{width:100%;height:100%;object-fit:cover}.ug-foto.bos{cursor:default;padding:6px}
+.ug-sorular{background:#fffaeb;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:14px}.ug-sorular ol{margin:6px 0;padding-left:20px}.ug-sorular small{color:var(--muted)}
+.ug-ust-alan{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}.ug-ust-alan label{display:grid;gap:4px;font-size:13px;color:var(--muted)}.ug-ust-alan .ug-not{flex:1 1 220px}
+.ug-ust-alan input{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;color:var(--ink,inherit)}
+.ug-tablo td.l,.ug-tablo th:nth-child(2),.ug-tablo th:nth-child(3){text-align:left}
+.ug-tablo input{text-align:left;font:inherit;padding:6px 8px;border:1px solid var(--line-2);border-radius:8px;width:100%;box-sizing:border-box}
+.ug-tablo .ug-adet{width:60px;text-align:right}.ug-tablo .ug-fiyat{width:96px;text-align:right}.ug-tablo .ug-urun{min-width:150px}.ug-tablo .ug-grup{min-width:110px}
+.ug-p{display:flex;gap:6px;align-items:center;min-width:220px}.ug-parasut.yeni{border-color:#e9a68c}
+.ug-yeni{font-size:11px;font-weight:600;color:#b54708;white-space:nowrap}
+.ug-toplam{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:14px}
+.ug-satislar{margin-top:14px;border-top:1px solid var(--line-2);padding-top:10px}.ug-etiket{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.ug-satis{border:1px solid var(--line-2);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.ug-satis-ust{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.ug-satis-ust select{font:inherit;padding:7px 9px;border-radius:9px;border:1px solid var(--line-2);max-width:100%}
+.ug-kar{color:#18794e}.ug-dusuk{color:#b42318;font-weight:600}
+.ug-kurallar{font-size:13px;margin-bottom:10px}.ug-kurallar ul{margin:6px 0;padding-left:18px;color:var(--muted)}
+.ug-kural-alan{display:grid;gap:4px;font-size:13px;color:var(--muted);margin-top:10px}.ug-kural-alan textarea{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px}
+.ug-klasor{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:10px 0}
+.ug-arsiv{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.ug-arsiv-kart{display:flex;gap:10px;border:1px solid var(--line-2);border-radius:12px;padding:8px;font-size:14px}.ug-arsiv-no{font-size:17px}
+.ug-buyuk{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.85);display:flex;flex-direction:column}
+.ug-buyuk-arac{display:flex;gap:8px;justify-content:flex-end;padding:10px}
+.ug-buyuk-alan{flex:1;overflow:auto;display:grid;place-items:center;padding:10px}
+.ug-buyuk-alan img{max-width:100%;max-height:calc(100vh - 80px);cursor:zoom-in;transition:transform .2s}.ug-buyuk-alan img.yakin{max-width:none;max-height:none;cursor:zoom-out}
