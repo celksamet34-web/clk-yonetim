@@ -343,6 +343,29 @@ Kurallar:
     });
     addEventListener('keydown', tus); document.body.append(kutu);
   }
+  // görseli olmayan (panelden taşınan) fişe sonradan görsel eklenir
+  function gorselEkle(id, i) {
+    const f = D.fisler.find(x => x.id === id); if (!f) return;
+    const inp = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*,application/pdf' });
+    inp.addEventListener('change', async () => {
+      const file = inp.files[0]; if (!file) return;
+      try {
+        toast('Görsel yükleniyor…');
+        const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+        const blob = pdf ? (await pdfGorseller(file))[0] : await gorselHazirla(file);
+        const yol = `${id}/${i + 1}.jpg`;
+        const { error } = await sb.storage.from('fisler').upload(yol, blob, { contentType: 'image/jpeg', upsert: true });
+        if (error) throw new Error(error.message);
+        const dosyalar = [...(f.dosyalar || [])];
+        dosyalar[i] = { yol, ad: dosyalar[i]?.ad || file.name, tur: 'image/jpeg' };
+        const r = await sb.from('ug_fis').update({ dosyalar }).eq('id', id);
+        if (r.error) throw new Error(r.error.message);
+        f.dosyalar = dosyalar; delete D.url[yol];
+        await urlleriAl(); toast('Görsel eklendi'); render();
+      } catch (e) { toast('Yüklenemedi: ' + e.message); }
+    });
+    inp.click();
+  }
   async function indir(id, i) {
     const f = D.fisler.find(x => x.id === id), d = f?.dosyalar?.[i], url = d && D.url[d.yol];
     if (!url) return;
@@ -354,7 +377,7 @@ Kurallar:
   // --- görünüm ---
   const fotolar = f => (f.dosyalar || []).length ? `<div class="ug-fotolar">${f.dosyalar.map((d, i) => d.yol && D.url[d.yol]
     ? `<button class="ug-foto" data-act="ugBuyut" data-id="${f.id}" data-i="${i}" aria-label="Fişi büyüt"><img src="${esc(D.url[d.yol])}" alt="Fiş ${i + 1}" loading="lazy"></button>`
-    : `<span class="ug-foto bos">${d.eski ? 'eski fiş, görsel panelde' : 'görsel yok'}<br><small>${esc(d.ad || '')}</small></span>`).join('')}</div>` : '';
+    : `<button class="ug-foto bos" data-act="ugGorselEkle" data-id="${f.id}" data-i="${i}">Görsel yok<br><b>Görseli yükle</b><br><small>${esc(d.ad || '')}</small></button>`).join('')}</div>` : '';
   const pill = durum => `<span class="ug-pill p-${durum}">${DURUM[durum] || durum}</span>`;
 
   function duzenTablosu(f) {
@@ -439,7 +462,7 @@ Kurallar:
         `<button class="sk-f" data-act="ugArsivFirma" data-ad="${esc(d)}" aria-pressed="${D.arsivFirma === d}"><b>${esc(ad)}</b><small>${n} fiş</small></button>`).join('')}</div>
       <div class="sk-arac"><input id="ugArsivAra" type="search" placeholder="clk no, firma ya da tarih ara" value="${esc(D.arsivAra)}"></div>
       <div class="ug-arsiv">${kayit.length ? kayit.map(f => { const d = (f.dosyalar || [])[0], u = d?.yol && D.url[d.yol]; return `<article class="ug-arsiv-kart">
-        ${u ? `<button class="ug-foto" data-act="ugBuyut" data-id="${f.id}" data-i="0"><img src="${esc(u)}" alt="${esc(f.dosya_no)}" loading="lazy"></button>` : '<span class="ug-foto bos">görsel yok</span>'}
+        ${u ? `<button class="ug-foto" data-act="ugBuyut" data-id="${f.id}" data-i="0"><img src="${esc(u)}" alt="${esc(f.dosya_no)}" loading="lazy"></button>` : `<button class="ug-foto bos" data-act="ugGorselEkle" data-id="${f.id}" data-i="0">Görsel yok<br><b>Görseli yükle</b><br><small>${esc(d?.ad || '')}</small></button>`}
         <div><b class="ug-arsiv-no">${esc(f.dosya_no)}</b><div>${esc(f.firma)}</div><div class="ug-meta">${[trT(f.tarih), tl(toplam(f.satirlar)), f.parasut_id ? 'Paraşüt ' + f.parasut_id : ''].filter(Boolean).join(' · ')}</div>
         ${u ? `<div class="ek-dug">${f.dosyalar.map((_, i) => `<button class="btn" data-act="ugIndir" data-id="${f.id}" data-i="${i}">${f.dosyalar.length > 1 ? 'İndir ' + (i + 1) : 'İndir'}</button>`).join('')}</div>` : ''}</div></article>`; }).join('') : '<p class="wp-not">Aramaya uyan fiş yok.</p>'}</div></div>`;
   }
@@ -523,6 +546,7 @@ Kurallar:
     else if (act === 'ugSatirEkle') { const t = taslak(f); t.satirlar.push({ adet: 1, urun: '', fiyat: '', grup: t.satirlar.at(-1)?.grup || '', parasutId: '', pAd: '' }); S.keepScroll = true; render(); }
     else if (act === 'ugSatis') satisYap(id, el.dataset.grup);
     else if (act === 'ugBuyut') { const d = f?.dosyalar?.[+el.dataset.i]; if (d && D.url[d.yol]) fotoBuyut(D.url[d.yol]); }
+    else if (act === 'ugGorselEkle') gorselEkle(id, +el.dataset.i);
     else if (act === 'ugIndir') indir(id, +el.dataset.i).catch(err => toast('İndirilemedi: ' + err.message));
     else if (act === 'ugArsivFirma') { D.arsivFirma = el.dataset.ad; render(); }
     else if (act === 'ugFirmaEkle') firmaEkle();
