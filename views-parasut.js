@@ -162,6 +162,7 @@
       toast((hata.length ? 'Eşitlendi, sorun var: ' + hata.join('; ') + ' · ' : 'Eşitlendi · ') + parca.join(' · '));
     } catch (err) { S.esitleniyor = false; toast('Eşitlenemedi: ' + err.message); }
     // açık sayfalar yeni bilgiyle yenilenir
+    for (const k of ['wp', 'ul']) if (S.ui[k]) S.ui[k].musteriler = null;
     if (S.ui.ek) { S.ui.ek.musteriler = null; if (S.route === 'ekstre' && S.ui.ek.resim) views.onAct('ekHazirla'); }
     if (S.route === 'eslestirme') await yukle(); else { D.veri = null; render(); }
   }
