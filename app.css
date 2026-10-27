@@ -416,7 +416,7 @@ body{font-size:15.5px;letter-spacing:0}
 .ul-tablo td{padding:5px 6px;border-bottom:1px solid var(--line-2);text-align:right;white-space:nowrap}
 .ul-tablo input{font:inherit;width:90px;padding:7px 9px;border:1px solid var(--line-2);border-radius:9px;text-align:right;background:#fff}
 .ul-tablo .ul-urun input{width:100%;min-width:240px;text-align:left}
-.ek-form.ul-sec{grid-template-columns:1fr 1fr}
+.ek-form.ul-sec{grid-template-columns:1fr}
 
 .sk-filtre{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:14px}
 .sk-f{background:#fff;border:1px solid var(--line-2);border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;font:inherit}
@@ -493,3 +493,16 @@ body{font-size:15.5px;letter-spacing:0}
 .ug-buyuk-arac{display:flex;gap:8px;justify-content:flex-end;padding:10px}
 .ug-buyuk-alan{flex:1;overflow:auto;display:grid;place-items:center;padding:10px}
 .ug-buyuk-alan img{max-width:100%;max-height:calc(100vh - 80px);cursor:zoom-in;transition:transform .2s}.ug-buyuk-alan img.yakin{max-width:none;max-height:none;cursor:zoom-out}
+.ul-sat-bas{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 8px;font-size:14px}
+.ul-sat-bas span{color:var(--muted)}
+.ul-hizli{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.ul-satlar{display:grid;gap:6px;max-height:340px;overflow-y:auto;padding:2px}
+.ul-sat{display:grid;grid-template-columns:auto 92px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line-2);border-radius:12px;background:#fff;cursor:pointer;font-size:14px}
+.ul-sat input{width:20px;height:20px;margin:0}
+.ul-sat .t{font-variant-numeric:tabular-nums;color:var(--muted)}
+.ul-sat .no{font-weight:600;min-width:0}
+.ul-sat .no small{display:block;font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ul-sat .tt{font-variant-numeric:tabular-nums;font-weight:600}
+.ul-sat.on{border-color:#1d2433;background:#f3f5f9}
+.ul-sat.iade{opacity:.6}
+@media (max-width:640px){.ul-sat{grid-template-columns:auto 1fr auto}.ul-sat .t{grid-column:2;grid-row:2;font-size:12px}.ul-sat .no{grid-column:2;grid-row:1}.ul-sat .tt{grid-column:3;grid-row:1/3}}

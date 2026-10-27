@@ -1,9 +1,9 @@
-/* CLK Yönetim — ürün listesi: müşteri ve Paraşüt'teki satışı seçilir, ürünler sevkiyat ve kontrol listesi olarak yazdırılır */
+/* CLK Yönetim — ürün listesi: müşteri ve Paraşüt'teki bir ya da birkaç satışı seçilir (aynı ürünler birleşir), ürünler sevkiyat ve kontrol listesi olarak yazdırılır */
 (() => {
   const { sb, S, $, esc, toast, head, views, render } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const FIRMA = ['CLK ÇANTA', 'Birlik Mah. 873 Sk. No:2/A Esenler / İstanbul', '0534 077 88 67', 'www.clkcanta.com'];
-  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, satis: '', kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
+  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, secili: [], okunan: {}, kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
   const tlE = v => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₺';
   const trT = d => d ? String(d).split('-').reverse().join('.') : '';
   const sayi = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
@@ -26,20 +26,38 @@
     D.musteriler = out.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')); render();
   }
   async function satislariAl(id) {
-    D.musteri = id; D.satislar = null; D.satis = ''; D.yukleniyor = 'satislar'; D.durum = ''; render();
+    D.musteri = id; D.satislar = null; D.secili = []; D.okunan = {}; D.yukleniyor = 'satislar'; D.durum = ''; render();
     try { const l = await sor({ islem: 'satislar', id }); if (D.musteri === id) D.satislar = l; }
     catch (e) { D.durum = 'Satışlar alınamadı: ' + e.message; D.satislar = []; }
     D.yukleniyor = ''; render();
   }
-  async function satisAl(id) {
-    D.satis = id; D.yukleniyor = 'satis'; D.durum = 'Satış Paraşüt\'ten okunuyor…'; render();
+  // seçilen faturalar sırayla okunur (Paraşüt aynı anda gelen girişleri reddediyor), aynı ürün + aynı fiyat tek satırda toplanır
+  async function secimiOku() {
+    const secim = D.secili.slice();
+    D.yukleniyor = 'satis'; render();
     try {
-      const v = await sor({ islem: 'satis', id });
-      D.kalemler = v.kalemler.map(([urun, miktar, fiyat, tutar]) => ({ urun, miktar, fiyat, tutar }));
-      D.bilgi = { musteri: v.musteri || '', no: v.no || '', tarih: v.tarih || '' };
-      D.durum = `${D.kalemler.length} kalem alındı${v.aciklama ? ' (' + v.aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.`;
+      for (const [i, id] of secim.entries()) {
+        if (D.okunan[id]) continue;
+        D.durum = `Satış Paraşüt'ten okunuyor (${i + 1}/${secim.length})…`; render();
+        D.okunan[id] = await sor({ islem: 'satis', id });
+        if (D.secili.join() !== secim.join()) return;
+      }
+      const fat = secim.map(id => D.okunan[id]).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
+      const bir = new Map();
+      for (const v of fat) for (const [urun, miktar, fiyat, tutar] of v.kalemler) {
+        const k = urun + '|' + fiyat, x = bir.get(k);
+        if (x) { x.miktar = yuvarla(x.miktar + miktar); x.tutar = yuvarla(x.tutar + tutar); }
+        else bir.set(k, { urun, miktar, fiyat, tutar });
+      }
+      D.kalemler = [...bir.values()];
+      D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no).filter(Boolean).join(', '), tarih: fat.at(-1)?.tarih || '' };
+      D.durum = fat.length ? `${fat.length} fatura, ${D.kalemler.length} kalem${fat.length > 1 ? ' (aynı ürünler birleştirildi)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
     } catch (e) { D.durum = 'Satış okunamadı: ' + e.message; }
-    D.yukleniyor = ''; render();
+    finally { if (D.secili.join() === secim.join()) { D.yukleniyor = ''; render(); } }
+  }
+  function sec(ids) {
+    D.secili = ids; D.kalemler = [];
+    if (ids.length) secimiOku(); else { D.durum = ''; render(); }
   }
 
   const toplam = (l = D.kalemler) => yuvarla(l.reduce((a, k) => a + (Number(k.tutar) || 0), 0));
@@ -47,7 +65,7 @@
 
   // West Polo'daki "Sevkiyat ve kontrol listesi" tasarımı (A4, kontrol kutulu)
   // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, miktar, fiyat, tutar}])
-  function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && ['Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler) {
+  function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && [D.bilgi.no.includes(',') ? 'Faturalar' : 'Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler) {
     const satirlar = kalemler.filter(k => k.urun);
     const logo = new URL('logo-clk.png', location.href).href;
     return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title> </title><style>
@@ -120,21 +138,23 @@
   views.urunlistesi = () => {
     if (!D.musteriler) musteriler().catch(e => { D.durum = 'Müşteri listesi alınamadı: ' + e.message; D.musteriler = []; render(); });
     const sat = D.satislar;
-    return `${head('Paraşüt', 'Ürün listesi', 'Müşteriyi ve Paraşüt\'teki satışı seçin; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
+    return `${head('Paraşüt', 'Ürün listesi', 'Müşteriyi ve Paraşüt\'teki bir ya da birkaç satışı seçin, aynı ürünler tek satırda toplanır; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
       <div class="card">
         <div class="ek-form ul-sec">
           <label class="ek-mus">Müşteri<select id="ulMusteri">${D.musteriler ? `<option value="">Müşteri seçin (${D.musteriler.length})</option>${D.musteriler.map(m => `<option value="${esc(m.id)}" ${m.id === D.musteri ? 'selected' : ''}>${esc(m.ad)}</option>`).join('')}` : '<option value="">Müşteriler yükleniyor…</option>'}</select></label>
-          <label class="ek-mus">Satış<select id="ulSatis" ${sat?.length ? '' : 'disabled'}>${!D.musteri ? '<option value="">Önce müşteriyi seçin</option>'
-            : !sat ? '<option value="">Satışlar yükleniyor…</option>'
-            : !sat.length ? '<option value="">Bu müşterinin satışı yok</option>'
-            : `<option value="">Satış seçin (${sat.length})</option>${sat.map(([id, t, no, tutar, ack, tur]) => `<option value="${esc(id)}" ${id === D.satis ? 'selected' : ''}>${esc([trT(t), no, tlE(tutar), tur !== 'invoice' ? '(iade/iptal)' : '', ack].filter(Boolean).join(' · '))}</option>`).join('')}`}</select></label>
         </div>
+        ${!D.musteri ? '' : !sat ? '<p class="ek-durum">Satışlar yükleniyor…</p>' : !sat.length ? '<p class="ek-durum">Bu müşterinin satışı yok.</p>' : `
+        <div class="ul-sat-bas"><b>Satışlar</b><span>${D.secili.length ? D.secili.length + ' seçili' : 'Bir ya da birkaç fatura seçin'}</span>
+          <span class="ul-hizli">${[1, 2, 3, 4].filter(n => n <= sat.length).map(n => `<button class="btn sm" data-act="ulSon" data-n="${n}">${n === 1 ? 'Son fatura' : 'Son ' + n}</button>`).join('')}${D.secili.length ? '<button class="btn sm" data-act="ulTemizle">Temizle</button>' : ''}</span></div>
+        <div class="ul-satlar" id="ulSatlar">${sat.map(([id, t, no, tutar, ack, tur]) => `<label class="ul-sat${D.secili.includes(id) ? ' on' : ''}${tur !== 'invoice' ? ' iade' : ''}">
+          <input type="checkbox" value="${esc(id)}" ${D.secili.includes(id) ? 'checked' : ''} ${D.yukleniyor === 'satis' ? 'disabled' : ''}>
+          <span class="t">${esc(trT(t))}</span><span class="no">${esc(no || '—')}${tur !== 'invoice' ? ' · iade/iptal' : ''}${ack ? `<small>${esc(ack)}</small>` : ''}</span><span class="tt">${tlE(tutar)}</span></label>`).join('')}</div>`}
         ${D.durum ? `<p class="ek-durum" role="status">${esc(D.durum)}</p>` : ''}
       </div>
       ${D.kalemler.length ? `<div class="card">
         <div class="ek-form">
           <label class="ek-mus">Müşteri adı (listede)<input id="ulBMusteri" value="${esc(D.bilgi.musteri)}"></label>
-          <label>Fatura no<input id="ulBNo" value="${esc(D.bilgi.no)}"></label>
+          <label>${D.secili.length > 1 ? 'Faturalar' : 'Fatura no'}<input id="ulBNo" value="${esc(D.bilgi.no)}"></label>
           <label>Tarih<input id="ulBTarih" type="date" value="${esc(D.bilgi.tarih)}"></label>
         </div>
         <div class="ul-ozet"><span>Kalem <b>${D.kalemler.length}</b></span><span>Toplam adet <b>${adet()}</b></span><span>Genel toplam <b>${tlE(toplam())}</b></span></div>
@@ -150,7 +170,7 @@
 
   views.bind_urunlistesi = () => {
     $('#ulMusteri')?.addEventListener('change', e => { D.kalemler = []; if (e.target.value) satislariAl(e.target.value); else { D.musteri = ''; D.satislar = null; render(); } });
-    $('#ulSatis')?.addEventListener('change', e => e.target.value && satisAl(e.target.value));
+    $('#ulSatlar')?.addEventListener('change', e => { S.keepScroll = true; sec([...document.querySelectorAll('#ulSatlar input:checked')].map(x => x.value)); });
     $('#ulBMusteri')?.addEventListener('input', e => { D.bilgi.musteri = e.target.value; });
     $('#ulBNo')?.addEventListener('input', e => { D.bilgi.no = e.target.value; });
     $('#ulBTarih')?.addEventListener('change', e => { D.bilgi.tarih = e.target.value; });
@@ -167,6 +187,8 @@
   views.onAct = (act, el, e) => {
     if (act === 'ulYazdir') yazdir(sayfaHtml());
     else if (act === 'ulIndir') { indir(); toast('Liste indirildi'); }
+    else if (act === 'ulSon') { S.keepScroll = true; sec(D.satislar.filter(x => x[5] === 'invoice').slice(0, +el.dataset.n).map(x => x[0])); }
+    else if (act === 'ulTemizle') { S.keepScroll = true; sec([]); }
     else if (act === 'ulEkle') { D.kalemler.push({ urun: '', miktar: 1, fiyat: 0, tutar: 0 }); S.keepScroll = true; render(); }
     else if (act === 'ulSil') { D.kalemler.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else prevAct?.(act, el, e);
