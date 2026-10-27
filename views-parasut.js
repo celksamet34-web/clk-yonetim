@@ -72,7 +72,7 @@
   };
   const satirGeri = g => {
     const [l, c] = GERI[g.durum] || [g.durum, 'off'];
-    const ne = g.tur === 'satis' ? 'Satış → site siparişi' + (g.site_ref ? ' ' + g.site_ref : '') : 'Tahsilat → cari girişi';
+    const ne = g.tur === 'satis' ? 'Satış → site siparişi' + (g.site_ref ? ' ' + g.site_ref : '') : g.tur === 'verilen' ? 'Verilen ödeme → cari borç' : 'Tahsilat → cari girişi';
     return `<div class="es-sip"><div><b>${esc(g.musteri)}</b><small>${esc(ne)}${g.belge ? ' · ' + esc(g.belge) : ''} · ${esc(g.tarih || '')}</small><small>İşlendi ${dtt(g.guncel)}</small>${g.not_ ? `<small class="es-not">${esc(g.not_)}</small>` : ''}</div>
       <div class="es-sag"><b class="num">${tl(g.tutar)}</b><span class="pill ${c}">${l}</span></div></div>`;
   };

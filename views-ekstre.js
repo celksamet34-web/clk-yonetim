@@ -33,7 +33,7 @@
     for (const [t, no, v] of m.iade || []) h.push({ t, s: 1, ack: 'İade' + (no ? ' · ' + no : ''), a: 0, b: v });
     for (const [t, tur, v, vade, seri, hesap] of m.odeme || [])
       h.push({ t, s: 2, v: vade, ack: tur === 'c' ? `Çek${seri ? ' no ' + seri : ''}${vade ? ' · vade ' + trE(vade) : ''}` : (hesap || 'Tahsilat'), cek: tur === 'c', a: 0, b: v });
-    for (const [t, ack, v] of m.verilen || []) h.push({ t, s: 3, ack: 'Tarafımızdan ödeme · ' + ack, a: v, b: 0 });
+    for (const [t, ack, v] of m.verilen || []) h.push({ t, s: 3, ack: 'Ödeme · ' + ack, a: v, b: 0 });
     h.sort((x, y) => x.t.localeCompare(y.t) || x.s - y.s || String(x.v || '').localeCompare(String(y.v || '')));
     const fark = m.bakiye - h.reduce((s, x) => s + x.a - x.b, 0);
     const devir = fark + h.filter(x => x.t < bas).reduce((s, x) => s + x.a - x.b, 0);
