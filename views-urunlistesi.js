@@ -70,7 +70,7 @@
       }
       const fat = secim.map(id => D.okunan[id]).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
       D.gruplar = fat.map(v => ({ no: v.no || sfNo(v.id), tarih: v.tarih || '' }));
-      D.kalemler = fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar]) => ({ urun, miktar, fiyat, tutar, g })));
+      D.kalemler = fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar, renk]) => ({ urun, miktar, fiyat, tutar, renk: renk || '', g })));
       D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no || sfNo(v.id)).join(', '), tarih: fat.at(-1)?.tarih || '' };
       D.durum = fat.length ? `${fat.length} satış, ${D.kalemler.length} kalem${fat.length > 1 ? ' (her satış tarihiyle ayrı bölümde)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
     } catch (e) { D.durum = 'Satış okunamadı: ' + e.message; }
@@ -85,11 +85,11 @@
   const adet = (l = D.kalemler) => l.reduce((a, k) => a + (Number(k.miktar) || 0), 0);
 
   // West Polo'daki "Sevkiyat ve kontrol listesi" tasarımı (A4, kontrol kutulu)
-  // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, renk?, miktar, fiyat, tutar}]); renk ürün adının altında küçük yazılır
+  // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, renk?, miktar, fiyat, tutar}]); renk ürün adının altında küçük yazılır, renksiz üründe • (celik isteği 29.10.2026)
   function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && [D.bilgi.no.includes(',') ? 'Faturalar' : 'Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler, gruplar = D.gruplar) {
     const satirlar = kalemler.filter(k => k.urun);
     const bolumler = gruplar.length > 1 ? gruplar.map((b, g) => ({ b, g, l: satirlar.filter(k => k.g === g) })).filter(x => x.l.length) : [{ l: satirlar }];
-    const satirYaz = l => l.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}${k.renk ? `<small class="renk">${esc(k.renk)}</small>` : ''}</td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('');
+    const satirYaz = l => l.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}<small class="renk">${k.renk ? esc(k.renk) : '•'}</small></td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('');
     const logo = new URL('logo-clk.png', location.href).href;
     return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title> </title><style>
     *{box-sizing:border-box}
@@ -169,7 +169,7 @@
 
 
   const satirHtml = (k, i) => `<tr data-i="${i}">
-    <td class="ul-urun"><input data-f="urun" value="${esc(k.urun)}" aria-label="Ürün ${i + 1}"></td>
+    <td class="ul-urun"><input data-f="urun" value="${esc(k.urun)}" aria-label="Ürün ${i + 1}">${k.renk ? `<small class="ul-renk">${esc(k.renk)}</small>` : ''}</td>
     <td><input data-f="miktar" inputmode="decimal" value="${esc(String(k.miktar).replace('.', ','))}" aria-label="Miktar ${i + 1}"></td>
     <td><input data-f="fiyat" inputmode="decimal" value="${esc(String(k.fiyat).replace('.', ','))}" aria-label="Fiyat ${i + 1}"></td>
     <td class="num">${tlE(k.tutar)}</td>
@@ -224,6 +224,8 @@
       if (!k || !f) return;
       if (f === 'urun') k.urun = e.target.value.trim().toLocaleUpperCase('tr');
       else { k[f] = sayi(e.target.value); k.tutar = yuvarla(k.miktar * k.fiyat); }
+      // adet elle değişince renk dağılımı artık tutmaz, çıktıda yazılmaz
+      if (f === 'miktar') k.renk = '';
       S.keepScroll = true; render();
     });
   };

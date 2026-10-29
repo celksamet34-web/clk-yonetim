@@ -416,6 +416,7 @@ body{font-size:15.5px;letter-spacing:0}
 .ul-tablo td{padding:5px 6px;border-bottom:1px solid var(--line-2);text-align:right;white-space:nowrap}
 .ul-tablo input{font:inherit;width:90px;padding:7px 9px;border:1px solid var(--line-2);border-radius:9px;text-align:right;background:#fff}
 .ul-tablo .ul-urun input{width:100%;min-width:240px;text-align:left}
+.ul-tablo .ul-renk{display:block;margin:4px 2px 0;font-size:11px;color:var(--muted,#777);letter-spacing:.02em}
 .ek-form.ul-sec{grid-template-columns:1fr}
 
 .sk-filtre{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:14px}
