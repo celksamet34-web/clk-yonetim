@@ -519,3 +519,10 @@ body{font-size:15.5px;letter-spacing:0}
 .ug-satis-ust .ara-kutu{flex:1;min-width:240px;max-width:420px}
 .ara-kutu input.wp-req{border-color:#e9a68c}
 .es-row .ara-kutu input{min-height:0;padding:8px 11px;font-size:15px}
+.fk-hucre{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.ul-tablo .fk-tablo .sk-num{width:72px;text-align:right}
+.fk-ornek{display:block;text-align:right;color:var(--muted);font-size:12px;margin-top:3px;white-space:nowrap}
+.ul-tablo input.fk-uyari{border-color:#d97706;background:#fff4e5}
+.fk-ayar{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.sk-arac .fk-ayar input{flex:0 0 96px;width:96px}
+.fk-ayar select{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px}
