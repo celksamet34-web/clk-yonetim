@@ -612,3 +612,7 @@ body{font-size:15.5px;letter-spacing:0}
 }
 .sg-gizli-dug{all:unset;cursor:pointer;margin-top:10px;font-size:12px;font-weight:600;color:var(--muted);padding:4px 0}
 .sg-gizli-dug:hover{color:var(--ink)}
+.sg-mus-kart{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-top:12px;padding:12px 14px;border:1px solid var(--line-2);border-radius:13px;background:#fcfcfd}
+.sg-mus-iletisim{display:grid;gap:3px;font-size:13px;min-width:0}.sg-mus-iletisim span{overflow-wrap:anywhere}
+.sg-mus-bakiye{display:grid;justify-items:end;gap:1px;flex:none}.sg-mus-bakiye small{font-size:11px;color:var(--muted);font-weight:600}.sg-mus-bakiye b{font-size:19px;font-variant-numeric:tabular-nums}
+.sg-tamam-dug{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}

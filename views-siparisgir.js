@@ -29,7 +29,8 @@
     for (let i = 0; i < 150 && !S.uLoaded && !S.uErr; i++) await new Promise(r => setTimeout(r, 200));
     if (!S.uLoaded) throw new Error(S.uErr || 'Site üyeleri alınamadı.');
     const uye = Object.fromEntries(S.users.map(x => [String(x.id), x]));
-    return (es || []).map(e => { const x = uye[String(e.site_ad).slice(2)]; return x ? { id: Number(x.id), ad: e.parasut_ad, tip: Number(x.priceType) || 0, iskonto: Number(x.discountRate) || 0, bakiye: Number(x.balance) || 0, pid: e.parasut_id } : null; })
+    return (es || []).map(e => { const x = uye[String(e.site_ad).slice(2)]; return x ? { id: Number(x.id), ad: e.parasut_ad, tip: Number(x.priceType) || 0, iskonto: Number(x.discountRate) || 0, bakiye: Number(x.balance) || 0, pid: e.parasut_id,
+      tel: x.phone || '', adres: [x.delivery?.address || x.invoice?.address, x.delivery?.district || x.invoice?.district, x.delivery?.city || x.invoice?.city].filter(Boolean).join(', '), vergi: [x.taxBranch, x.taxId || x.nationalId].filter(Boolean).join(' ') } : null; })
       .filter(Boolean).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
   }
   async function yukle() {
@@ -133,6 +134,7 @@
 
   // telefonda alt çubuk: toplam her an görünür, düğme özete götürür
   const mbarHtml = () => `<span><small>${T.satirlar.length} ürün · ${toplamAdet()} adet</small><b>${fmt(toplam())} ₺</b></span><button type="button" class="btn dark sm" data-act="sgOzeteGit">Özet ve onay</button>`;
+  const sonVar = () => { try { return !!localStorage.getItem('clk-siparis-son'); } catch { return false; } };
   function ozetHtml() {
     const m = musteri(), n = T.satirlar.length, ta = toplamAdet();
     const eksik = !m ? 'Müşteri seçilmedi' : !ta ? 'Adet yazılmadı' : T.satirlar.some(s => !(birim(s) >= 0) || Number.isNaN(birim(s))) ? 'Fiyatı hatalı ürün var' : '';
@@ -146,7 +148,8 @@
           <div class="sg-onay-dug"><button class="btn" data-act="sgVazgec">Geri dön</button><button class="btn dark" data-act="sgGonder">Onayla, siparişi aç</button></div></div>`
         : `<button class="btn dark sg-olustur" data-act="sgOnay" ${eksik || D.durum ? 'disabled' : ''}>${D.durum === 'gonderiliyor' ? 'Sipariş açılıyor…' : 'Siparişi oluştur'}</button>
           ${eksik ? `<p class="sg-soluk">${eksik}</p>` : ''}`}
-      ${n || m ? '<button class="btn ghost sm" data-act="sgTemizle">Formu temizle</button>' : ''}`;
+      ${n || m ? '<button class="btn ghost sm" data-act="sgTemizle">Formu temizle</button>' : ''}
+      ${!n && sonVar() ? '<button class="btn ghost sm" data-act="sgSonYazdir">Son siparişin listesini yazdır</button>' : ''}`;
   }
 
   views.siparisgir = () => {
@@ -155,15 +158,17 @@
     if (D.hata) return ust + `<div class="card empty"><h3>Bilgiler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>`;
     if (D.sonuc) return ust + `<div class="card sg-tamam"><div class="pill ok">Sipariş açıldı</div><h3>${esc(D.sonuc.kod || 'Sipariş')}</h3>
       <p>${esc(D.sonuc.musteri)} · ${fmt(D.sonuc.toplam)} ₺</p><p class="sg-soluk">${D.sonuc.teslim ? 'Elden teslim olarak açıldı, 5 dakika içinde Paraşüt\'e satış faturası olur.' : 'Sitede "Kargolandı" yapılınca Paraşüt\'e satış faturası olur.'}</p>
-      <button class="btn dark" data-act="sgYeni">Yeni sipariş</button></div>`;
+      <div class="sg-tamam-dug"><button class="btn dark" data-act="sgYazdir">Listeyi yazdır</button><button class="btn" data-act="sgYeni">Yeni sipariş</button></div></div>`;
     const m = musteri(), n = T.satirlar.length, ta = toplamAdet();
     const musteriKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">1</span><h3>Müşteri</h3></div>
       ${araKutu('sgMusteri', D.musteriler, m?.ad || '', 'sgMus', { yer: D.musteriler ? `Müşteri adı yazın (${D.musteriler.length} müşteri)` : 'Müşteriler yükleniyor…' })}
-      ${m ? `<button type="button" class="sg-gizli-dug" data-act="sgGizli" aria-expanded="${D.gizli ? 'true' : 'false'}">${D.gizli ? 'Ayrıntıları gizle ▴' : 'Ayrıntılar ▾'}</button>
+      ${m ? `<div class="sg-mus-kart">
+          <div class="sg-mus-iletisim">${m.tel ? `<span>${esc(m.tel)}</span>` : ''}${m.adres ? `<span>${esc(m.adres)}</span>` : ''}${m.vergi ? `<span>Vergi: ${esc(m.vergi)}</span>` : ''}${!m.tel && !m.adres && !m.vergi ? '<span class="sg-soluk">Sitede iletişim bilgisi yok</span>' : ''}</div>
+          <div class="sg-mus-bakiye"><small>Bakiye</small><b class="${m.bakiye < -0.004 ? 'sg-borc' : ''}">${fmt(Math.abs(m.bakiye))} ₺</b><small>${m.bakiye < -0.004 ? 'borç' : m.bakiye > 0.004 ? 'alacak' : ''}</small></div></div>
+        <button type="button" class="sg-gizli-dug" data-act="sgGizli" aria-expanded="${D.gizli ? 'true' : 'false'}">${D.gizli ? 'Ayrıntıları gizle ▴' : 'Ayrıntılar ▾'}</button>
         ${D.gizli ? `<div class="sg-mus-bilgi">
         <label>Fiyat tanımı (★ müşterinin) <select id="sgTip">${TIP.map(([k, l]) => `<option value="${k}" ${tip() === k ? 'selected' : ''}>${l}${k === m.tip ? ' ★' : ''}</option>`).join('')}</select></label>
-        <div><small>İskonto</small><b>%${m.iskonto}</b></div>
-        <div><small>Site bakiyesi</small><b class="${m.bakiye < 0 ? 'sg-borc' : ''}">${fmt(m.bakiye)} ₺</b></div></div>` : ''}` : ''}
+        <div><small>İskonto</small><b>%${m.iskonto}</b></div></div>` : ''}` : ''}
     </div>`;
     const urunKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">2</span><h3>Ürünler</h3><span class="sg-soluk">${n ? `${n} ürün · ${ta} adet` : ''}</span></div>
       <div class="sg-ara"><input id="sgAra" type="search" autocomplete="off" placeholder="${D.urunler ? 'Ürün adı ya da kodu yazın (örn. 4924)' : 'Ürünler yükleniyor…'}" value="${esc(D.ara)}" ${m ? '' : 'disabled'} aria-label="Ürün ara">
@@ -224,10 +229,20 @@
     D.durum = 'gonderiliyor'; render();
     try {
       const r = await sor({ islem: 'siparis_gir', siparis: { istek: T.istek, userId: m.id, satirlar, not: T.not, teslim: T.teslim } });
-      D.sonuc = r; T = BOS(); sakla(); D.durum = '';
+      // çıktı için: renk renk satırlar, müşteri bilgisi ve teslimat sonuçla birlikte saklanır (sayfa yenilense de yazdırılabilir)
+      D.sonuc = { ...r, tel: m.tel, adres: m.adres, liste: T.satirlar.flatMap(s => adetler(s).map(x => ({ urun: s.ad + (x.renk ? ' – ' + x.renk : ''), miktar: Number(x.adet), fiyat: birim(s), tutar: Math.round(Number(x.adet) * birim(s) * 100) / 100 }))) };
+      try { localStorage.setItem('clk-siparis-son', JSON.stringify(D.sonuc)); } catch {}
+      T = BOS(); sakla(); D.durum = '';
       toast(`Sipariş ${r.kod || ''} açıldı`);
     } catch (e) { D.durum = ''; toast(/Oturum gerekli/.test(e.message) ? 'Siparişi siteye gönderme henüz açılmadı (sunucu güncellemesi bekleniyor). Taslak saklandı.' : 'Sipariş açılamadı: ' + e.message); }
     render();
+  }
+
+  // Ürün listesi sayfasındaki "Sevkiyat ve kontrol listesi" A4 düzeni (telefonda yazdırma penceresinden PDF kaydedilebilir)
+  function yazdir(o) {
+    if (!o?.liste?.length || !CLK.kontrolListesi) { toast('Yazdırılacak liste yok'); return; }
+    const trTarih = new Date(o.zaman || Date.now()).toLocaleDateString('tr-TR');
+    CLK.kontrolListesi('Sipariş', [['Müşteri', o.musteri], o.kod && ['Sipariş no', o.kod], ['Tarih', trTarih], ['Teslimat', o.teslim ? 'Elden' : 'Kargo'], o.tel && ['Telefon', o.tel]].filter(Boolean), o.liste);
   }
 
   const prevAct = views.onAct;
@@ -248,6 +263,8 @@
     else if (act === 'sgGizli') { D.gizli = !D.gizli; S.keepScroll = true; render(); }
     else if (act === 'sgOzeteGit') { document.activeElement?.blur(); $('#sgOzet')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     else if (act === 'sgYeni') { D.sonuc = null; render(); }
+    else if (act === 'sgYazdir') yazdir(D.sonuc);
+    else if (act === 'sgSonYazdir') { try { yazdir(JSON.parse(localStorage.getItem('clk-siparis-son'))); } catch { toast('Son sipariş bulunamadı'); } }
     else if (act === 'sgTemizle') { T = BOS(); D.durum = ''; sakla(); render(); }
     else prevAct?.(act, el, e);
   };
