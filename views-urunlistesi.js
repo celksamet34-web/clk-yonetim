@@ -85,11 +85,11 @@
   const adet = (l = D.kalemler) => l.reduce((a, k) => a + (Number(k.miktar) || 0), 0);
 
   // West Polo'daki "Sevkiyat ve kontrol listesi" tasarımı (A4, kontrol kutulu)
-  // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, miktar, fiyat, tutar}])
+  // West Polo sayfası da aynı tasarımı kullanır: CLK.kontrolListesi(başlık, [[etiket, değer]], [{urun, renk?, miktar, fiyat, tutar}]); renk ürün adının altında küçük yazılır
   function sayfaHtml(baslik = 'Ürün Listesi', bilgiler = [['Müşteri', D.bilgi.musteri], D.bilgi.no && [D.bilgi.no.includes(',') ? 'Faturalar' : 'Fatura no', D.bilgi.no], D.bilgi.tarih && ['Tarih', trT(D.bilgi.tarih)]].filter(Boolean), kalemler = D.kalemler, gruplar = D.gruplar) {
     const satirlar = kalemler.filter(k => k.urun);
     const bolumler = gruplar.length > 1 ? gruplar.map((b, g) => ({ b, g, l: satirlar.filter(k => k.g === g) })).filter(x => x.l.length) : [{ l: satirlar }];
-    const satirYaz = l => l.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}</td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('');
+    const satirYaz = l => l.map((k, i) => `<tr><td class="n">${i + 1}</td><td class="l u">${esc(k.urun)}${k.renk ? `<small class="renk">${esc(k.renk)}</small>` : ''}</td><td>${k.miktar}</td><td>Adet</td><td>${tlE(k.fiyat)}</td><td>${tlE(k.tutar)}</td><td class="k"><span class="kutu"></span></td></tr>`).join('');
     const logo = new URL('logo-clk.png', location.href).href;
     return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title> </title><style>
     *{box-sizing:border-box}
@@ -113,7 +113,7 @@
     th{font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#555;text-align:right;padding:0 5px 6px;border-bottom:1.5px solid #111}
     td{padding:4.5px 5px;text-align:right;white-space:nowrap;border-bottom:.5px solid #d4d4d4} tbody tr:nth-child(even) td{background:#f5f5f3}
     th.l,td.l{text-align:left} td.n{color:#999;width:22px;text-align:left} td.u{font-weight:500;white-space:normal}
-    th.k,td.k{text-align:center;width:50px} table.liste{font-size:10px}
+    th.k,td.k{text-align:center;width:50px} .renk{display:block;font-size:8.5px;font-weight:400;color:#555;letter-spacing:.02em;margin-top:1px} table.liste{font-size:10px}
     .kutu{display:inline-block;width:17px;height:17px;border:1.6px solid #111;border-radius:3px;background:#fff;vertical-align:middle}
     tr{break-inside:avoid} tr.grup td{background:#fff!important;border-bottom:1.2px solid #111;padding:14px 5px 5px;text-align:left;font-size:11px;letter-spacing:.04em;break-after:avoid} tr.grup b{font-weight:700;text-transform:uppercase;letter-spacing:.14em} tr.grup span{float:right;color:#555;font-size:9.5px} .alt{display:flex;justify-content:flex-end;margin-top:14px;break-inside:avoid}
     .toplam{min-width:260px;border-top:1.5px solid #111} .toplam div{display:flex;justify-content:space-between;align-items:baseline;padding:6px 2px} .toplam div+div{border-top:.5px solid #bbb}

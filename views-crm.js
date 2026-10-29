@@ -203,10 +203,22 @@
     if (!o || !CLK.kontrolListesi) { CLK.toast('Yazdırılamadı'); return; }
     const d = o.order || {}, c = o.customer || {};
     const adres = [c.delivery?.address, c.delivery?.district, c.delivery?.city].filter(Boolean).join(', ');
-    const kalemler = O.items(o).map(i => {
-      const miktar = Number(i.quantity) || 0, fiyat = Number(i.priceIncVat ?? i.price) || 0;
-      return { urun: [i.name, varyant(i.variants)].filter(Boolean).join(' · '), miktar, fiyat, tutar: Number(i.totalPriceIncVat ?? i.totalPrice) || miktar * fiyat };
-    });
+    // panel siparişinde renkler yönetici notunda ("AD: SİYAH 10, TABA 5; AD2: ..."); site her rengi ayrı satır tutar
+    const kuyruk = {};
+    for (const parca of String(d.adminNote || '').split(' – ').slice(1)) for (const u of parca.split('; ')) {
+      const i = u.lastIndexOf(': '); if (i < 0) continue;
+      kuyruk[u.slice(0, i)] = u.slice(i + 2).split(', ').map(x => x.match(/^(.+) (\d+)$/)).filter(Boolean).map(m => ({ renk: m[1], adet: Number(m[2]) }));
+    }
+    // çıktıda ürün başına tek satır, renkler adın altında küçük
+    const grup = new Map();
+    for (const i of O.items(o)) {
+      const miktar = Number(i.quantity) || 0, tutar = Number(i.totalPriceIncVat ?? i.totalPrice) || miktar * (Number(i.priceIncVat ?? i.price) || 0);
+      const q = kuyruk[i.name] || [], j = q.findIndex(x => x.adet === miktar);
+      const renk = j >= 0 ? q.splice(j, 1)[0].renk : varyant(i.variants);
+      const g = grup.get(i.code || i.name) || grup.set(i.code || i.name, { urun: i.name, renkler: [], miktar: 0, tutar: 0 }).get(i.code || i.name);
+      g.miktar += miktar; g.tutar += tutar; if (renk) g.renkler.push(`${renk} ${miktar}`);
+    }
+    const kalemler = [...grup.values()].map(g => ({ urun: g.urun, renk: g.renkler.join(' · '), miktar: g.miktar, fiyat: g.miktar ? Math.round(g.tutar / g.miktar * 100) / 100 : 0, tutar: g.tutar }));
     CLK.kontrolListesi('Sipariş', [['Müşteri', O.cust(o)], ['Sipariş no', O.code(o)], ['Tarih', dtt(O.date(o))],
       ['Durum', (ORDER_STATUS[O.status(o)] || ['—'])[0]], c.phone && ['Telefon', c.phone], adres && ['Adres', adres]].filter(Boolean), kalemler);
   }

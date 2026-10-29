@@ -251,8 +251,8 @@
       const r = await sor({ islem: 'siparis_gir', siparis: { istek: T.istek, userId: m.id, satirlar, not: T.not, teslim: T.teslim, ...(T.duzelt ? { duzelt: T.duzelt } : {}) } });
       // eski sipariş sitede iptal edildi: listede hemen gizlensin
       if (r.eski) { const o = S.orders.find(x => String(CLK.O.code(x)) === String(r.eski)); if (o?.order) o.order.status = 6; }
-      // çıktı için: renk renk satırlar, müşteri bilgisi ve teslimat sonuçla birlikte saklanır (sayfa yenilense de yazdırılabilir)
-      D.sonuc = { ...r, tel: m.tel, adres: m.adres, liste: T.satirlar.flatMap(s => adetler(s).map(x => ({ urun: s.ad + (x.renk ? ' – ' + x.renk : ''), miktar: Number(x.adet), fiyat: birim(s), tutar: Math.round(Number(x.adet) * birim(s) * 100) / 100 }))) };
+      // çıktı için: ürün başına tek satır, renkler adın altında; müşteri bilgisi ve teslimat sonuçla birlikte saklanır (sayfa yenilense de yazdırılabilir)
+      D.sonuc = { ...r, tel: m.tel, adres: m.adres, liste: T.satirlar.filter(s => satirAdet(s) > 0).map(s => ({ urun: s.ad, renk: adetler(s).filter(x => x.renk).map(x => `${x.renk} ${x.adet}`).join(' · '), miktar: satirAdet(s), fiyat: birim(s), tutar: Math.round(satirAdet(s) * birim(s) * 100) / 100 })) };
       try { localStorage.setItem('clk-siparis-son', JSON.stringify(D.sonuc)); } catch {}
       T = BOS(); sakla(); D.durum = '';
       toast(r.eski ? `Sipariş ${r.eski} düzeltildi, yeni no ${r.kod || ''}` : `Sipariş ${r.kod || ''} açıldı`);
