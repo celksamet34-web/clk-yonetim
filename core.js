@@ -163,14 +163,16 @@ window.CLK = (() => {
       <header class="mtop"><div class="logo">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
-      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['siparisgir', 'Sipariş gir'], ['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
+      <div class="sheet-more" id="more" data-act="moreKapat" ${S.more ? '' : 'hidden'}><div class="sheet-in">${[['siparisgir', 'Sipariş gir'], ['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
   }
   const head = (eyebrow, title, sub, acts = '') => `<div class="page-h"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="acts">${acts}</div></div>`;
   const skel = () => `<div class="card"><div class="skel" style="height:110px"></div><div class="skel" style="height:240px;margin-top:14px"></div></div>`;
   const errBox = (msg, act) => `<div class="card empty"><h3>Veri alınamadı</h3><p>${esc(msg)}</p><button class="btn dark" data-act="${act}">Tekrar dene</button></div>`;
 
   function go(r, arg) {
-    if (r === 'daha') { const m = $('#more'); if (m) m.hidden = !m.hidden; return; }
+    // menünün açık olduğu S.more'da tutulur: arka plandaki yüklemeler sayfayı yeniden çizince menü kendiliğinden kapanmasın
+    if (r === 'daha') { S.more = !S.more; S.keepScroll = true; render(); return; }
+    S.more = false;
     S.route = r; S.arg = arg; try { history.replaceState(null, '', '#' + r); } catch {}
     render(); window.scrollTo({ top: 0 });
   }
@@ -238,6 +240,7 @@ window.CLK = (() => {
     const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); go(g.dataset.go, g.dataset.arg); return; }
     const a = e.target.closest('[data-act]'); if (!a) return;
     const act = a.dataset.act;
+    if (act === 'moreKapat') { if (e.target === a) { S.more = false; S.keepScroll = true; render(); } return; }
     if (act === 'logout') sb.auth.signOut();
     else if (act === 'reloadP') loadProducts(true);
     else if (act === 'reloadO') loadOrders(true);
