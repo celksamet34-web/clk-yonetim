@@ -46,7 +46,7 @@
   const sitedeMi = u => !!(sitede()[u.id] || D.sonuc[u.id]?.id);
   const kural = (u, a) => {
     const r = D.kurallar?.[anahtar(katAd(u))], oran = r?.[a];
-    return CLK.fiyatla?.(u.alis, oran == null || oran === '' ? null : Number(oran), D.yuvarla) ?? null;
+    return CLK.fiyatla?.(Number(deger(u, 'alis')) || 0, oran == null || oran === '' ? null : Number(oran), D.yuvarla) ?? null;
   };
   // kutudaki ilk değer: son gönderilen, sitedeki ürün, yoksa Paraşüt adı ve fiyat kuralı
   const varsayilan = (u, a) => {
@@ -56,6 +56,7 @@
     if (a === 'ad') return p ? buyuk(p.name) : buyuk(u.ad);
     if (a === 'kat') return p ? String(p.categoryId ?? p.categoryID ?? '') : String(D.katEs[katAd(u)] || '');
     if (a === 'acik') return p ? P.on(p) : false;
+    if (a === 'alis') return u.alis || null;
     if (p) return Number(a === 'site' ? p.salePrice : p['dealerPrice' + a.slice(1)]) || null;
     return kural(u, a);
   };
@@ -68,6 +69,8 @@
     if (v === varsayilan(u, a) || (typeof v === 'number' && Number.isNaN(v))) delete t[a]; else t[a] = v;
     if (Object.keys(t).length) taslak[u.id] = t; else delete taslak[u.id];
     sakla();
+    // alış değişince oranı girilmiş kategorinin fiyatları yeni alışla yeniden hesaplanır (elle yazılan fiyat da)
+    if (a === 'alis') for (const [f] of FIYAT) { const k = kural(u, f); if (k > 0) degistir(u, f, k); }
   }
 
   const FILTRE = {
@@ -102,8 +105,9 @@
     return `<tr class="${Object.keys(t).length ? 'sk-satir-deg' : ''}">
       <td><input type="checkbox" data-sec="${u.id}" ${sec ? 'checked' : ''} aria-label="Seç ${esc(u.ad)}"></td>
       <td class="sg-urun"><input class="sk-in sk-ad-in ${'ad' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="ad" value="${esc(deger(u, 'ad'))}" aria-label="Sitedeki adı ${esc(u.ad)}">
-        <small>${esc(katAd(u))} · alış ${u.alis > 0 ? fmt(u.alis) + ' ₺' : 'yok'} · stok ${fmt(u.stok)}${p ? ' · ' + esc(p.code) : ''}</small></td>
+        <small>${esc(katAd(u))} · stok ${fmt(u.stok)}${p ? ' · ' + esc(p.code) : ''}</small></td>
       <td><select class="sg-kat ${'kat' in t ? 'sk-deg' : ''} ${sec && ek.includes('site kategorisi') ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="kat" aria-label="Site kategorisi ${esc(u.ad)}"><option value="">${p ? 'Değiştirme' : 'Kategori seç'}</option>${kat ? katSecenek.replace(`value="${kat}"`, `value="${kat}" selected`) : katSecenek}</select></td>
+      <td><input class="sk-in sk-num ${'alis' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="alis" value="${deger(u, 'alis') > 0 ? String(deger(u, 'alis')).replace('.', ',') : ''}" placeholder="—" inputmode="decimal" aria-label="Alış ${esc(u.ad)}"></td>
       ${FIYAT.map(([a]) => fiyatKutu(a)).join('')}
       <td><label class="sk-arsiv"><input type="checkbox" data-acik="${u.id}" ${deger(u, 'acik') ? 'checked' : ''}>Açık</label></td>
       <td>${durum}</td></tr>`;
@@ -114,7 +118,7 @@
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
     if (!S.categories.length && !D.katYuk) { D.katYuk = true; loadCategories().then(() => render()); }
     const acts = `<button class="btn" data-act="sgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
-    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
+    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = S.categories || [];
     const katSecenek = kats.map(c => `<option value="${c.id}">${esc(c.path)}</option>`).join('');
@@ -138,8 +142,8 @@
           <button class="btn" data-act="sgKural" ${D.secili.size ? '' : 'disabled'} title="Seçilenlerin fiyatını Fiyat kurallarındaki oranla yeniden yazar">Seçilenlere kural fiyatı</button>
           <button class="btn" data-act="sgAcik" data-v="1" ${D.secili.size ? '' : 'disabled'}>Seçilenleri açık yap</button>
           <button class="btn" data-act="sgAcik" data-v="0" ${D.secili.size ? '' : 'disabled'}>Seçilenleri gizli yap</button></div>
-        <div class="ul-tablo"><table class="sk-tablo sg-tablo"><thead><tr><th><input type="checkbox" id="sgHepsi" aria-label="Görünenlerin hepsini seç" ${liste.length && liste.slice(0, D.goster).every(u => D.secili.has(u.id)) ? 'checked' : ''}></th><th>Ürün (sitedeki adı)</th><th>Site kategorisi</th>${FIYAT.map(([, l]) => `<th>${l}</th>`).join('')}<th>Sitede</th><th>Durum</th></tr></thead>
-          <tbody>${liste.length ? liste.slice(0, D.goster).map(u => satir(u, katSecenek)).join('') : '<tr><td colspan="10" class="sk-bos">Bu filtrede ürün yok.</td></tr>'}</tbody></table></div>
+        <div class="ul-tablo"><table class="sk-tablo sg-tablo"><thead><tr><th><input type="checkbox" id="sgHepsi" aria-label="Görünenlerin hepsini seç" ${liste.length && liste.slice(0, D.goster).every(u => D.secili.has(u.id)) ? 'checked' : ''}></th><th>Ürün (sitedeki adı)</th><th>Site kategorisi</th><th title="Değişirse Paraşüt'e de yazılır">Alış</th>${FIYAT.map(([, l]) => `<th>${l}</th>`).join('')}<th>Sitede</th><th>Durum</th></tr></thead>
+          <tbody>${liste.length ? liste.slice(0, D.goster).map(u => satir(u, katSecenek)).join('') : '<tr><td colspan="11" class="sk-bos">Bu filtrede ürün yok.</td></tr>'}</tbody></table></div>
         ${liste.length > D.goster ? `<div class="ek-dug"><button class="btn" data-act="sgDaha">Daha fazla göster (${num(liste.length - D.goster)} kaldı)</button></div>` : ''}
       </div>
       <div class="sk-cubuk"><span>${D.secili.size ? `${num(D.secili.size)} ürün seçili` : 'Göndermek için ürün seçin'}${n ? ` · ${num(n)} üründe değişiklik` : ''}</span>${D.ilerleme ? `<span class="sk-durum">${esc(D.ilerleme)}</span>` : ''}
@@ -172,7 +176,7 @@
     });
   };
 
-  const paket = u => ({ pid: u.id, ad: buyuk(deger(u, 'ad')), pad: u.ad, kategori: Number(deger(u, 'kat')) || 0, alis: u.alis, acik: !!deger(u, 'acik'), fiyat: Object.fromEntries(FIYAT.map(([a]) => [a, fiyat(u, a)])) });
+  const paket = u => ({ pid: u.id, ad: buyuk(deger(u, 'ad')), pad: u.ad, kategori: Number(deger(u, 'kat')) || 0, alis: Number(deger(u, 'alis')) || 0, acik: !!deger(u, 'acik'), fiyat: Object.fromEntries(FIYAT.map(([a]) => [a, fiyat(u, a)])) });
   // site aynı anda gelen istekleri reddedebiliyor: beşerli parçalar sırayla gider, parça hata verirse bir kez daha denenir
   async function gonder() {
     const liste = (D.urunler || []).filter(u => D.secili.has(u.id));
@@ -182,10 +186,20 @@
     for (let i = 0; i < liste.length; i += 5) {
       const parca = liste.slice(i, i + 5), paketler = parca.map(paket);
       D.ilerleme = `${num(i)} / ${num(liste.length)} gönderildi`; S.keepScroll = true; render();
-      let r = null;
-      for (let dene = 0; dene < 2 && !r; dene++) {
-        try { r = await sor({ islem: 'site_gonder', urunler: paketler }); }
-        catch (e) { if (dene) r = { sonuc: parca.map(u => ({ pid: u.id, hata: e.message })) }; else await new Promise(s => setTimeout(s, 3000)); }
+      // değişen alış önce Paraşüt'e yazılır; yazılamayan ürün siteye gitmez (iki taraf aynı kalsın)
+      const alisDegisen = parca.filter(u => taslak[u.id] && 'alis' in taslak[u.id] && taslak[u.id].alis > 0);
+      const alisHata = {};
+      if (alisDegisen.length) {
+        try {
+          const a = await sor({ islem: 'urun_guncelle', degisiklikler: alisDegisen.map(u => ({ id: u.id, alis: taslak[u.id].alis })) });
+          for (const x of a.sonuc || []) { const u = parca.find(y => y.id === String(x.id)); if (!u) continue; if (x.ok) u.alis = taslak[u.id].alis; else alisHata[u.id] = 'Alış Paraşüt\'e yazılamadı: ' + (x.hata || ''); }
+        } catch (e) { for (const u of alisDegisen) alisHata[u.id] = 'Alış Paraşüt\'e yazılamadı: ' + e.message; }
+      }
+      const gidecek = paketler.filter(x => !alisHata[x.pid]);
+      let r = { sonuc: Object.entries(alisHata).map(([pid, hata]) => ({ pid, hata })) };
+      for (let dene = 0; dene < 2 && gidecek.length; dene++) {
+        try { const g = await sor({ islem: 'site_gonder', urunler: gidecek }); r.sonuc.push(...(g.sonuc || [])); break; }
+        catch (e) { if (dene) r.sonuc.push(...gidecek.map(x => ({ pid: x.pid, hata: e.message }))); else await new Promise(s => setTimeout(s, 3000)); }
       }
       for (const s of r.sonuc || []) {
         const pk = paketler.find(x => x.pid === String(s.pid));
