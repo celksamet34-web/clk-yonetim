@@ -140,6 +140,7 @@ window.CLK = (() => {
     urungiris: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/><path d="M15 2v4M9 2v4"/></svg>',
     westpolo: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
     stokkart: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h8M8 16h5"/></svg>',
+    siparisgir: '<svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><path d="M13 8v5M10.5 10.5h5"/></svg>',
     fiyat: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
@@ -151,18 +152,18 @@ window.CLK = (() => {
     const nav = NAV.map(([k, l]) => `<button data-go="${k}" ${S.route === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
     const more = ['siparisler', 'musteriler', 'cari'].includes(S.route);
     const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['yeni', 'Ekle'], ['siparisler', 'Sipariş'], ['daha', 'Daha']].map(([k, l]) => {
-      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urungiris', 'westpolo', 'urunlistesi', 'stokkart', 'fiyat', 'ekstre'].includes(S.route));
+      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urungiris', 'westpolo', 'urunlistesi', 'stokkart', 'fiyat', 'ekstre', 'siparisgir'].includes(S.route));
       const ic = k === 'yeni' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
       return `<button data-go="${k}" class="${k === 'yeni' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
     }).join('');
     return `<div class="shell">
       <aside class="side"><div class="logo">CLK<small>ÇANTA · YÖNETİM</small></div>
-        <nav class="nav">${nav}<button class="add" data-go="yeni">${ICONS.plus}<span>Yeni ürün</span></button>${esitleBtn()}</nav>
+        <nav class="nav">${nav}<button class="add" data-go="siparisgir" ${S.route === 'siparisgir' ? 'aria-current="page"' : ''}>${ICONS.siparisgir}<span>Sipariş gir</span></button><button class="add" data-go="yeni">${ICONS.plus}<span>Yeni ürün</span></button>${esitleBtn()}</nav>
         <div class="foot"><b>${esc(S.user?.email || '')}</b><button class="link" data-act="logout">Çıkış yap</button></div></aside>
       <header class="mtop"><div class="logo">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
-      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
+      <div class="sheet-more" id="more" hidden><div class="sheet-in">${[['siparisgir', 'Sipariş gir'], ['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
   }
   const head = (eyebrow, title, sub, acts = '') => `<div class="page-h"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="acts">${acts}</div></div>`;
   const skel = () => `<div class="card"><div class="skel" style="height:110px"></div><div class="skel" style="height:240px;margin-top:14px"></div></div>`;

@@ -19,12 +19,13 @@
   }
 
   const deger = (r, a) => (D.taslak[r.kategori] && a in D.taslak[r.kategori] ? D.taslak[r.kategori][a] : r[a]);
-  // alış + oran, seçilen adıma yukarı yuvarlanır
-  const fiyat = (alis, oran) => {
-    if (oran == null || Number.isNaN(oran) || !(alis > 0)) return null;
-    const ham = alis * (1 + oran / 100), adim = Number(D.ayar.yuvarla) || 0;
+  // alış + oran, seçilen adıma yukarı yuvarlanır (Sipariş gir de kullanır)
+  CLK.fiyatla = (alis, oran, yuvarla) => {
+    if (oran == null || Number.isNaN(Number(oran)) || !(alis > 0)) return null;
+    const ham = alis * (1 + Number(oran) / 100), adim = Number(yuvarla) || 0;
     return adim ? Math.ceil(ham / adim - 1e-9) * adim : Math.round(ham * 100) / 100;
   };
+  const fiyat = (alis, oran) => CLK.fiyatla(alis, oran, D.ayar.yuvarla);
 
   const satir = r => {
     const t = D.taslak[r.kategori] || {}, alis = Number(D.ayar.ornek_alis) || 0;
