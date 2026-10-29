@@ -150,7 +150,11 @@
   }
   CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler, []));
   // PDF: liste gizli bir çerçevede çizilir, html2pdf ile A4 PDF olarak indirilir
-  const dosyaAdi = () => `urun-listesi-${(D.bilgi.musteri || 'musteri').toLocaleLowerCase('tr').replace(/[çğıöşü]/g, c => 'cgiosu'['çğıöşü'.indexOf(c)]).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}${D.bilgi.tarih ? '-' + D.bilgi.tarih : ''}.pdf`;
+  // dosya adı: CLKCANTA-SATIŞFATURASI-<fatura no> (celik isteği 29.10.2026; birden çok faturada tarih)
+  const dosyaAdi = () => {
+    const no = D.bilgi.no && !D.bilgi.no.includes(',') ? D.bilgi.no : D.bilgi.tarih.split('-').reverse().join('.');
+    return `CLKCANTA-SATIŞFATURASI${no ? '-' + no.replace(/\s+/g, '') : ''}.pdf`;
+  };
   function indir() {
     return new Promise((tamam, hata) => {
       const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0' });
