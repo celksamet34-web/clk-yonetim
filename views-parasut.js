@@ -155,7 +155,8 @@
       const l = await fonksiyon('liste').catch(e => ({ hata: e.message }));
       const r = await fonksiyon('calis');
       const p = r.parasut || {}, k = r.kontrol || {};
-      const parca = [`Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`, ...(r.silinen?.iptal ? [`Paraşüt'te silinen ${num(r.silinen.iptal)} kayıt sitede geri alındı`] : []),
+      const yeniKat = l.kategori?.eklenen || [];
+      const parca = [...(yeniKat.length ? [`Fiyat kurallarına yeni kategori: ${yeniKat.join(', ')}`] : []), `Siteden Paraşüt'e ${num(r.aktarilan || 0)}`, `Paraşüt'ten siteye ${num(p.satis || 0)} satış, ${num(p.odeme || 0)} tahsilat`, ...(r.silinen?.iptal ? [`Paraşüt'te silinen ${num(r.silinen.iptal)} kayıt sitede geri alındı`] : []),
         k.hata ? 'bakiye kontrolü olmadı' : k.farkli ? `${num(k.farkli)} müşteride bakiye farkı` : `${num(k.toplam || 0)} müşterinin bakiyesi aynı`];
       const hata = [l.hata && 'listeler: ' + l.hata, r.hata && 'site → Paraşüt: ' + r.hata, p.hata && 'Paraşüt → site: ' + p.hata, r.silinen?.hata && 'iptaller: ' + r.silinen.hata].filter(Boolean);
       S.esitleniyor = false;
@@ -163,6 +164,7 @@
     } catch (err) { S.esitleniyor = false; toast('Eşitlenemedi: ' + err.message); }
     // açık sayfalar yeni bilgiyle yenilenir
     for (const k of ['wp', 'ul']) if (S.ui[k]) S.ui[k].musteriler = null;
+    if (S.ui.fk && !Object.keys(S.ui.fk.taslak || {}).length) S.ui.fk.kurallar = null; // Paraşüt'te açılan yeni kategoriler Fiyat kurallarına gelsin
     if (S.ui.ek) { S.ui.ek.musteriler = null; if (S.route === 'ekstre' && S.ui.ek.resim) views.onAct('ekHazirla'); }
     if (S.route === 'eslestirme') await yukle(); else { D.veri = null; render(); }
   }
