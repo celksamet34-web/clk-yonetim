@@ -99,19 +99,27 @@
     return D.urunler.filter(u => { const a = buyuk(u.ad); return k.every(x => a.includes(x)); }).slice(0, 15);
   };
 
+  const sonucHtml = () => {
+    if (!buyuk(D.ara)) return '';
+    const sonuc = aramaSonuc();
+    return `<div class="sg-sonuc">${sonuc.length ? sonuc.map(u => `<button type="button" data-act="sgEkle" data-pid="${u.id}"><span><b>${esc(u.ad)}</b><small>${esc(u.kat || 'Kategorisiz')} · stok ${u.stok}${(D.renkler[u.id] || []).length ? ' · ' + D.renkler[u.id].length + ' renk' : ''}</small></span><em>${fmt(otoFiyat(u).f)} ₺</em></button>`).join('') : `<span>${D.urunler ? 'Eşleşen ürün yok' : 'Ürünler yükleniyor…'}</span>`}</div>`;
+  };
+
   const renkOzet = s => adetler(s).map(r => `${r.renk ? esc(r.renk) + ' ' : ''}<b>${r.adet}</b>`).join(' · ') || '<span class="sg-soluk">Adet yazılmadı</span>';
+  function satirUst(s) {
+    const adet = satirAdet(s), b = birim(s);
+    return `<div class="sg-satir-ad"><b>${esc(s.ad)}</b><small>${renkOzet(s)}</small></div>
+        <div class="sg-satir-adet"><b>${adet}</b><small>adet</small></div>
+        <div class="sg-satir-tutar"><b>${fmt(adet * b)} ₺</b><small>${fmt(b)} ₺ / adet</small></div>`;
+  }
   function satirHtml(s) {
-    const u = urun(s.pid), o = otoFiyat(u), adet = satirAdet(s), b = birim(s);
+    const u = urun(s.pid), o = otoFiyat(u), b = birim(s);
     const renkler = s.renkler.map((r, i) => `<div class="sg-renk"><span class="sg-renk-ad">${r.renk ? esc(r.renk) : 'Renk yok'}</span>
       <input id="sgAdet-${s.pid}-${i}" class="sg-adet" data-pid="${s.pid}" data-i="${i}" inputmode="numeric" value="${esc(r.adet)}" placeholder="0" aria-label="${esc(r.renk || 'Adet')} adedi">
       ${s.renkler.length > 1 || r.renk ? `<button type="button" class="sg-x" data-act="sgRenkSil" data-pid="${s.pid}" data-i="${i}" aria-label="${esc(r.renk || 'Satırı')} kaldır">×</button>` : ''}</div>`).join('');
     const oneri = SIK_RENK.filter(r => !s.renkler.some(x => x.renk === r) && !(D.renkler[s.pid] || []).includes(r)).slice(0, 8);
     return `<div class="sg-satir ${s.acik ? 'acik' : ''}">
-      <div class="sg-satir-ust" data-act="sgAc" data-pid="${s.pid}">
-        <div class="sg-satir-ad"><b>${esc(s.ad)}</b><small>${renkOzet(s)}</small></div>
-        <div class="sg-satir-adet"><b>${adet}</b><small>adet</small></div>
-        <div class="sg-satir-tutar"><b>${fmt(adet * b)} ₺</b><small>${fmt(b)} ₺ / adet</small></div>
-      </div>
+      <div class="sg-satir-ust" data-act="sgAc" data-pid="${s.pid}">${satirUst(s)}</div>
       ${s.acik ? `<div class="sg-satir-alt">
         <div class="sg-renkler">${renkler}</div>
         <div class="sg-renk-ekle"><input id="sgRenk-${s.pid}" data-pid="${s.pid}" placeholder="Renk ekle (yaz, Enter)" aria-label="Yeni renk adı">
@@ -123,28 +131,12 @@
     </div>`;
   }
 
-  views.siparisgir = () => {
-    if (!D.musteriler && !D.urunler && !D.hata && !yukle.basladi) { yukle.basladi = true; yukle(); }
-    const ust = head('Satış', 'Sipariş gir', 'Müşteriyi seçin, ürünü arayıp tıklayın, renklerin adedini yazın. Sipariş sitede müşterinin carisine açılır; Paraşüt\'e tek satış faturası olarak gider (renkler toplanır).');
-    if (D.hata) return ust + `<div class="card empty"><h3>Bilgiler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>`;
-    if (D.sonuc) return ust + `<div class="card sg-tamam"><div class="pill ok">Sipariş açıldı</div><h3>${esc(D.sonuc.kod || 'Sipariş')}</h3>
-      <p>${esc(D.sonuc.musteri)} · ${fmt(D.sonuc.toplam)} ₺</p><p class="sg-soluk">${D.sonuc.teslim ? 'Elden teslim olarak açıldı, 5 dakika içinde Paraşüt\'e satış faturası olur.' : 'Sitede "Kargolandı" yapılınca Paraşüt\'e satış faturası olur.'}</p>
-      <button class="btn dark" data-act="sgYeni">Yeni sipariş</button></div>`;
-    const m = musteri(), sonuc = aramaSonuc(), n = T.satirlar.length, ta = toplamAdet();
-    const musteriKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">1</span><h3>Müşteri</h3></div>
-      ${araKutu('sgMusteri', D.musteriler, m?.ad || '', 'sgMus', { yer: D.musteriler ? `Müşteri adı yazın (${D.musteriler.length} müşteri)` : 'Müşteriler yükleniyor…' })}
-      ${m ? `<div class="sg-mus-bilgi">
-        <label>Fiyat tanımı (★ müşterinin) <select id="sgTip">${TIP.map(([k, l]) => `<option value="${k}" ${tip() === k ? 'selected' : ''}>${l}${k === m.tip ? ' ★' : ''}</option>`).join('')}</select></label>
-        <div><small>İskonto</small><b>%${m.iskonto}</b></div>
-        <div><small>Site bakiyesi</small><b class="${m.bakiye < 0 ? 'sg-borc' : ''}">${fmt(m.bakiye)} ₺</b></div></div>` : ''}
-    </div>`;
-    const urunKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">2</span><h3>Ürünler</h3><span class="sg-soluk">${n ? `${n} ürün · ${ta} adet` : ''}</span></div>
-      <div class="sg-ara"><input id="sgAra" type="search" autocomplete="off" placeholder="${D.urunler ? 'Ürün adı ya da kodu yazın (örn. 4924)' : 'Ürünler yükleniyor…'}" value="${esc(D.ara)}" ${m ? '' : 'disabled'} aria-label="Ürün ara">
-        ${!m ? '<p class="sg-soluk">Önce müşteriyi seçin; fiyatlar müşteriye göre hesaplanır.</p>' : !buyuk(D.ara) ? '' : `<div class="sg-sonuc">${sonuc.length ? sonuc.map(u => `<button type="button" data-act="sgEkle" data-pid="${u.id}"><span><b>${esc(u.ad)}</b><small>${esc(u.kat || 'Kategorisiz')} · stok ${u.stok}${(D.renkler[u.id] || []).length ? ' · ' + D.renkler[u.id].length + ' renk' : ''}</small></span><em>${fmt(otoFiyat(u).f)} ₺</em></button>`).join('') : '<span>Eşleşen ürün yok</span>'}</div>`}</div>
-      <div class="sg-satirlar">${n ? T.satirlar.map(satirHtml).join('') : m ? '<p class="sg-bos">Henüz ürün eklenmedi. Yukarıda arayıp tıklayın.</p>' : ''}</div>
-    </div>`;
+  // telefonda alt çubuk: toplam her an görünür, düğme özete götürür
+  const mbarHtml = () => `<span><small>${T.satirlar.length} ürün · ${toplamAdet()} adet</small><b>${fmt(toplam())} ₺</b></span><button type="button" class="btn dark sm" data-act="sgOzeteGit">Özet ve onay</button>`;
+  function ozetHtml() {
+    const m = musteri(), n = T.satirlar.length, ta = toplamAdet();
     const eksik = !m ? 'Müşteri seçilmedi' : !ta ? 'Adet yazılmadı' : T.satirlar.some(s => !(birim(s) >= 0) || Number.isNaN(birim(s))) ? 'Fiyatı hatalı ürün var' : '';
-    const ozet = `<div class="card sg-ozet"><div class="sg-baslik"><span class="sg-no">3</span><h3>Özet</h3></div>
+    return `<div class="sg-baslik"><span class="sg-no">3</span><h3>Özet</h3></div>
       <dl><div><dt>Müşteri</dt><dd>${m ? esc(m.ad) : '—'}</dd></div><div><dt>Ürün</dt><dd>${n}</dd></div><div><dt>Toplam adet</dt><dd>${ta}</dd></div><div class="sg-genel"><dt>Toplam</dt><dd>${fmt(toplam())} ₺</dd></div></dl>
       <fieldset class="sg-teslim"><legend>Teslimat</legend>
         <label><input type="radio" name="sgTeslim" value="kargo" ${T.teslim ? '' : 'checked'}><span><b>Kargo ile gönderilecek</b><small>Sitede "Kargolandı" yapılınca Paraşüt'e geçer</small></span></label>
@@ -154,24 +146,56 @@
           <div class="sg-onay-dug"><button class="btn" data-act="sgVazgec">Geri dön</button><button class="btn dark" data-act="sgGonder">Onayla, siparişi aç</button></div></div>`
         : `<button class="btn dark sg-olustur" data-act="sgOnay" ${eksik || D.durum ? 'disabled' : ''}>${D.durum === 'gonderiliyor' ? 'Sipariş açılıyor…' : 'Siparişi oluştur'}</button>
           ${eksik ? `<p class="sg-soluk">${eksik}</p>` : ''}`}
-      ${n || m ? '<button class="btn ghost sm" data-act="sgTemizle">Formu temizle</button>' : ''}
+      ${n || m ? '<button class="btn ghost sm" data-act="sgTemizle">Formu temizle</button>' : ''}`;
+  }
+
+  views.siparisgir = () => {
+    if (!D.musteriler && !D.urunler && !D.hata && !yukle.basladi) { yukle.basladi = true; yukle(); }
+    const ust = head('Satış', 'Sipariş gir', 'Müşteriyi seçin, ürünü arayıp tıklayın, renklerin adedini yazın. Sipariş sitede müşterinin carisine açılır; Paraşüt\'e tek satış faturası olarak gider (renkler toplanır).');
+    if (D.hata) return ust + `<div class="card empty"><h3>Bilgiler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>`;
+    if (D.sonuc) return ust + `<div class="card sg-tamam"><div class="pill ok">Sipariş açıldı</div><h3>${esc(D.sonuc.kod || 'Sipariş')}</h3>
+      <p>${esc(D.sonuc.musteri)} · ${fmt(D.sonuc.toplam)} ₺</p><p class="sg-soluk">${D.sonuc.teslim ? 'Elden teslim olarak açıldı, 5 dakika içinde Paraşüt\'e satış faturası olur.' : 'Sitede "Kargolandı" yapılınca Paraşüt\'e satış faturası olur.'}</p>
+      <button class="btn dark" data-act="sgYeni">Yeni sipariş</button></div>`;
+    const m = musteri(), n = T.satirlar.length, ta = toplamAdet();
+    const musteriKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">1</span><h3>Müşteri</h3></div>
+      ${araKutu('sgMusteri', D.musteriler, m?.ad || '', 'sgMus', { yer: D.musteriler ? `Müşteri adı yazın (${D.musteriler.length} müşteri)` : 'Müşteriler yükleniyor…' })}
+      ${m ? `<div class="sg-mus-bilgi">
+        <label>Fiyat tanımı (★ müşterinin) <select id="sgTip">${TIP.map(([k, l]) => `<option value="${k}" ${tip() === k ? 'selected' : ''}>${l}${k === m.tip ? ' ★' : ''}</option>`).join('')}</select></label>
+        <div><small>İskonto</small><b>%${m.iskonto}</b></div>
+        <div><small>Site bakiyesi</small><b class="${m.bakiye < 0 ? 'sg-borc' : ''}">${fmt(m.bakiye)} ₺</b></div></div>` : ''}
     </div>`;
-    return `${ust}<div class="sg-duzen"><div class="sg-sol">${musteriKutu}${urunKutu}</div><div class="sg-sag">${ozet}</div></div>`;
+    const urunKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">2</span><h3>Ürünler</h3><span class="sg-soluk">${n ? `${n} ürün · ${ta} adet` : ''}</span></div>
+      <div class="sg-ara"><input id="sgAra" type="search" autocomplete="off" placeholder="${D.urunler ? 'Ürün adı ya da kodu yazın (örn. 4924)' : 'Ürünler yükleniyor…'}" value="${esc(D.ara)}" ${m ? '' : 'disabled'} aria-label="Ürün ara">
+        ${m ? `<div id="sgSonuc">${sonucHtml()}</div>` : '<p class="sg-soluk">Önce müşteriyi seçin; fiyatlar müşteriye göre hesaplanır.</p>'}</div>
+      <div class="sg-satirlar">${n ? T.satirlar.map(satirHtml).join('') : m ? '<p class="sg-bos">Henüz ürün eklenmedi. Yukarıda arayıp tıklayın.</p>' : ''}</div>
+    </div>`;
+    return `${ust}<div class="sg-duzen"><div class="sg-sol">${musteriKutu}${urunKutu}</div><div class="sg-sag"><div class="card sg-ozet" id="sgOzet">${ozetHtml()}</div></div></div>
+      <div class="sg-mbar" id="sgMbar" ${n ? '' : 'hidden'}>${mbarHtml()}</div>`;
   };
 
   araSec.sgMus = mus => { T.musteri = mus.id; T.tip = null; D.durum = ''; sakla(); D.odak = 'sgAra'; };
 
+  // adet yazılınca yalnız ürünün başlığı ve özet yenilenir; odaktaki kutu yerinde kalır
+  function parcaYenile(s) {
+    const ust = document.querySelector(`.sg-satir-ust[data-pid="${s.pid}"]`); if (ust) ust.innerHTML = satirUst(s);
+    const oz = $('#sgOzet'); if (oz && !oz.contains(document.activeElement)) oz.innerHTML = ozetHtml();
+    const mb = $('#sgMbar'); if (mb) mb.innerHTML = mbarHtml();
+  }
+
   views.bind_siparisgir = () => {
     const ara = $('#sgAra');
-    ara?.addEventListener('input', () => { D.ara = ara.value; clearTimeout(D.t); D.t = setTimeout(() => { S.keepScroll = true; render(); }, 100); });
+    // yazarken sayfa yeniden çizilmez (mobilde her harfte klavye sıfırlanıyor, ekran kayıyordu): yalnız sonuç listesi yenilenir
+    ara?.addEventListener('input', () => { D.ara = ara.value; clearTimeout(D.t); D.t = setTimeout(() => { const k = $('#sgSonuc'); if (k) k.innerHTML = sonucHtml(); }, 80); });
     ara?.addEventListener('keydown', e => { if (e.key === 'Enter') { const ilk = aramaSonuc()[0]; if (ilk) { e.preventDefault(); urunEkle(ilk.id); } } });
     $('#sgTip')?.addEventListener('change', e => { T.tip = Number(e.target.value); sakla(); S.keepScroll = true; render(); });
-    $('#sgNot')?.addEventListener('input', e => { T.not = e.target.value; sakla(); });
-    document.querySelectorAll('input[name=sgTeslim]').forEach(r => r.addEventListener('change', () => { T.teslim = r.value === 'elden'; sakla(); S.keepScroll = true; render(); }));
+    // özet parça parça yenilendiği için olaylar kapsayıcıdan dinlenir
+    const oz = $('#sgOzet');
+    oz?.addEventListener('input', e => { if (e.target.id === 'sgNot') { T.not = e.target.value; sakla(); } });
+    oz?.addEventListener('change', e => { if (e.target.name === 'sgTeslim') { T.teslim = e.target.value === 'elden'; sakla(); oz.innerHTML = ozetHtml(); } });
     const sat = $('.sg-satirlar');
     sat?.addEventListener('input', e => {
       const el = e.target, s = T.satirlar.find(x => x.pid === el.dataset.pid); if (!s) return;
-      if (el.classList.contains('sg-adet')) { s.renkler[+el.dataset.i].adet = el.value.replace(/\D/g, ''); sakla(); clearTimeout(D.t); D.t = setTimeout(() => { S.keepScroll = true; render(); }, 250); }
+      if (el.classList.contains('sg-adet')) { s.renkler[+el.dataset.i].adet = el.value.replace(/\D/g, ''); sakla(); parcaYenile(s); }
     });
     sat?.addEventListener('change', e => {
       const el = e.target, s = T.satirlar.find(x => x.pid === el.dataset.pid); if (!s) return;
@@ -219,6 +243,7 @@
     else if (act === 'sgOnay') { D.durum = 'onay'; S.keepScroll = true; render(); }
     else if (act === 'sgVazgec') { D.durum = ''; S.keepScroll = true; render(); }
     else if (act === 'sgGonder') gonder();
+    else if (act === 'sgOzeteGit') { document.activeElement?.blur(); $('#sgOzet')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     else if (act === 'sgYeni') { D.sonuc = null; render(); }
     else if (act === 'sgTemizle') { T = BOS(); D.durum = ''; sakla(); render(); }
     else prevAct?.(act, el, e);

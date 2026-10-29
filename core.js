@@ -187,14 +187,15 @@ window.CLK = (() => {
     return (liste || []).filter(m => { const a = buyukH(m.ad); return k.every(x => a.includes(x)); })
       .sort((a, b) => buyukH(b.ad).startsWith(bas) - buyukH(a.ad).startsWith(bas) || a.ad.localeCompare(b.ad, 'tr')).slice(0, 12);
   }
+  const araAlt = (st, liste) => !st.acik || !buyukH(st.q) ? '' : !liste ? '<div class="ara-oneri"><span>Liste yükleniyor…</span></div>'
+    : st.sonuc.length ? `<div class="ara-oneri" role="listbox">${st.sonuc.map((m, i) => `<button type="button" role="option" data-ara-sec="${i}">${esc(m.ad)}</button>`).join('')}</div>`
+    : '<div class="ara-oneri"><span>Eşleşen kayıt yok</span></div>';
   function araKutu(id, liste, seciliAd, grup, { yer = 'Müşteri adı yazın', sinif = '', ek = '' } = {}) {
     const st = ARA[id] ||= { q: null, acik: false };
     const deger = st.q ?? seciliAd ?? '';
     const sonuc = st.acik ? eslesen(liste, st.q) : [];
     st.sonuc = sonuc; st.liste = liste;
-    const altta = !st.acik || !buyukH(st.q) ? '' : !liste ? '<div class="ara-oneri"><span>Liste yükleniyor…</span></div>'
-      : sonuc.length ? `<div class="ara-oneri" role="listbox">${sonuc.map((m, i) => `<button type="button" role="option" data-ara-sec="${i}">${esc(m.ad)}</button>`).join('')}</div>`
-      : '<div class="ara-oneri"><span>Eşleşen kayıt yok</span></div>';
+    const altta = araAlt(st, liste);
     return `<div class="ara-kutu" data-ara="${esc(id)}" data-ara-grup="${esc(grup)}" ${ek}><input id="${esc(id)}" class="${sinif}" type="search" autocomplete="off" placeholder="${esc(yer)}" value="${esc(deger)}">${altta}</div>`;
   }
   function araSecildi(kutu, m) {
@@ -205,7 +206,11 @@ window.CLK = (() => {
   document.addEventListener('input', e => {
     const kutu = e.target.closest?.('.ara-kutu'); if (!kutu || e.target.tagName !== 'INPUT') return;
     const st = ARA[kutu.dataset.ara]; st.q = e.target.value; st.acik = true;
-    clearTimeout(st.t); st.t = setTimeout(() => { S.keepScroll = true; render(); }, 120);
+    // yalnız öneri listesi yenilenir: kutu yeniden çizilirse mobilde klavye sıfırlanıp ekran kayıyor
+    clearTimeout(st.t); st.t = setTimeout(() => {
+      st.sonuc = eslesen(st.liste, st.q); kutu.querySelector('.ara-oneri')?.remove();
+      kutu.insertAdjacentHTML('beforeend', araAlt(st, st.liste));
+    }, 120);
   });
   document.addEventListener('keydown', e => {
     const kutu = e.target.closest?.('.ara-kutu'); if (!kutu || e.key !== 'Enter') return;

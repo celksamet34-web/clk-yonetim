@@ -601,3 +601,12 @@ body{font-size:15.5px;letter-spacing:0}
 .sg-satir-alt>*{min-width:0}
 .sg-renkler{grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr))}
 @media (max-width:560px){.sg-renkler{grid-template-columns:minmax(0,1fr)}.sg-renk{padding-left:10px}.sg-renk input.sg-adet{width:52px}.sg-renk-ekle input{max-width:none}}
+
+/* Sipariş gir: telefonda toplam alt çubukta */
+.sg-mbar{display:none}
+@media (max-width:900px){
+  .sg-mbar:not([hidden]){display:flex;position:fixed;left:0;right:0;bottom:calc(68px + env(safe-area-inset-bottom));z-index:39;align-items:center;justify-content:space-between;gap:12px;padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));background:#fff;border-top:1px solid var(--line-2);box-shadow:0 -8px 24px rgba(20,24,40,.08)}
+  .sg-mbar span{display:grid;gap:1px}.sg-mbar small{font-size:12px;color:var(--muted)}.sg-mbar b{font-size:18px;font-variant-numeric:tabular-nums}
+  .sg-duzen{padding-bottom:64px}
+  #sgOzet{scroll-margin-top:76px}
+}
