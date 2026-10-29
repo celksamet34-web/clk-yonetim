@@ -4,7 +4,7 @@
   --line:#e8e3db; --line-2:#d8d0c3; --bg:#f6f4f0; --card:#fff; --sunk:#f0ece6;
   --gold:#b48f55; --gold-2:#d6bd8f; --gold-soft:#f6efe3; --gold-ink:#6a5226;
   --ok:#3b7656; --ok-soft:#e6f0ea; --warn:#9a6a18; --warn-soft:#f8eedb; --bad:#a1372d; --bad-soft:#f8e4e1;
-  --f-d:"Playfair Display",Georgia,"Times New Roman",serif; --f-b:"Lora",Georgia,"Times New Roman",serif;
+  --f-d:"Playfair Display",Georgia,"Times New Roman",serif; --f-b:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   --r:18px; --tap:48px; --side:248px;
   --sh:0 1px 2px rgba(18,17,16,.04),0 16px 36px -22px rgba(18,17,16,.22);
 }
@@ -218,7 +218,7 @@ table.tbl{width:100%;border-collapse:collapse;min-width:760px}
 .toggle{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .desc-pv{border:1px solid var(--line-2);border-radius:14px;padding:16px 18px;background:#fff;font-size:14px;line-height:1.6;color:var(--ink)}
 .desc-pv-h{display:block;font:700 11px var(--f-b);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.desc-pv h3{font:600 17px "Playfair Display",Georgia,serif;margin:14px 0 6px}
+.desc-pv h3{font:600 17px var(--f-d);margin:14px 0 6px}
 .desc-pv p{margin:0 0 8px}.desc-pv ul{margin:0;padding-left:18px}.desc-pv li{margin:2px 0}
 .toggle input{width:20px;height:20px;accent-color:var(--ink)}
 
@@ -307,11 +307,13 @@ table.tbl{width:100%;border-collapse:collapse;min-width:760px}
 .side .foot .link{color:#bfa775;text-align:left}
 @media(max-width:900px){.kpi .v{font-size:30px}.kpi.hero .v{font-size:38px}}
 
-/* klasik yazı tipi ayarları */
-body{font-size:15.5px;letter-spacing:0}
-.btn,.chip,.nav button,.mnav button,.pill,.f>span,.kpi .k,.mini-kpis span,.tbl th,.page-h .eyebrow,.step-h .no,.shot .lb,.info2 span{font-family:"Lora",Georgia,serif}
+/* yazı tipi ayarları: başlıklar Playfair, metin Inter */
+body{font-size:15px;letter-spacing:0}
+.btn,.chip,.nav button,.mnav button,.pill,.f>span,.kpi .k,.mini-kpis span,.tbl th,.page-h .eyebrow,.step-h .no,.shot .lb,.info2 span{font-family:var(--f-b)}
 .f>span,.kpi .k,.mini-kpis span,.tbl th,.page-h .eyebrow,.info2 span{letter-spacing:.12em}
-.kpi .v,.mini-kpis b,.pc .pr,.page-h h1,.card h3,.cat-h h2,.step-h h2,.sum-card h3,.sum-card .big,.logo,.auth-art h1,.auth-box h2{font-family:"Playfair Display",Georgia,serif;font-weight:600}
+.page-h h1,.card h3,.cat-h h2,.step-h h2,.sum-card h3,.logo,.auth-art h1,.auth-box h2{font-family:var(--f-d);font-weight:600}
+/* rakamlar metin yazı tipiyle, hizalı (celik isteği 29.10.2026) */
+.kpi .v,.mini-kpis b,.pc .pr,.sum-card .big{font-family:var(--f-b);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .page-h h1{letter-spacing:-.01em}
 /* kategori kutuları */
 .ctiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
@@ -321,7 +323,7 @@ body{font-size:15.5px;letter-spacing:0}
 .ctile::after{content:"";position:absolute;right:-28px;top:-28px;width:80px;height:80px;border-radius:50%;border:1px solid var(--gold-2);opacity:.35}
 .ctile:hover{border-color:var(--gold);box-shadow:var(--sh);transform:translateY(-1px)}
 .ctile .cp{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.ctile b{font:600 19px/1.2 "Playfair Display",Georgia,serif;color:var(--ink);overflow-wrap:anywhere}
+.ctile b{font:600 19px/1.2 var(--f-d);color:var(--ink);overflow-wrap:anywhere}
 .ctile .cm{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
 .ctile .cf{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .ctile .cv{font-weight:700;color:var(--gold-ink);font-size:13px}
@@ -342,7 +344,7 @@ body{font-size:15.5px;letter-spacing:0}
 .gal-strip img{width:100%;height:100%;object-fit:cover}
 /* kategori yolu */
 .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-8px 0 16px;font-size:13px}
-.crumbs button{border:0;background:none;padding:4px 2px;color:var(--gold-ink);cursor:pointer;font:600 13px "Lora",Georgia,serif;text-decoration:underline;text-underline-offset:3px}
+.crumbs button{border:0;background:none;padding:4px 2px;color:var(--gold-ink);cursor:pointer;font:600 13px var(--f-b);text-decoration:underline;text-underline-offset:3px}
 .crumbs button[aria-current=page]{color:var(--ink);text-decoration:none}
 .crumbs span{color:var(--muted-2)}
 .gal-main img{width:100%;height:100%}
