@@ -125,7 +125,7 @@
         <div class="sg-renk-ekle"><input id="sgRenk-${s.pid}" data-pid="${s.pid}" placeholder="Renk ekle (yaz, Enter)" aria-label="Yeni renk adı">
           ${oneri.map(r => `<button type="button" class="chip" data-act="sgRenkEkle" data-pid="${s.pid}" data-renk="${esc(r)}">+ ${esc(r)}</button>`).join('')}</div>
         <div class="sg-fiyat"><label>Birim fiyat <input id="sgFiyat-${s.pid}" class="sg-fiyat-in ${s.fiyat != null ? 'elle' : ''}" data-pid="${s.pid}" inputmode="decimal" value="${String(b).replace('.', ',')}"> ₺</label>
-          <small>${s.fiyat != null ? `Elle girildi. Hesaplanan ${fmt(o.f)} ₺ (${esc(o.kaynak)}) <button type="button" class="sg-link" data-act="sgOto" data-pid="${s.pid}">Hesaplanana dön</button>` : esc(o.kaynak)}${u ? ` · Paraşüt stok ${u.stok}` : ''}</small></div>
+          <small>${s.fiyat != null ? `Elle girildi.${D.gizli ? ` Hesaplanan ${fmt(o.f)} ₺ (${esc(o.kaynak)})` : ''} <button type="button" class="sg-link" data-act="sgOto" data-pid="${s.pid}">Hesaplanana dön</button>` : D.gizli ? esc(o.kaynak) : ''}${u ? `${s.fiyat != null || D.gizli ? ' · ' : ''}Paraşüt stok ${u.stok}` : ''}</small></div>
         <div class="sg-satir-dug"><button type="button" class="btn sm danger" data-act="sgSil" data-pid="${s.pid}">Ürünü çıkar</button><button type="button" class="btn sm" data-act="sgKapat" data-pid="${s.pid}">Tamam</button></div>
       </div>` : ''}
     </div>`;
@@ -159,10 +159,11 @@
     const m = musteri(), n = T.satirlar.length, ta = toplamAdet();
     const musteriKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">1</span><h3>Müşteri</h3></div>
       ${araKutu('sgMusteri', D.musteriler, m?.ad || '', 'sgMus', { yer: D.musteriler ? `Müşteri adı yazın (${D.musteriler.length} müşteri)` : 'Müşteriler yükleniyor…' })}
-      ${m ? `<div class="sg-mus-bilgi">
+      ${m ? `<button type="button" class="sg-gizli-dug" data-act="sgGizli" aria-expanded="${D.gizli ? 'true' : 'false'}">${D.gizli ? 'Ayrıntıları gizle ▴' : 'Ayrıntılar ▾'}</button>
+        ${D.gizli ? `<div class="sg-mus-bilgi">
         <label>Fiyat tanımı (★ müşterinin) <select id="sgTip">${TIP.map(([k, l]) => `<option value="${k}" ${tip() === k ? 'selected' : ''}>${l}${k === m.tip ? ' ★' : ''}</option>`).join('')}</select></label>
         <div><small>İskonto</small><b>%${m.iskonto}</b></div>
-        <div><small>Site bakiyesi</small><b class="${m.bakiye < 0 ? 'sg-borc' : ''}">${fmt(m.bakiye)} ₺</b></div></div>` : ''}
+        <div><small>Site bakiyesi</small><b class="${m.bakiye < 0 ? 'sg-borc' : ''}">${fmt(m.bakiye)} ₺</b></div></div>` : ''}` : ''}
     </div>`;
     const urunKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">2</span><h3>Ürünler</h3><span class="sg-soluk">${n ? `${n} ürün · ${ta} adet` : ''}</span></div>
       <div class="sg-ara"><input id="sgAra" type="search" autocomplete="off" placeholder="${D.urunler ? 'Ürün adı ya da kodu yazın (örn. 4924)' : 'Ürünler yükleniyor…'}" value="${esc(D.ara)}" ${m ? '' : 'disabled'} aria-label="Ürün ara">
@@ -173,7 +174,7 @@
       <div class="sg-mbar" id="sgMbar" ${n ? '' : 'hidden'}>${mbarHtml()}</div>`;
   };
 
-  araSec.sgMus = mus => { T.musteri = mus.id; T.tip = null; D.durum = ''; sakla(); D.odak = 'sgAra'; };
+  araSec.sgMus = mus => { D.gizli = false; T.musteri = mus.id; T.tip = null; D.durum = ''; sakla(); D.odak = 'sgAra'; };
 
   // adet yazılınca yalnız ürünün başlığı ve özet yenilenir; odaktaki kutu yerinde kalır
   function parcaYenile(s) {
@@ -243,6 +244,8 @@
     else if (act === 'sgOnay') { D.durum = 'onay'; S.keepScroll = true; render(); }
     else if (act === 'sgVazgec') { D.durum = ''; S.keepScroll = true; render(); }
     else if (act === 'sgGonder') gonder();
+    // fiyat tanımı, iskonto, bakiye ve fiyatın kaynağı müşterinin yanında görünmesin diye kapalı gelir
+    else if (act === 'sgGizli') { D.gizli = !D.gizli; S.keepScroll = true; render(); }
     else if (act === 'sgOzeteGit') { document.activeElement?.blur(); $('#sgOzet')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     else if (act === 'sgYeni') { D.sonuc = null; render(); }
     else if (act === 'sgTemizle') { T = BOS(); D.durum = ''; sakla(); render(); }

@@ -610,3 +610,5 @@ body{font-size:15.5px;letter-spacing:0}
   .sg-duzen{padding-bottom:64px}
   #sgOzet{scroll-margin-top:76px}
 }
+.sg-gizli-dug{all:unset;cursor:pointer;margin-top:10px;font-size:12px;font-weight:600;color:var(--muted);padding:4px 0}
+.sg-gizli-dug:hover{color:var(--ink)}
