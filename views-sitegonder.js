@@ -13,6 +13,22 @@
   const buyuk = s => String(s || '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('tr');
   const anahtar = a => buyuk(a).replace(/İ/g, 'I');
   const katAd = u => u.kat || 'KATEGORİSİZ';
+  // fiyat kutusunun altındaki kâr: alışa göre yüzde ve tutar (celik isteği 29.10.2026)
+  const kar = (alis, f) => {
+    if (!(alis > 0) || !(f > 0)) return { yazi: '', zarar: false };
+    const k = f - alis;
+    return { yazi: `%${fmt(Math.round(k / alis * 1000) / 10)} · ${k > 0 ? '+' : ''}${fmt(k)} ₺`, zarar: k < 0 };
+  };
+  // yazarken satırdaki kâr yazıları hemen yenilenir (kutudan çıkmayı beklemez)
+  const karGuncelle = tr => {
+    const oku = a => { const n = sayi(tr.querySelector(`input[data-a="${a}"]`)?.value); return n > 0 ? n : 0; };
+    const alis = oku('alis'), b1 = oku('b1');
+    for (const [a] of FIYAT) {
+      const el = tr.querySelector(`[data-kar="${a}"]`); if (!el) continue;
+      const k = kar(alis, oku(a) || (a !== 'site' ? b1 : 0));
+      el.textContent = k.yazi; el.classList.toggle('sg-zarar', k.zarar);
+    }
+  };
 
   async function sor(govde) {
     const { data } = await sb.auth.getSession();
@@ -105,7 +121,8 @@
     const fiyatKutu = a => {
       const v = deger(u, a), gerek = sec && ((a === 'b1' && ek.includes('Bayi 1')) || (a === 'site' && ek.includes('site fiyatı')));
       const yer = a === 'b1' || a === 'site' ? 'Gerekli' : deger(u, 'b1') > 0 ? '= ' + fmt(deger(u, 'b1')) : '= Bayi 1';
-      return `<td><input class="sk-in sk-num ${a in t ? 'sk-deg' : ''} ${gerek ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="${a}" value="${v > 0 ? String(v).replace('.', ',') : ''}" placeholder="${esc(yer)}" inputmode="decimal" aria-label="${a} ${esc(u.ad)}"></td>`;
+      const k = kar(Number(deger(u, 'alis')) || 0, fiyat(u, a));
+      return `<td><input class="sk-in sk-num ${a in t ? 'sk-deg' : ''} ${gerek ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="${a}" value="${v > 0 ? String(v).replace('.', ',') : ''}" placeholder="${esc(yer)}" inputmode="decimal" aria-label="${a} ${esc(u.ad)}"><small class="sg-kar ${k.zarar ? 'sg-zarar' : ''}" data-kar="${a}" title="Alışa göre kâr oranı ve kâr">${k.yazi}</small></td>`;
     };
     const durum = s?.hata ? `<span class="pill bad" title="${esc(s.hata)}">${esc(s.hata.length > 40 ? s.hata.slice(0, 40) + '…' : s.hata)}</span>`
       : s?.id ? `<span class="pill ok">${s.yeni ? 'Sitede açıldı' : 'Güncellendi'}${s.acik ? '' : ' (gizli)'}</span>`
@@ -126,7 +143,7 @@
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
     if (!D.kats && !D.katYuk) katYukle();
     const acts = `<button class="btn" data-act="sgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
-    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
+    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = D.kats || [];
     const katSecenek = kats.map(c => `<option value="${c.id}">${esc(c.path)}</option>`).join('');
@@ -170,6 +187,7 @@
       const { error } = await sb.from('fiyat_ayar').upsert({ ad: 'site_kategori', deger: D.katEs, guncel: new Date().toISOString() });
       if (error) toast('Kategori eşleştirmesi kaydedilemedi: ' + error.message);
     }));
+    $('.sg-tablo')?.addEventListener('input', e => { const a = e.target.dataset.a; if (a === 'alis' || FIYAT.some(([f]) => f === a)) karGuncelle(e.target.closest('tr')); });
     $('.sg-tablo')?.addEventListener('change', e => {
       const el = e.target, bul = id => D.urunler.find(u => u.id === id);
       if (el.dataset.sec) { el.checked ? D.secili.add(el.dataset.sec) : D.secili.delete(el.dataset.sec); }

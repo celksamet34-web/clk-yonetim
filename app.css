@@ -636,4 +636,6 @@ body{font-size:15px;letter-spacing:0}
 .ul-tablo .sg-tablo .sk-num{width:84px}
 .sg-tablo td:nth-child(3),.sg-tablo th:nth-child(3),.sg-tablo td:nth-child(9),.sg-tablo th:nth-child(9),.sg-tablo th:last-child{text-align:left}
 .ul-tablo select.fk-uyari{border-color:#d97706;background:#fff4e5}
+.sg-kar{display:block;text-align:right;color:var(--muted);font-size:11.5px;margin-top:3px;white-space:nowrap;font-variant-numeric:tabular-nums;min-height:14px}
+.sg-kar.sg-zarar{color:var(--bad);font-weight:600}
 .fk-hepsi td{background:var(--gold-soft)}
