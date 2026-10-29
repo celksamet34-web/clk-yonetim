@@ -3,7 +3,7 @@
   const { sb, S, $, esc, num, dtt, toast, head, views, render, loadProducts, loadCategories, P } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const FIYAT = [['b1', 'Bayi 1'], ['b2', 'Bayi 2'], ['b3', 'Bayi 3'], ['b4', 'Bayi 4'], ['site', 'Site']];
-  const D = (S.ui.sg ||= { urunler: null, zaman: '', yukleniyor: '', hata: '', kurallar: null, yuvarla: '1', katEs: {}, katYuk: false, filtre: 'yok', pkat: '', ara: '', goster: 100, secili: new Set(), gonderiyor: false, ilerleme: '', sonuc: {} });
+  const D = (S.ui.stg ||= { urunler: null, zaman: '', yukleniyor: '', hata: '', kurallar: null, yuvarla: '1', katEs: {}, katYuk: false, filtre: 'yok', pkat: '', ara: '', goster: 100, secili: new Set(), gonderiyor: false, ilerleme: '', sonuc: {} });
   // kaydedilmemiş değişiklikler: { paraşüt id: { ad?, kat?, b1?…, site?, acik? } }, sayfa yenilenince kaybolmasın
   let taslak = {};
   try { taslak = JSON.parse(localStorage.getItem('clk-sitegonder-taslak') || '{}'); } catch {}
@@ -26,7 +26,7 @@
     for (const [a] of FIYAT) {
       const el = tr.querySelector(`[data-kar="${a}"]`); if (!el) continue;
       const k = kar(alis, oku(a) || (a !== 'site' ? b1 : 0));
-      el.textContent = k.yazi; el.classList.toggle('sg-zarar', k.zarar);
+      el.textContent = k.yazi; el.classList.toggle('stg-zarar', k.zarar);
     }
   };
 
@@ -122,16 +122,16 @@
       const v = deger(u, a), gerek = sec && ((a === 'b1' && ek.includes('Bayi 1')) || (a === 'site' && ek.includes('site fiyatı')));
       const yer = a === 'b1' || a === 'site' ? 'Gerekli' : deger(u, 'b1') > 0 ? '= ' + fmt(deger(u, 'b1')) : '= Bayi 1';
       const k = kar(Number(deger(u, 'alis')) || 0, fiyat(u, a));
-      return `<td><input class="sk-in sk-num ${a in t ? 'sk-deg' : ''} ${gerek ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="${a}" value="${v > 0 ? String(v).replace('.', ',') : ''}" placeholder="${esc(yer)}" inputmode="decimal" aria-label="${a} ${esc(u.ad)}"><small class="sg-kar ${k.zarar ? 'sg-zarar' : ''}" data-kar="${a}" title="Alışa göre kâr oranı ve kâr">${k.yazi}</small></td>`;
+      return `<td><input class="sk-in sk-num ${a in t ? 'sk-deg' : ''} ${gerek ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="${a}" value="${v > 0 ? String(v).replace('.', ',') : ''}" placeholder="${esc(yer)}" inputmode="decimal" aria-label="${a} ${esc(u.ad)}"><small class="stg-kar ${k.zarar ? 'stg-zarar' : ''}" data-kar="${a}" title="Alışa göre kâr oranı ve kâr">${k.yazi}</small></td>`;
     };
     const durum = s?.hata ? `<span class="pill bad" title="${esc(s.hata)}">${esc(s.hata.length > 40 ? s.hata.slice(0, 40) + '…' : s.hata)}</span>`
       : s?.id ? `<span class="pill ok">${s.yeni ? 'Sitede açıldı' : 'Güncellendi'}${s.acik ? '' : ' (gizli)'}</span>`
       : p ? `<span class="pill ${P.on(p) ? 'ok' : 'off'}">Sitede ${P.on(p) ? 'açık' : 'gizli'}</span>` : '<span class="pill info">Sitede yok</span>';
     return `<tr class="${Object.keys(t).length ? 'sk-satir-deg' : ''}">
       <td><input type="checkbox" data-sec="${u.id}" ${sec ? 'checked' : ''} aria-label="Seç ${esc(u.ad)}"></td>
-      <td class="sg-urun"><input class="sk-in sk-ad-in ${'ad' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="ad" value="${esc(deger(u, 'ad'))}" aria-label="Sitedeki adı ${esc(u.ad)}">
+      <td class="stg-urun"><input class="sk-in sk-ad-in ${'ad' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="ad" value="${esc(deger(u, 'ad'))}" aria-label="Sitedeki adı ${esc(u.ad)}">
         <small>${esc(katAd(u))} · stok ${fmt(u.stok)}${p ? ' · ' + esc(p.code) : ''}</small></td>
-      <td><select class="sg-kat ${'kat' in t ? 'sk-deg' : ''} ${sec && ek.includes('site kategorisi') ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="kat" aria-label="Site kategorisi ${esc(u.ad)}"><option value="">${p ? 'Değiştirme' : 'Kategori seç'}</option>${kat ? katSecenek.replace(`value="${kat}"`, `value="${kat}" selected`) : katSecenek}</select></td>
+      <td><select class="stg-kat ${'kat' in t ? 'sk-deg' : ''} ${sec && ek.includes('site kategorisi') ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="kat" aria-label="Site kategorisi ${esc(u.ad)}"><option value="">${p ? 'Değiştirme' : 'Kategori seç'}</option>${kat ? katSecenek.replace(`value="${kat}"`, `value="${kat}" selected`) : katSecenek}</select></td>
       <td><input class="sk-in sk-num ${'alis' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="alis" value="${deger(u, 'alis') > 0 ? String(deger(u, 'alis')).replace('.', ',') : ''}" placeholder="—" inputmode="decimal" aria-label="Alış ${esc(u.ad)}"></td>
       ${FIYAT.map(([a]) => fiyatKutu(a)).join('')}
       <td><label class="sk-arsiv"><input type="checkbox" data-acik="${u.id}" ${deger(u, 'acik') ? 'checked' : ''}>Açık</label></td>
@@ -142,9 +142,9 @@
     if (!D.urunler && !D.yukleniyor && !D.hata) yukle(false);
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
     if (!D.kats && !D.katYuk) katYukle();
-    const acts = `<button class="btn" data-act="sgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
+    const acts = `<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
     const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
-    if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
+    if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="stgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = D.kats || [];
     const katSecenek = kats.map(c => `<option value="${c.id}">${esc(c.path)}</option>`).join('');
     const liste = gorunen(), pk = pKategoriler(), n = Object.keys(taslak).length;
@@ -152,34 +152,34 @@
     return `${ust}
       <div class="card">
         <div class="sk-arac"><b>Kategori eşleştirme</b><span class="sk-say">Paraşüt kategorisindeki ürünler sitede bu kategoriye girer. Satırda ayrıca değiştirebilirsiniz.</span></div>
-        ${kats.length ? `<div class="sg-es">${pk.map(([k, c]) => `<label><b>${esc(k)} <small>(${num(c)})</small></b><select data-katesle="${esc(k)}"><option value="">Seçilmedi</option>${D.katEs[k] ? katSecenek.replace(`value="${D.katEs[k]}"`, `value="${D.katEs[k]}" selected`) : katSecenek}</select></label>`).join('')}</div>`
+        ${kats.length ? `<div class="stg-es">${pk.map(([k, c]) => `<label><b>${esc(k)} <small>(${num(c)})</small></b><select data-katesle="${esc(k)}"><option value="">Seçilmedi</option>${D.katEs[k] ? katSecenek.replace(`value="${D.katEs[k]}"`, `value="${D.katEs[k]}" selected`) : katSecenek}</select></label>`).join('')}</div>`
           : `<p class="sk-say">${D.kats ? 'Sitede kategori bulunamadı; önce Qukasoft panelinde kategori açın.' : 'Site kategorileri okunuyor…'}</p>`}
       </div>
-      <div class="sk-filtre">${Object.entries(FILTRE).map(([k, [ad, f]]) => `<button class="sk-f" data-act="sgFiltre" data-k="${k}" aria-pressed="${D.filtre === k}"><b>${num(D.urunler.filter(f).length)}</b><small>${ad}</small></button>`).join('')}</div>
+      <div class="sk-filtre">${Object.entries(FILTRE).map(([k, [ad, f]]) => `<button class="sk-f" data-act="stgFiltre" data-k="${k}" aria-pressed="${D.filtre === k}"><b>${num(D.urunler.filter(f).length)}</b><small>${ad}</small></button>`).join('')}</div>
       <div class="card">
         ${siteDurum ? `<p class="sk-say">${siteDurum}</p>` : ''}
-        <div class="sk-arac"><input id="sgAra" type="search" placeholder="Ürün ara" value="${esc(D.ara)}" aria-label="Ürün ara">
-          <select id="sgPkat" class="sg-kat" aria-label="Paraşüt kategorisi"><option value="">Tüm Paraşüt kategorileri</option>${pk.map(([k, c]) => `<option value="${esc(k)}" ${D.pkat === k ? 'selected' : ''}>${esc(k)} (${num(c)})</option>`).join('')}</select>
+        <div class="sk-arac"><input id="stgAra" type="search" placeholder="Ürün ara" value="${esc(D.ara)}" aria-label="Ürün ara">
+          <select id="stgPkat" class="stg-kat" aria-label="Paraşüt kategorisi"><option value="">Tüm Paraşüt kategorileri</option>${pk.map(([k, c]) => `<option value="${esc(k)}" ${D.pkat === k ? 'selected' : ''}>${esc(k)} (${num(c)})</option>`).join('')}</select>
           <span class="sk-say">${num(liste.length)} ürün</span></div>
         <div class="sk-arac">
-          <button class="btn" data-act="sgHepsiSec" ${liste.length ? '' : 'disabled'}>Listedeki ${num(liste.length)} ürünü seç</button>
-          <button class="btn" data-act="sgSecBos" ${D.secili.size ? '' : 'disabled'}>Seçimi kaldır</button>
-          <button class="btn" data-act="sgKural" ${D.secili.size ? '' : 'disabled'} title="Seçilenlerin fiyatını Fiyat kurallarındaki oranla yeniden yazar">Seçilenlere kural fiyatı</button>
-          <button class="btn" data-act="sgAcik" data-v="1" ${D.secili.size ? '' : 'disabled'}>Seçilenleri açık yap</button>
-          <button class="btn" data-act="sgAcik" data-v="0" ${D.secili.size ? '' : 'disabled'}>Seçilenleri gizli yap</button></div>
-        <div class="ul-tablo"><table class="sk-tablo sg-tablo"><thead><tr><th><input type="checkbox" id="sgHepsi" aria-label="Görünenlerin hepsini seç" ${liste.length && liste.slice(0, D.goster).every(u => D.secili.has(u.id)) ? 'checked' : ''}></th><th>Ürün (sitedeki adı)</th><th>Site kategorisi</th><th title="Değişirse Paraşüt'e de yazılır">Alış</th>${FIYAT.map(([, l]) => `<th>${l}</th>`).join('')}<th>Sitede</th><th>Durum</th></tr></thead>
+          <button class="btn" data-act="stgHepsiSec" ${liste.length ? '' : 'disabled'}>Listedeki ${num(liste.length)} ürünü seç</button>
+          <button class="btn" data-act="stgSecBos" ${D.secili.size ? '' : 'disabled'}>Seçimi kaldır</button>
+          <button class="btn" data-act="stgKural" ${D.secili.size ? '' : 'disabled'} title="Seçilenlerin fiyatını Fiyat kurallarındaki oranla yeniden yazar">Seçilenlere kural fiyatı</button>
+          <button class="btn" data-act="stgAcik" data-v="1" ${D.secili.size ? '' : 'disabled'}>Seçilenleri açık yap</button>
+          <button class="btn" data-act="stgAcik" data-v="0" ${D.secili.size ? '' : 'disabled'}>Seçilenleri gizli yap</button></div>
+        <div class="ul-tablo"><table class="sk-tablo stg-tablo"><thead><tr><th><input type="checkbox" id="stgHepsi" aria-label="Görünenlerin hepsini seç" ${liste.length && liste.slice(0, D.goster).every(u => D.secili.has(u.id)) ? 'checked' : ''}></th><th>Ürün (sitedeki adı)</th><th>Site kategorisi</th><th title="Değişirse Paraşüt'e de yazılır">Alış</th>${FIYAT.map(([, l]) => `<th>${l}</th>`).join('')}<th>Sitede</th><th>Durum</th></tr></thead>
           <tbody>${liste.length ? liste.slice(0, D.goster).map(u => satir(u, katSecenek)).join('') : '<tr><td colspan="11" class="sk-bos">Bu filtrede ürün yok.</td></tr>'}</tbody></table></div>
-        ${liste.length > D.goster ? `<div class="ek-dug"><button class="btn" data-act="sgDaha">Daha fazla göster (${num(liste.length - D.goster)} kaldı)</button></div>` : ''}
+        ${liste.length > D.goster ? `<div class="ek-dug"><button class="btn" data-act="stgDaha">Daha fazla göster (${num(liste.length - D.goster)} kaldı)</button></div>` : ''}
       </div>
       <div class="sk-cubuk"><span>${D.secili.size ? `${num(D.secili.size)} ürün seçili` : 'Göndermek için ürün seçin'}${n ? ` · ${num(n)} üründe değişiklik` : ''}</span>${D.ilerleme ? `<span class="sk-durum">${esc(D.ilerleme)}</span>` : ''}
-        <button class="btn" data-act="sgGeriAl" ${n && !D.gonderiyor ? '' : 'disabled'}>Değişiklikleri geri al</button>
-        <button class="btn dark" data-act="sgGonder" ${D.secili.size && !D.gonderiyor ? '' : 'disabled'}>${D.gonderiyor ? 'Gönderiliyor…' : 'Siteye gönder'}</button></div>`;
+        <button class="btn" data-act="stgGeriAl" ${n && !D.gonderiyor ? '' : 'disabled'}>Değişiklikleri geri al</button>
+        <button class="btn dark" data-act="stgGonder" ${D.secili.size && !D.gonderiyor ? '' : 'disabled'}>${D.gonderiyor ? 'Gönderiliyor…' : 'Siteye gönder'}</button></div>`;
   };
 
   views.bind_sitegonder = () => {
-    const ara = $('#sgAra'); ara?.addEventListener('input', () => { D.ara = ara.value; D.goster = 100; clearTimeout(ara.t); ara.t = setTimeout(render, 220); });
-    $('#sgPkat')?.addEventListener('change', e => { D.pkat = e.target.value; D.goster = 100; render(); });
-    $('#sgHepsi')?.addEventListener('change', e => { gorunen().slice(0, D.goster).forEach(u => e.target.checked ? D.secili.add(u.id) : D.secili.delete(u.id)); S.keepScroll = true; render(); });
+    const ara = $('#stgAra'); ara?.addEventListener('input', () => { D.ara = ara.value; D.goster = 100; clearTimeout(ara.t); ara.t = setTimeout(render, 220); });
+    $('#stgPkat')?.addEventListener('change', e => { D.pkat = e.target.value; D.goster = 100; render(); });
+    $('#stgHepsi')?.addEventListener('change', e => { gorunen().slice(0, D.goster).forEach(u => e.target.checked ? D.secili.add(u.id) : D.secili.delete(u.id)); S.keepScroll = true; render(); });
     document.querySelectorAll('[data-katesle]').forEach(el => el.addEventListener('change', async () => {
       const k = el.dataset.katesle;
       if (el.value) D.katEs[k] = el.value; else delete D.katEs[k];
@@ -187,8 +187,8 @@
       const { error } = await sb.from('fiyat_ayar').upsert({ ad: 'site_kategori', deger: D.katEs, guncel: new Date().toISOString() });
       if (error) toast('Kategori eşleştirmesi kaydedilemedi: ' + error.message);
     }));
-    $('.sg-tablo')?.addEventListener('input', e => { const a = e.target.dataset.a; if (a === 'alis' || FIYAT.some(([f]) => f === a)) karGuncelle(e.target.closest('tr')); });
-    $('.sg-tablo')?.addEventListener('change', e => {
+    $('.stg-tablo')?.addEventListener('input', e => { const a = e.target.dataset.a; if (a === 'alis' || FIYAT.some(([f]) => f === a)) karGuncelle(e.target.closest('tr')); });
+    $('.stg-tablo')?.addEventListener('change', e => {
       const el = e.target, bul = id => D.urunler.find(u => u.id === id);
       if (el.dataset.sec) { el.checked ? D.secili.add(el.dataset.sec) : D.secili.delete(el.dataset.sec); }
       else if (el.dataset.acik) degistir(bul(el.dataset.acik), 'acik', el.checked);
@@ -245,19 +245,19 @@
 
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
-    if (act === 'sgYenile') { yukle(true); if (!S.pLoading) loadProducts(true); D.kats = null; katYukle(); }
-    else if (act === 'sgFiltre') { D.filtre = el.dataset.k; D.goster = 100; render(); }
-    else if (act === 'sgDaha') { D.goster += 200; S.keepScroll = true; render(); }
-    else if (act === 'sgHepsiSec') { gorunen().forEach(u => D.secili.add(u.id)); S.keepScroll = true; render(); }
-    else if (act === 'sgSecBos') { D.secili.clear(); S.keepScroll = true; render(); }
-    else if (act === 'sgKural') {
+    if (act === 'stgYenile') { yukle(true); if (!S.pLoading) loadProducts(true); D.kats = null; katYukle(); }
+    else if (act === 'stgFiltre') { D.filtre = el.dataset.k; D.goster = 100; render(); }
+    else if (act === 'stgDaha') { D.goster += 200; S.keepScroll = true; render(); }
+    else if (act === 'stgHepsiSec') { gorunen().forEach(u => D.secili.add(u.id)); S.keepScroll = true; render(); }
+    else if (act === 'stgSecBos') { D.secili.clear(); S.keepScroll = true; render(); }
+    else if (act === 'stgKural') {
       let n = 0;
       for (const id of D.secili) { const u = D.urunler.find(x => x.id === id); if (!u) continue; for (const [a] of FIYAT) { const v = kural(u, a); if (v > 0) { degistir(u, a, v); n++; } } }
       S.keepScroll = true; render(); toast(n ? 'Seçilenlerin fiyatı Fiyat kurallarına göre yazıldı' : 'Seçilenlerin kategorisinde oran girilmemiş');
     }
-    else if (act === 'sgAcik') { for (const id of D.secili) { const u = D.urunler.find(x => x.id === id); if (u) degistir(u, 'acik', el.dataset.v === '1'); } S.keepScroll = true; render(); }
-    else if (act === 'sgGeriAl') { taslak = {}; sakla(); S.keepScroll = true; render(); }
-    else if (act === 'sgGonder') gonder();
+    else if (act === 'stgAcik') { for (const id of D.secili) { const u = D.urunler.find(x => x.id === id); if (u) degistir(u, 'acik', el.dataset.v === '1'); } S.keepScroll = true; render(); }
+    else if (act === 'stgGeriAl') { taslak = {}; sakla(); S.keepScroll = true; render(); }
+    else if (act === 'stgGonder') gonder();
     else prevAct?.(act, el, e);
   };
 })();
