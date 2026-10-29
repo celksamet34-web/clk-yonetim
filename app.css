@@ -623,3 +623,5 @@ body{font-size:15px;letter-spacing:0}
 .sg-mus-degis{all:unset;cursor:pointer;float:right;margin:8px 2px 0;font-size:12px;font-weight:600;color:var(--muted)}.sg-mus-degis:hover{color:var(--bad)}
 .kpi.tikla{cursor:pointer;transition:background .15s}.kpi.tikla:hover{background:rgba(185,148,92,.08)}
 .o-uyari{margin-bottom:16px;border-color:var(--bad);padding:14px 18px}.o-uyari p{margin:0;font-size:14px}
+.sg-renk-ad small{display:block;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.02em}
+.sg-renk-ad small.sg-uyar{color:var(--bad)}

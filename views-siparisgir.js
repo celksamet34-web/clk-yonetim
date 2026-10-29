@@ -53,10 +53,12 @@
   async function yukle() {
     D.hata = ''; D.musteriler = D.urunler = null; render();
     try {
-      const [m, u, k, a, r] = await Promise.all([
+      const [m, u, k, a, r, sr] = await Promise.all([
         musterileriAl(), sor({ islem: 'urunler' }),
-        sb.from('fiyat_kural').select('*'), sb.from('fiyat_ayar').select('ad,deger'), sb.from('urun_renk').select('parasut_id,renkler')
+        sb.from('fiyat_kural').select('*'), sb.from('fiyat_ayar').select('ad,deger'), sb.from('urun_renk').select('parasut_id,renkler'),
+        sor({ islem: 'site_renkler' }).catch(() => ({}))
       ]);
+      D.siteRenk = sr || {};
       D.musteriler = m;
       D.urunler = u.urunler.filter(x => !x[7]).map(([id, ad, alis, satis, stok, , , , kat]) => ({ id: String(id), ad, alis, satis, stok, kat: kat || '' }));
       D.kurallar = Object.fromEntries((k.data || []).map(r => [buyuk(r.kategori), r]));
@@ -80,6 +82,9 @@
     if (isk) { f = Math.round(f * (1 - isk / 100) * 100) / 100; kaynak += `, iskonto %${isk}`; }
     return { f, kaynak };
   }
+  // sitede (Qukasoft) renk tanımlı ürün: yalnız stoktaki renkler gelir (celik isteği 29.10.2026); hiçbiri stokta değilse hepsi
+  const siteRenk = pid => D.siteRenk?.[pid] || [];
+  const stoktaki = pid => { const l = siteRenk(pid), v = l.filter(x => x[1] > 0); return v.length ? v : l; };
   const birim = s => (s.fiyat != null ? s.fiyat : otoFiyat(urun(s.pid)).f);
   const adetler = s => s.renkler.filter(r => Number(r.adet) > 0);
   const satirAdet = s => adetler(s).reduce((t, r) => t + Number(r.adet), 0);
@@ -89,7 +94,7 @@
   function urunEkle(pid) {
     let s = T.satirlar.find(x => x.pid === pid);
     if (!s) {
-      const u = urun(pid), bilinen = D.renkler[pid] || [];
+      const u = urun(pid), site = stoktaki(pid).map(x => x[0]), bilinen = site.length ? site : D.renkler[pid] || [];
       s = { pid, ad: u?.ad || pid, fiyat: null, acik: true, renkler: bilinen.length ? bilinen.map(renk => ({ renk, adet: '' })) : [{ renk: '', adet: '' }] };
       T.satirlar.unshift(s);
     }
@@ -104,7 +109,8 @@
     if (s.renkler.length === 1 && !s.renkler[0].renk && !s.renkler[0].adet) s.renkler = [];
     s.renkler.push({ renk, adet: '' });
     D.odak = `sgAdet-${s.pid}-${s.renkler.length - 1}`; sakla(); S.keepScroll = true; render();
-    // ürünün renkleri hatırlanır, sonraki siparişte hazır gelir
+    // ürünün renkleri hatırlanır, sonraki siparişte hazır gelir (sitede renkleri tanımlı üründe gerekmez)
+    if (siteRenk(s.pid).length) return;
     const liste = [...new Set([...(D.renkler[s.pid] || []), renk])];
     D.renkler[s.pid] = liste;
     const { error } = await sb.from('urun_renk').upsert({ parasut_id: s.pid, renkler: liste, guncel: new Date().toISOString() });
@@ -120,7 +126,7 @@
   const sonucHtml = () => {
     if (!buyuk(D.ara)) return '';
     const sonuc = aramaSonuc();
-    return `<div class="sg-sonuc">${sonuc.length ? sonuc.map(u => `<button type="button" data-act="sgEkle" data-pid="${u.id}"><span><b>${esc(u.ad)}</b><small>${esc(u.kat || 'Kategorisiz')} · stok ${u.stok}${(D.renkler[u.id] || []).length ? ' · ' + D.renkler[u.id].length + ' renk' : ''}</small></span><em>${fmt(otoFiyat(u).f)} ₺</em></button>`).join('') : `<span>${D.urunler ? 'Eşleşen ürün yok' : 'Ürünler yükleniyor…'}</span>`}</div>`;
+    return `<div class="sg-sonuc">${sonuc.length ? sonuc.map(u => `<button type="button" data-act="sgEkle" data-pid="${u.id}"><span><b>${esc(u.ad)}</b><small>${esc(u.kat || 'Kategorisiz')} · stok ${u.stok}${stoktaki(u.id).length ? ' · ' + stoktaki(u.id).length + ' renk sitede' : (D.renkler[u.id] || []).length ? ' · ' + D.renkler[u.id].length + ' renk' : ''}</small></span><em>${fmt(otoFiyat(u).f)} ₺</em></button>`).join('') : `<span>${D.urunler ? 'Eşleşen ürün yok' : 'Ürünler yükleniyor…'}</span>`}</div>`;
   };
 
   const renkOzet = s => adetler(s).map(r => `${r.renk ? esc(r.renk) + ' ' : ''}<b>${r.adet}</b>`).join(' · ') || '<span class="sg-soluk">Adet yazılmadı</span>';
@@ -132,7 +138,9 @@
   }
   function satirHtml(s) {
     const u = urun(s.pid), o = otoFiyat(u), b = birim(s);
-    const renkler = s.renkler.map((r, i) => `<div class="sg-renk"><span class="sg-renk-ad">${r.renk ? esc(r.renk) : 'Renk yok'}</span>
+    const site = siteRenk(s.pid), stok = Object.fromEntries(site.map(x => [x[0], x[1]]));
+    const renkNot = r => !site.length ? '' : !(r.renk in stok) ? '<small class="sg-uyar">sitede yok</small>' : `<small class="${Number(r.adet) > stok[r.renk] ? 'sg-uyar' : ''}">stok ${stok[r.renk]}</small>`;
+    const renkler = s.renkler.map((r, i) => `<div class="sg-renk"><span class="sg-renk-ad">${r.renk ? esc(r.renk) : 'Renk yok'}${renkNot(r)}</span>
       <input id="sgAdet-${s.pid}-${i}" class="sg-adet" data-pid="${s.pid}" data-i="${i}" inputmode="numeric" value="${esc(r.adet)}" placeholder="0" aria-label="${esc(r.renk || 'Adet')} adedi">
       ${s.renkler.length > 1 || r.renk ? `<button type="button" class="sg-x" data-act="sgRenkSil" data-pid="${s.pid}" data-i="${i}" aria-label="${esc(r.renk || 'Satırı')} kaldır">×</button>` : ''}</div>`).join('');
     const oneri = SIK_RENK.filter(r => !s.renkler.some(x => x.renk === r) && !(D.renkler[s.pid] || []).includes(r)).slice(0, 8);
@@ -140,8 +148,9 @@
       <div class="sg-satir-ust" data-act="sgAc" data-pid="${s.pid}">${satirUst(s)}</div>
       ${s.acik ? `<div class="sg-satir-alt">
         <div class="sg-renkler">${renkler}</div>
-        <div class="sg-renk-ekle"><input id="sgRenk-${s.pid}" data-pid="${s.pid}" placeholder="Renk ekle (yaz, Enter)" aria-label="Yeni renk adı">
-          ${oneri.map(r => `<button type="button" class="chip" data-act="sgRenkEkle" data-pid="${s.pid}" data-renk="${esc(r)}">+ ${esc(r)}</button>`).join('')}</div>
+        ${site.length ? (() => { const eksik = site.filter(x => x[1] > 0 && !s.renkler.some(r => r.renk === x[0])); return eksik.length ? `<div class="sg-renk-ekle">${eksik.map(([r, n]) => `<button type="button" class="chip" data-act="sgRenkEkle" data-pid="${s.pid}" data-renk="${esc(r)}">+ ${esc(r)} (stok ${n})</button>`).join('')}</div>` : ''; })()
+          : `<div class="sg-renk-ekle"><input id="sgRenk-${s.pid}" data-pid="${s.pid}" placeholder="Renk ekle (yaz, Enter)" aria-label="Yeni renk adı">
+          ${oneri.map(r => `<button type="button" class="chip" data-act="sgRenkEkle" data-pid="${s.pid}" data-renk="${esc(r)}">+ ${esc(r)}</button>`).join('')}</div>`}
         <div class="sg-fiyat"><label>Birim fiyat <input id="sgFiyat-${s.pid}" class="sg-fiyat-in ${s.fiyat != null ? 'elle' : ''}" data-pid="${s.pid}" inputmode="decimal" value="${String(b).replace('.', ',')}"> ₺</label>
           <small>${s.fiyat != null ? `Elle girildi.${D.gizli ? ` Hesaplanan ${fmt(o.f)} ₺ (${esc(o.kaynak)})` : ''} <button type="button" class="sg-link" data-act="sgOto" data-pid="${s.pid}">Hesaplanana dön</button>` : D.gizli ? esc(o.kaynak) : ''}${u ? `${s.fiyat != null || D.gizli ? ' · ' : ''}Paraşüt stok ${u.stok}` : ''}</small></div>
         <div class="sg-satir-dug"><button type="button" class="btn sm danger" data-act="sgSil" data-pid="${s.pid}">Ürünü çıkar</button><button type="button" class="btn sm" data-act="sgKapat" data-pid="${s.pid}">Tamam</button></div>
@@ -221,7 +230,12 @@
     const sat = $('.sg-satirlar');
     sat?.addEventListener('input', e => {
       const el = e.target, s = T.satirlar.find(x => x.pid === el.dataset.pid); if (!s) return;
-      if (el.classList.contains('sg-adet')) { s.renkler[+el.dataset.i].adet = el.value.replace(/\D/g, ''); sakla(); parcaYenile(s); }
+      if (el.classList.contains('sg-adet')) {
+        const r = s.renkler[+el.dataset.i]; r.adet = el.value.replace(/\D/g, ''); sakla(); parcaYenile(s);
+        // sitedeki stoktan fazla yazılınca stok yazısı kırmızı olur
+        const st = siteRenk(s.pid).find(x => x[0] === r.renk), not = el.parentElement.querySelector('.sg-renk-ad small');
+        if (st && not) not.classList.toggle('sg-uyar', Number(r.adet) > st[1]);
+      }
     });
     sat?.addEventListener('change', e => {
       const el = e.target, s = T.satirlar.find(x => x.pid === el.dataset.pid); if (!s) return;
