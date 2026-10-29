@@ -41,7 +41,7 @@
   views.fiyat = () => {
     if (!D.kurallar && !D.yukleniyor && !D.hata) yukle();
     const n = Object.keys(D.taslak).length;
-    const ust = head('Ürünler', 'Fiyat kuralları', 'Sitedeki Bayi 1–4 ve site fiyatı, ürünün Paraşüt\'teki alış fiyatına kategorisinin oranı eklenerek hesaplanır. Ürün girişinde alış değişince fiyatlar da bu oranlarla yenilenir. Boş kutu: henüz karar verilmedi. Fiyatlar şimdilik siteye gönderilmiyor.');
+    const ust = head('Ürünler', 'Fiyat kuralları', 'Sitedeki Bayi 1–4 ve site fiyatı, ürünün Paraşüt\'teki alış fiyatına kategorisinin oranı eklenerek hesaplanır. Ürün girişinde alış değişince fiyatlar da bu oranlarla yenilenir. Boş kutu: henüz karar verilmedi. Fiyatlar siteye Siteye gönder sayfasından gider.');
     if (!D.kurallar) return ust + (D.hata ? `<div class="card empty"><h3>Oranlar alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="fkYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     return `${ust}
       <div class="card">

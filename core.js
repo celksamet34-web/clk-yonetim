@@ -142,9 +142,10 @@ window.CLK = (() => {
     stokkart: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h8M8 16h5"/></svg>',
     siparisgir: '<svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><path d="M13 8v5M10.5 10.5h5"/></svg>',
     fiyat: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
+    sitegonder: '<svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
-  const NAV = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']];
+  const NAV = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['ekstre', 'Müşteri ekstresi']];
   const views = {};
   // Paraşüt ↔ site eşitlemesini hemen çalıştırır (saatlik görevi beklemeden); işleyişi views-parasut.js'te
   const esitleBtn = () => `<button class="esitle" data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${ICONS.esitle}<span>${S.esitleniyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</span></button>`;
@@ -152,7 +153,7 @@ window.CLK = (() => {
     const nav = NAV.map(([k, l]) => `<button data-go="${k}" ${S.route === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
     const more = ['siparisler', 'musteriler', 'cari'].includes(S.route);
     const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['daha', 'Daha']].map(([k, l]) => {
-      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urungiris', 'westpolo', 'urunlistesi', 'stokkart', 'fiyat', 'ekstre', 'yeni'].includes(S.route));
+      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urungiris', 'westpolo', 'urunlistesi', 'stokkart', 'fiyat', 'sitegonder', 'ekstre', 'yeni'].includes(S.route));
       const ic = k === 'siparisgir' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
       return `<button data-go="${k}" class="${k === 'siparisgir' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
     }).join('');
@@ -163,7 +164,7 @@ window.CLK = (() => {
       <header class="mtop"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
-      <div class="sheet-more" id="more" data-act="moreKapat" ${S.more ? '' : 'hidden'}><div class="sheet-in">${[['siparisgir', 'Sipariş gir'], ['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
+      <div class="sheet-more" id="more" data-act="moreKapat" ${S.more ? '' : 'hidden'}><div class="sheet-in">${[['siparisgir', 'Sipariş gir'], ['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
   }
   const head = (eyebrow, title, sub, acts = '') => `<div class="page-h"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="acts">${acts}</div></div>`;
   const skel = () => `<div class="card"><div class="skel" style="height:110px"></div><div class="skel" style="height:240px;margin-top:14px"></div></div>`;

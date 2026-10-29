@@ -625,3 +625,14 @@ body{font-size:15px;letter-spacing:0}
 .o-uyari{margin-bottom:16px;border-color:var(--bad);padding:14px 18px}.o-uyari p{margin:0;font-size:14px}
 .sg-renk-ad small{display:block;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.02em}
 .sg-renk-ad small.sg-uyar{color:var(--bad)}
+/* Siteye gönder */
+.sg-es{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px 14px}
+.sg-es label{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.sg-es label small{color:var(--muted);font-weight:400}
+.sg-es select,.sg-kat{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line-2);border-radius:9px;background:#fff;max-width:100%}
+.ul-tablo .sg-kat{width:210px}
+.ul-tablo td.sg-urun{text-align:left;white-space:normal;min-width:250px}
+.sg-urun small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.ul-tablo .sg-tablo .sk-num{width:84px}
+.sg-tablo td:nth-child(3),.sg-tablo th:nth-child(3),.sg-tablo td:nth-child(9),.sg-tablo th:nth-child(9),.sg-tablo th:last-child{text-align:left}
+.ul-tablo select.fk-uyari{border-color:#d97706;background:#fff4e5}
