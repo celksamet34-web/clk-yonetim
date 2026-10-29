@@ -29,7 +29,8 @@
   // hareketleri sırala; devir = dönem öncesi + Paraşüt bakiyesiyle hareket toplamı arasındaki fark
   function hesapla(m, bas, son) {
     const h = [];
-    for (const [t, no, v, ac] of m.satis || []) h.push({ t, s: 0, ack: 'Satış faturası' + (no ? ' ' + no : '') + (ac ? ' · ' + ac : ''), a: v, b: 0 });
+    // siteden gelen siparişin faturasında "Satış faturası" yazılmaz, numara ve açıklama kalır (celik isteği 29.10.2026)
+    for (const [t, no, v, ac] of m.satis || []) h.push({ t, s: 0, ack: /^clkcanta\.com/i.test(ac || '') ? [no, ac].filter(Boolean).join(' · ') : 'Satış faturası' + (no ? ' ' + no : '') + (ac ? ' · ' + ac : ''), a: v, b: 0 });
     for (const [t, no, v] of m.iade || []) h.push({ t, s: 1, ack: 'İade' + (no ? ' · ' + no : ''), a: 0, b: v });
     for (const [t, tur, v, vade, seri, hesap] of m.odeme || [])
       h.push({ t, s: 2, v: vade, ack: tur === 'c' ? `Çek${seri ? ' no ' + seri : ''}${vade ? ' · vade ' + trE(vade) : ''}` : (hesap || 'Tahsilat'), cek: tur === 'c', a: 0, b: v });
@@ -91,7 +92,17 @@
       if (x.cek) {
         g.font = `400 18px ${F}`; const on = `Ödeme · Çek${x.seriYaz}`; yaz(on, kol.i, yy, { z: 18 });
         if (x.v) yaz(` · vade ${trE(x.v)}`, kol.i + g.measureText(on).width, yy, { b: 700, z: 18 });
-      } else yaz(x.ack, kol.i, yy, { z: 18, it: x.it });
+      } else {
+        // uzun açıklama fatura tutarının üstüne binmesin: yazı biraz küçülür, yine sığmazsa iki satıra bölünür
+        const genis = kol.a - 125 - kol.i;
+        const olc = (s, z) => { g.font = `${x.it ? 'italic ' : ''}400 ${z}px ${F}`; return g.measureText(s).width; };
+        const kisalt = (s, z) => { while (s.length > 4 && olc(s, z) > genis) s = s.slice(0, -2).trimEnd() + '…'; return s; };
+        let z = 18;
+        while (z > 16 && olc(x.ack, z) > genis) z--;
+        const i = x.ack.indexOf(' · ');
+        if (olc(x.ack, z) <= genis || i < 0) yaz(kisalt(x.ack, z), kol.i, yy, { z, it: x.it });
+        else { yaz(kisalt(x.ack.slice(0, i), 15), kol.i, yy - 9, { z: 15, it: x.it }); yaz(kisalt(x.ack.slice(i + 3), 15), kol.i, yy + 9, { z: 15, it: x.it, renk: '#5b6475' }); }
+      }
       if (x.a) yaz(tlE(x.a), kol.a, yy, { z: 18, r: true });
       if (x.b) yaz(tlE(x.b), kol.b, yy, { z: 18, r: true, renk: '#1a7f4b' });
       kalanYaz(x.kal, kol.k, yy);
