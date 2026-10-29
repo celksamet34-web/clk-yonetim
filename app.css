@@ -641,4 +641,5 @@ body{font-size:15px;letter-spacing:0}
 .fk-hepsi td{background:var(--gold-soft)}
 /* Siteye gönder: elle değiştirilen (henüz gönderilmeyen) kutu mavi, eksik bilgi uyarısı turuncu kalır */
 .ul-tablo .sg-tablo input.sk-deg,.ul-tablo .sg-tablo select.sk-deg{border-color:#3b6fd8;background:#eef3ff}
-.sk-satir-deg .sg-tablo td,.sg-tablo .sk-satir-deg td{background:#f7f9ff}
+.sg-tablo .sk-satir-deg td{background:#f7f9ff}
+.ul-tablo .sg-tablo input.fk-uyari,.ul-tablo .sg-tablo select.fk-uyari{border-color:#d97706;background:#fff4e5}
