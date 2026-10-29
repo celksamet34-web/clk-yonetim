@@ -60,10 +60,18 @@
         D.okunan[id] = await sor({ islem: 'satis', id });
         if (D.secili.join() !== secim.join()) return;
       }
+      // numarası olmayan faturaya CLK-SF numarası hemen Paraşüt'e yazılır; numarası olan (ör. CLK-WEST) kendi numarasıyla kalır
+      const yeni = secim.filter(id => !D.okunan[id].no);
+      if (yeni.length) {
+        D.durum = 'Fatura numarası Paraşüt\'e yazılıyor…'; render();
+        try { for (const x of await sor({ islem: 'sf_no', idler: yeni })) if (x.no && !x.hata) D.okunan[x.id].no = x.no; }
+        catch (e) { toast('Numara Paraşüt\'e yazılamadı: ' + e.message); }
+        if (D.secili.join() !== secim.join()) return;
+      }
       const fat = secim.map(id => D.okunan[id]).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
-      D.gruplar = fat.map(v => ({ no: sfNo(v.id), tarih: v.tarih || '' }));
+      D.gruplar = fat.map(v => ({ no: v.no || sfNo(v.id), tarih: v.tarih || '' }));
       D.kalemler = fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar]) => ({ urun, miktar, fiyat, tutar, g })));
-      D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => sfNo(v.id)).join(', '), tarih: fat.at(-1)?.tarih || '' };
+      D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no || sfNo(v.id)).join(', '), tarih: fat.at(-1)?.tarih || '' };
       D.durum = fat.length ? `${fat.length} satış, ${D.kalemler.length} kalem${fat.length > 1 ? ' (her satış tarihiyle ayrı bölümde)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
     } catch (e) { D.durum = 'Satış okunamadı: ' + e.message; }
     finally { if (D.secili.join() === secim.join()) { D.yukleniyor = ''; render(); } }
@@ -100,7 +108,7 @@
     h1{font-size:30px;font-weight:400;margin:0;line-height:1;letter-spacing:.01em}
     h1 small{display:block;font:600 8.5px/1 "Segoe UI",sans-serif;letter-spacing:.28em;color:#777;margin-bottom:8px;text-transform:uppercase}
     .meta{border:1px solid #111;border-radius:3px;min-width:230px} .meta div{display:flex;justify-content:space-between;gap:16px;padding:5px 10px} .meta div+div{border-top:.5px solid #bbb}
-    .meta span{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#666;padding-top:1px} .meta b{font-weight:600;text-align:right}
+    .meta span{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#666;padding-top:1px} .meta b{font-weight:600;text-align:right;white-space:nowrap}
     table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
     th{font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#555;text-align:right;padding:0 5px 6px;border-bottom:1.5px solid #111}
     td{padding:4.5px 5px;text-align:right;white-space:nowrap;border-bottom:.5px solid #d4d4d4} tbody tr:nth-child(even) td{background:#f5f5f3}
@@ -113,7 +121,7 @@
     .imza{display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:22px;margin-top:26px;break-inside:avoid}
     .imza div{border-top:.8px solid #111;padding-top:5px;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#555;height:62px}
     .not{margin-top:22px;padding:9px 12px;border:1px solid #111;border-radius:3px;text-align:center;font-size:10px;break-inside:avoid} .not b{font-weight:600}
-    .bakiye{margin-top:18px;display:flex;justify-content:space-between;align-items:baseline;padding:9px 12px;border:1.5px solid #111;border-radius:3px;break-inside:avoid} .bakiye span{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#555} .bakiye b{font-size:16px;font-weight:600} .bakiye small{display:block;font-size:8px;color:#777;letter-spacing:.04em;text-transform:none}
+    .toplam .bakiye{border-top:1.5px solid #111} .toplam .bakiye b{font-size:14px;font-weight:600} .bakiye small{display:block;font-size:7.5px;color:#888;letter-spacing:.04em;text-transform:none;margin-top:2px}
     .son{margin-top:14px;text-align:center;font-size:11px;font-style:italic;color:#333;break-inside:avoid} .son b{font-style:normal;letter-spacing:.12em;font-weight:600}
     </style></head><body><table class="sayfa"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot><tbody><tr><td>
     <div class="ust"><img src="${logo}" alt="CLK"><div class="marka serif">${esc(FIRMA[0])}</div>
@@ -126,13 +134,13 @@
     ${bolumler.map(({ b, g, l }) => (b ? `<tr class="grup"><td colspan="7"><b>${g + 1}. satış</b> · ${esc(trT(b.tarih))}${b.no ? ' · ' + esc(b.no) : ''}<span>${l.length} kalem · ${adet(l)} adet · ${tlE(toplam(l))}</span></td></tr>` : '') + satirYaz(l)).join('')}
     </tbody></table>
     <div class="alt"><div class="toplam"><div><span>Kalem</span><b>${satirlar.length}</b></div><div><span>Toplam adet</span><b>${adet(satirlar)}</b></div>
-      <div class="buyuk"><span>Genel toplam</span><b class="serif">${tlE(toplam(satirlar))}</b></div></div></div>
+      <div class="buyuk"><span>Genel toplam</span><b class="serif">${tlE(toplam(satirlar))}</b></div>${bakiyeHtml(kalemler === D.kalemler)}</div></div>
     <div class="imza"><div>Sayan / kolileyen</div><div>Koli sayısı</div><div>Tarih / imza</div></div>
     <div class="not">Eksik veya hatalı ürünleriniz için lütfen bizimle iletişime geçiniz: <b>${esc(FIRMA[2])}</b></div>
-    <div class="son serif">Diğer ürünlerimiz için web sitemizi ziyaret etmeyi unutmayın · <b>${esc(FIRMA[3])}</b></div>${bakiyeHtml(kalemler === D.kalemler)}</td></tr></tbody></table></body></html>`;
+    <div class="son serif">Diğer ürünlerimiz için web sitemizi ziyaret etmeyi unutmayın · <b>${esc(FIRMA[3])}</b></div></td></tr></tbody></table></body></html>`;
   }
   const bakiyeYazi = t => tlE(Math.abs(t)) + (t > 0.004 ? ' borç' : t < -0.004 ? ' alacak' : '');
-  const bakiyeHtml = ulMu => !ulMu || !D.bakiyeGoster || !D.bakiye ? '' : `<div class="bakiye"><span>Güncel cari bakiyeniz<small>${esc(new Date(D.bakiye.zaman || Date.now()).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }))} itibarıyla</small></span><b>${esc(bakiyeYazi(D.bakiye.tutar))}</b></div>`;
+  const bakiyeHtml = ulMu => !ulMu || !D.bakiyeGoster || !D.bakiye ? '' : `<div class="bakiye"><span>Güncel bakiye<small>${esc(new Date(D.bakiye.zaman || Date.now()).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }))} itibarıyla</small></span><b>${esc(bakiyeYazi(D.bakiye.tutar))}</b></div>`;
   // gizli çerçevede açılıp yazdırma penceresi gelir (telefonda PDF olarak kaydedilebilir)
   function yazdir(html = sayfaHtml()) {
     const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0' });
@@ -141,10 +149,23 @@
     f.onload = () => { setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300); };
   }
   CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler, []));
+  // PDF: liste gizli bir çerçevede çizilir, html2pdf ile A4 PDF olarak indirilir
+  const dosyaAdi = () => `urun-listesi-${(D.bilgi.musteri || 'musteri').toLocaleLowerCase('tr').replace(/[çğıöşü]/g, c => 'cgiosu'['çğıöşü'.indexOf(c)]).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}${D.bilgi.tarih ? '-' + D.bilgi.tarih : ''}.pdf`;
   function indir() {
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([sayfaHtml()], { type: 'text/html' })), download: `urun-listesi-${(D.bilgi.musteri || 'musteri').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}${D.bilgi.tarih ? '-' + D.bilgi.tarih : ''}.html` });
-    document.body.append(a); a.click(); a.remove();
+    return new Promise((tamam, hata) => {
+      const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0' });
+      document.body.append(f);
+      const ad = JSON.stringify(dosyaAdi());
+      f.srcdoc = sayfaHtml().replace('</body>', `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></` + `script><script>
+        document.querySelectorAll('.sayfa>thead td,.sayfa>tfoot td').forEach(t => t.style.height = '0');
+        html2pdf().set({ margin: [12, 0, 12, 0], filename: ${ad}, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.alt', '.imza', '.not', '.son'] } })
+          .from(document.body).save().then(() => parent.postMessage('ulPdfTamam', '*'), e => parent.postMessage('ulPdfHata', '*'));
+      </` + `script></body>`);
+      const dinle = e => { if (e.source !== f.contentWindow) return; removeEventListener('message', dinle); setTimeout(() => f.remove(), 1000); e.data === 'ulPdfTamam' ? tamam() : hata(new Error('PDF oluşturulamadı')); };
+      addEventListener('message', dinle);
+    });
   }
+
 
   const satirHtml = (k, i) => `<tr data-i="${i}">
     <td class="ul-urun"><input data-f="urun" value="${esc(k.urun)}" aria-label="Ürün ${i + 1}"></td>
@@ -184,7 +205,7 @@
           <tbody id="ulGovde">${D.kalemler.map((k, i) => (D.gruplar.length > 1 && (i === 0 || D.kalemler[i - 1].g !== k.g) ? grupHtml(k.g) : '') + satirHtml(k, i)).join('')}</tbody></table></div>
         <div class="ek-dug">
           <button class="btn dark" data-act="ulYazdir">Yazdır</button>
-          <button class="btn" data-act="ulIndir">Dosya olarak indir</button>
+          <button class="btn" data-act="ulIndir">PDF indir</button>
           <button class="btn" data-act="ulEkle">Satır ekle</button>
           <button class="btn${D.bakiyeGoster ? ' dark' : ''}" data-act="ulBakiye" aria-pressed="${D.bakiyeGoster}">${D.bakiyeGoster ? '✓ Bakiye listede' : 'Bakiyeyi göster'}</button>
         </div>
@@ -210,7 +231,7 @@
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'ulYazdir') yazdir(sayfaHtml());
-    else if (act === 'ulIndir') { indir(); toast('Liste indirildi'); }
+    else if (act === 'ulIndir') { toast('PDF hazırlanıyor…'); indir().then(() => toast('PDF indirildi'), e => toast(e.message)); }
     else if (act === 'ulSon') { S.keepScroll = true; sec(D.satislar.filter(x => x[5] === 'invoice').slice(0, +el.dataset.n).map(x => x[0])); }
     else if (act === 'ulTemizle') { S.keepScroll = true; sec([]); }
     else if (act === 'ulBakiye') { D.bakiyeGoster = !D.bakiyeGoster; S.keepScroll = true; if (D.bakiyeGoster && !D.bakiye && D.musteri) bakiyeAl(D.musteri).then(render); render(); }
