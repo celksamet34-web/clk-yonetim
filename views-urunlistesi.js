@@ -3,11 +3,29 @@
   const { sb, S, $, esc, toast, head, views, render, araKutu, araSec } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const FIRMA = ['CLK ÇANTA', 'Birlik Mah. 873 Sk. No:2/A Esenler / İstanbul', '0534 077 88 67', 'www.clkcanta.com'];
-  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, secili: [], okunan: {}, gruplar: [], kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, yukleniyor: '', durum: '' });
+  const D = (S.ui.ul ||= { musteriler: null, musteri: '', satislar: null, secili: [], okunan: {}, gruplar: [], kalemler: [], bilgi: { musteri: '', no: '', tarih: '' }, bakiyeGoster: false, bakiye: null, yukleniyor: '', durum: '' });
   const tlE = v => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₺';
   const trT = d => d ? String(d).split('-').reverse().join('.') : '';
   const sayi = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
   const yuvarla = n => Math.round(n * 100) / 100;
+  // müşteriye giden fatura no: CLK-SF + Paraşüt fatura id'sinden türeyen rakam-harf-rakam-harf (aynı faturada hep aynı, ör. CLK-SF4A8D)
+  const sfNo = id => {
+    let h = 2166136261;
+    for (const c of 'sf' + id) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    const H = 'ABCDEFGHJKLMNPRSTUVYZ';
+    return 'CLK-SF' + (h % 10) + H[(h >>> 4) % H.length] + ((h >>> 9) % 10) + H[(h >>> 13) % H.length];
+  };
+  // güncel Paraşüt bakiyesi: 5 dakikada bir yenilenen bakiye raporundan, yoksa müşteri listesinden
+  async function bakiyeAl(id) {
+    D.bakiye = null;
+    try {
+      const r = await sor({ islem: 'rapor' });
+      const s = (r?.satirlar || []).find(x => String(x.parasut_id) === String(id));
+      if (s && s.parasut_bakiye !== null) { D.bakiye = { tutar: Number(s.parasut_bakiye), zaman: r.zaman }; return; }
+    } catch { }
+    const { data } = await sb.from('sp_parasut_musteri').select('bakiye,guncel').eq('id', id).maybeSingle();
+    if (data) D.bakiye = { tutar: Number(data.bakiye) || 0, zaman: data.guncel };
+  }
 
   async function sor(govde) {
     const { data } = await sb.auth.getSession();
@@ -26,7 +44,7 @@
     D.musteriler = out.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')); render();
   }
   async function satislariAl(id) {
-    D.musteri = id; D.satislar = null; D.secili = []; D.okunan = {}; D.yukleniyor = 'satislar'; D.durum = ''; render();
+    D.musteri = id; D.satislar = null; D.secili = []; D.bakiye = null; if (D.bakiyeGoster) bakiyeAl(id).then(render); D.okunan = {}; D.yukleniyor = 'satislar'; D.durum = ''; render();
     try { const l = await sor({ islem: 'satislar', id }); if (D.musteri === id) D.satislar = l; }
     catch (e) { D.durum = 'Satışlar alınamadı: ' + e.message; D.satislar = []; }
     D.yukleniyor = ''; render();
@@ -43,9 +61,9 @@
         if (D.secili.join() !== secim.join()) return;
       }
       const fat = secim.map(id => D.okunan[id]).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
-      D.gruplar = fat.map(v => ({ no: v.no || '', tarih: v.tarih || '' }));
+      D.gruplar = fat.map(v => ({ no: sfNo(v.id), tarih: v.tarih || '' }));
       D.kalemler = fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar]) => ({ urun, miktar, fiyat, tutar, g })));
-      D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no).filter(Boolean).join(', '), tarih: fat.at(-1)?.tarih || '' };
+      D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => sfNo(v.id)).join(', '), tarih: fat.at(-1)?.tarih || '' };
       D.durum = fat.length ? `${fat.length} satış, ${D.kalemler.length} kalem${fat.length > 1 ? ' (her satış tarihiyle ayrı bölümde)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
     } catch (e) { D.durum = 'Satış okunamadı: ' + e.message; }
     finally { if (D.secili.join() === secim.join()) { D.yukleniyor = ''; render(); } }
@@ -95,6 +113,7 @@
     .imza{display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:22px;margin-top:26px;break-inside:avoid}
     .imza div{border-top:.8px solid #111;padding-top:5px;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#555;height:62px}
     .not{margin-top:22px;padding:9px 12px;border:1px solid #111;border-radius:3px;text-align:center;font-size:10px;break-inside:avoid} .not b{font-weight:600}
+    .bakiye{margin-top:18px;display:flex;justify-content:space-between;align-items:baseline;padding:9px 12px;border:1.5px solid #111;border-radius:3px;break-inside:avoid} .bakiye span{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#555} .bakiye b{font-size:16px;font-weight:600} .bakiye small{display:block;font-size:8px;color:#777;letter-spacing:.04em;text-transform:none}
     .son{margin-top:14px;text-align:center;font-size:11px;font-style:italic;color:#333;break-inside:avoid} .son b{font-style:normal;letter-spacing:.12em;font-weight:600}
     </style></head><body><table class="sayfa"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot><tbody><tr><td>
     <div class="ust"><img src="${logo}" alt="CLK"><div class="marka serif">${esc(FIRMA[0])}</div>
@@ -110,8 +129,10 @@
       <div class="buyuk"><span>Genel toplam</span><b class="serif">${tlE(toplam(satirlar))}</b></div></div></div>
     <div class="imza"><div>Sayan / kolileyen</div><div>Koli sayısı</div><div>Tarih / imza</div></div>
     <div class="not">Eksik veya hatalı ürünleriniz için lütfen bizimle iletişime geçiniz: <b>${esc(FIRMA[2])}</b></div>
-    <div class="son serif">Diğer ürünlerimiz için web sitemizi ziyaret etmeyi unutmayın · <b>${esc(FIRMA[3])}</b></div></td></tr></tbody></table></body></html>`;
+    <div class="son serif">Diğer ürünlerimiz için web sitemizi ziyaret etmeyi unutmayın · <b>${esc(FIRMA[3])}</b></div>${bakiyeHtml(kalemler === D.kalemler)}</td></tr></tbody></table></body></html>`;
   }
+  const bakiyeYazi = t => tlE(Math.abs(t)) + (t > 0.004 ? ' borç' : t < -0.004 ? ' alacak' : '');
+  const bakiyeHtml = ulMu => !ulMu || !D.bakiyeGoster || !D.bakiye ? '' : `<div class="bakiye"><span>Güncel cari bakiyeniz<small>${esc(new Date(D.bakiye.zaman || Date.now()).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }))} itibarıyla</small></span><b>${esc(bakiyeYazi(D.bakiye.tutar))}</b></div>`;
   // gizli çerçevede açılıp yazdırma penceresi gelir (telefonda PDF olarak kaydedilebilir)
   function yazdir(html = sayfaHtml()) {
     const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0' });
@@ -165,7 +186,9 @@
           <button class="btn dark" data-act="ulYazdir">Yazdır</button>
           <button class="btn" data-act="ulIndir">Dosya olarak indir</button>
           <button class="btn" data-act="ulEkle">Satır ekle</button>
+          <button class="btn${D.bakiyeGoster ? ' dark' : ''}" data-act="ulBakiye" aria-pressed="${D.bakiyeGoster}">${D.bakiyeGoster ? '✓ Bakiye listede' : 'Bakiyeyi göster'}</button>
         </div>
+        ${D.bakiyeGoster ? `<p class="ek-durum">${D.bakiye ? `Listenin en altında: güncel cari bakiye <b>${esc(bakiyeYazi(D.bakiye.tutar))}</b>` : 'Bakiye alınıyor…'}</p>` : ''}
       </div>` : ''}`;
   };
 
@@ -190,6 +213,7 @@
     else if (act === 'ulIndir') { indir(); toast('Liste indirildi'); }
     else if (act === 'ulSon') { S.keepScroll = true; sec(D.satislar.filter(x => x[5] === 'invoice').slice(0, +el.dataset.n).map(x => x[0])); }
     else if (act === 'ulTemizle') { S.keepScroll = true; sec([]); }
+    else if (act === 'ulBakiye') { D.bakiyeGoster = !D.bakiyeGoster; S.keepScroll = true; if (D.bakiyeGoster && !D.bakiye && D.musteri) bakiyeAl(D.musteri).then(render); render(); }
     else if (act === 'ulEkle') { D.kalemler.push({ urun: '', miktar: 1, fiyat: 0, tutar: 0, g: D.kalemler.at(-1)?.g ?? 0 }); S.keepScroll = true; render(); }
     else if (act === 'ulSil') { D.kalemler.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else prevAct?.(act, el, e);
