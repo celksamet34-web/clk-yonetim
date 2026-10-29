@@ -14,17 +14,19 @@
     const acts = `<button class="btn sm" data-act="reloadO" ${S.oLoading ? 'disabled' : ''}>${S.oLoading ? 'Yükleniyor ' + num(S.orders.length) : 'Yenile'}</button>`;
     if (S.oErr && !S.orders.length) return head('Satış', 'Siparişler', '', acts) + errBox(S.oErr, 'reloadO');
     if (!S.orders.length) return head('Satış', 'Siparişler', 'Qukasoft siparişleri alınıyor…', acts) + skel();
+    if (F.s > 4) F.s = 0;
     const q = F.q.trim().toLocaleLowerCase('tr');
-    const L = S.orders.filter(o => (!F.s || O.status(o) === F.s) && (!F.plat || O.platform(o) === F.plat) &&
+    const T = S.orders.filter(O.counts); // iade ve iptaller listede gösterilmez
+    const L = T.filter(o => (!F.s || O.status(o) === F.s) && (!F.plat || O.platform(o) === F.plat) &&
       (!q || [O.code(o), O.cust(o), o.customer?.phone, o.customer?.email, ...O.items(o).map(i => i.name + ' ' + i.code)].join(' ').toLocaleLowerCase('tr').includes(q)));
     const valid = L.filter(O.counts), rev = valid.reduce((a, o) => a + O.total(o), 0);
-    const cnt = s => S.orders.filter(o => O.status(o) === s).length;
-    const plats = [...new Set(S.orders.map(O.platform))];
-    return head('Satış', 'Siparişler', `${num(S.orders.length)} sipariş · Qukasoft`, acts) + `
+    const cnt = s => T.filter(o => O.status(o) === s).length;
+    const plats = [...new Set(T.map(O.platform))];
+    return head('Satış', 'Siparişler', `${num(T.length)} sipariş · Qukasoft`, acts) + `
       <div class="mini-kpis"><div><span>Listelenen</span><b>${num(L.length)}</b></div><div><span>Ciro</span><b>${tl(rev)}</b></div><div><span>Ortalama sepet</span><b>${tl(valid.length ? rev / valid.length : 0)}</b></div><div><span>Bekleyen</span><b>${num(cnt(1) + cnt(2))}</b></div></div>
       <div class="card"><div class="tools"><input type="search" id="oq" placeholder="Sipariş no, müşteri, telefon veya ürün ara" value="${esc(F.q)}">
         ${plats.length > 1 ? `<select id="oplat"><option value="">Tüm kanallar</option>${plats.map(p => `<option ${p === F.plat ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>` : ''}</div>
-        <div class="chips">${[[0, 'Tümü'], [1, 'Yeni'], [2, 'Hazırlanıyor'], [3, 'Kargoda'], [4, 'Teslim'], [5, 'İade'], [6, 'İptal']].map(([k, l]) => `<button class="chip" data-os="${k}" aria-pressed="${F.s === k}">${l} <b>${k ? cnt(k) : S.orders.length}</b></button>`).join('')}</div>
+        <div class="chips">${[[0, 'Tümü'], [1, 'Yeni'], [2, 'Hazırlanıyor'], [3, 'Kargoda'], [4, 'Teslim']].map(([k, l]) => `<button class="chip" data-os="${k}" aria-pressed="${F.s === k}">${l} <b>${k ? cnt(k) : T.length}</b></button>`).join('')}</div>
         <div class="olist">${L.slice(0, F.shown).map(o => `<button class="orow" data-order="${O.id(o)}">
           <div class="o1"><b>${esc(O.cust(o))}</b><small>${esc(O.code(o))} · ${dtt(O.date(o))} · ${esc(O.platform(o))}</small></div>
           <div class="o2">${O.items(o).slice(0, 3).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}${O.items(o).length > 3 ? `<span>+${O.items(o).length - 3}</span>` : ''}</div>
@@ -39,11 +41,12 @@
 
   views.siparis = () => {
     const o = S.orders.find(x => String(O.id(x)) === String(S.arg));
-    const back = `<button class="btn sm" data-go="siparisler">← Siparişler</button>`;
-    if (!o) return head('Sipariş', 'Bulunamadı', '', back) + (S.oLoading ? skel() : '<div class="card empty"><h3>Sipariş bulunamadı</h3></div>');
+    const geri = `<button class="btn sm" data-go="siparisler">← Siparişler</button>`;
+    if (!o) return head('Sipariş', 'Bulunamadı', '', geri) + (S.oLoading ? skel() : '<div class="card empty"><h3>Sipariş bulunamadı</h3></div>');
     const d = o.order || {}, c = o.customer || {}, s = o.summary || {}, items = O.items(o);
     const cost = items.reduce((a, i) => a + (Number(i.purchasePrice) || 0) * (Number(i.netQuantity ?? i.quantity) || 0), 0);
     const pm = {}; S.products.forEach(p => { pm[p.code] = p; });
+    const back = `<button class="btn sm gold" data-act="oYazdir" data-id="${esc(O.id(o))}">Yazdır</button>` + geri;
     return head('Sipariş · ' + esc(d.platform || 'Site'), esc(d.code || ''), `${dtt(d.createdAt)} · ${st(Number(d.status))}`, back) + `
       <div class="ed"><div class="stack">
         <div class="card"><div class="card-h"><div><h3>Ürünler</h3><p class="sub">${items.length} kalem</p></div></div>
@@ -169,9 +172,24 @@
     $$('[data-ct]').forEach(b => b.addEventListener('click', () => { C.t = b.dataset.ct; render(); }));
   };
 
+  // Sipariş detayındaki Yazdır: Sipariş gir çıktısıyla aynı sevkiyat ve kontrol listesi
+  const varyant = v => !v ? '' : typeof v === 'string' ? v : Object.values(v).join(' / ');
+  function siparisYazdir(o) {
+    if (!o || !CLK.kontrolListesi) { CLK.toast('Yazdırılamadı'); return; }
+    const d = o.order || {}, c = o.customer || {};
+    const adres = [c.delivery?.address, c.delivery?.district, c.delivery?.city].filter(Boolean).join(', ');
+    const kalemler = O.items(o).map(i => {
+      const miktar = Number(i.quantity) || 0, fiyat = Number(i.priceIncVat ?? i.price) || 0;
+      return { urun: [i.name, varyant(i.variants)].filter(Boolean).join(' · '), miktar, fiyat, tutar: Number(i.totalPriceIncVat ?? i.totalPrice) || miktar * fiyat };
+    });
+    CLK.kontrolListesi('Sipariş', [['Müşteri', O.cust(o)], ['Sipariş no', O.code(o)], ['Tarih', dtt(O.date(o))],
+      ['Durum', (ORDER_STATUS[O.status(o)] || ['—'])[0]], c.phone && ['Telefon', c.phone], adres && ['Adres', adres]].filter(Boolean), kalemler);
+  }
+
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'oMore') { F.shown += 40; S.keepScroll = true; render(); }
+    else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'copy') { navigator.clipboard?.writeText(el.dataset.v).then(() => CLK.toast('Kopyalandı'), () => CLK.toast('Kopyalanamadı')); }
     else prevAct?.(act, el, e);
   };
