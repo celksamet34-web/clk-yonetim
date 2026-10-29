@@ -46,7 +46,7 @@
     const d = o.order || {}, c = o.customer || {}, s = o.summary || {}, items = O.items(o);
     const cost = items.reduce((a, i) => a + (Number(i.purchasePrice) || 0) * (Number(i.netQuantity ?? i.quantity) || 0), 0);
     const pm = {}; S.products.forEach(p => { pm[p.code] = p; });
-    const id = esc(O.id(o)), acik = ![5, 6].includes(O.status(o)), is = OI.id === String(O.id(o)) ? OI : {};
+    const id = esc(O.id(o)), acik = [1, 2].includes(O.status(o)), is = OI.id === String(O.id(o)) ? OI : {};
     const back = (acik ? `<button class="btn sm danger" data-act="oIptal" data-id="${id}" ${is.is ? 'disabled' : ''}>${is.is === 'iptal' ? 'İptal ediliyor…' : is.onay ? 'Evet, iptal et' : 'İptal et'}</button>
       <button class="btn sm" data-act="oDuzelt" data-id="${id}" ${is.is ? 'disabled' : ''}>${is.is === 'duzelt' ? 'Yükleniyor…' : 'Düzelt'}</button>` : '')
       + `<button class="btn sm gold" data-act="oYazdir" data-id="${id}">Yazdır</button>` + geri;
