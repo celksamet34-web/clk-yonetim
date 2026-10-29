@@ -94,6 +94,8 @@
     const uyan = (...s) => !q || s.join(' ').toLocaleLowerCase('tr').includes(q);
     const uB = V.urun.filter(u => !u.parasut_id).length, mB = V.musteri.filter(m => !m.parasut_id).length;
     const sB = V.siparis.filter(s => !['aktarildi', 'iptal', 'kargo_bekliyor'].includes(s.durum)).length;
+    // iptal edilen siparişler listede görünmez (celik 29.10.2026); faturası kontrol edilecek iptaller (iptal_kontrol) görünür
+    const sipL = V.siparis.filter(s => s.durum !== 'iptal');
     let govde = '';
     if (D.tab === 'urun') {
       const L = V.urun.filter(u => (D.f === 'hepsi' || (D.f === 'bekleyen' ? !u.parasut_id : u.parasut_id)) && uyan(u.site_ad, u.parasut_ad, u.oneri_ad, u.site_anahtar));
@@ -112,12 +114,12 @@
         <div class="es-bas"><b>Paraşüt'ten siteye aktarılanlar</b><span>son ${num(V.geri.length)} kayıt</span></div>
         ${V.geri.filter(g => uyan(g.musteri, g.belge, g.site_ref)).map(satirGeri).join('') || '<p class="empty">Henüz aktarım yok.</p>'}`;
     } else {
-      govde = `<p class="es-ip">Siparişler sitede <b>Kargolandı</b> ya da <b>Teslim edildi</b> olunca Paraşüt'e aktarılır; eksik ürünü ondan önce siparişten çıkarın.</p>` + (V.siparis.filter(s => uyan(s.musteri, s.kod)).map(satirSiparis).join('') || '<p class="empty">Henüz siteden yeni sipariş gelmedi.</p>');
+      govde = `<p class="es-ip">Siparişler sitede <b>Kargolandı</b> ya da <b>Teslim edildi</b> olunca Paraşüt'e aktarılır; eksik ürünü ondan önce siparişten çıkarın.</p>` + (sipL.filter(s => uyan(s.musteri, s.kod)).map(satirSiparis).join('') || '<p class="empty">Henüz siteden yeni sipariş gelmedi.</p>');
     }
     const son = V.ayar.son_calisma, sonL = V.ayar.son_liste;
     return head('Paraşüt', 'Eşleştirme', alt, acts) + `
       <div class="mini-kpis"><div><span>Bekleyen ürün</span><b>${num(uB)}</b></div><div><span>Bekleyen müşteri</span><b>${num(mB)}</b></div><div><span>Bekleyen sipariş</span><b>${num(sB)}</b></div><div><span>Son kontrol</span><b>${son?.zaman ? dtt(son.zaman) : '—'}</b></div></div>
-      <div class="card"><div class="chips">${[['urun', 'Ürünler', V.urun.length], ['musteri', 'Müşteriler', V.musteri.length], ['siparis', 'Siparişler', V.siparis.length], ['rapor', 'Rapor', V.kontrol?.farkli || 0]].map(([k, l, n]) => `<button class="chip" data-estab="${k}" aria-pressed="${D.tab === k}">${l} <b>${num(n)}</b></button>`).join('')}</div>
+      <div class="card"><div class="chips">${[['urun', 'Ürünler', V.urun.length], ['musteri', 'Müşteriler', V.musteri.length], ['siparis', 'Siparişler', sipL.length], ['rapor', 'Rapor', V.kontrol?.farkli || 0]].map(([k, l, n]) => `<button class="chip" data-estab="${k}" aria-pressed="${D.tab === k}">${l} <b>${num(n)}</b></button>`).join('')}</div>
         <div class="tools"><input type="search" id="esq" placeholder="Ara" value="${esc(D.q)}">
           ${!['siparis', 'rapor'].includes(D.tab) ? `<select id="esf">${[['bekleyen', 'Onay bekleyenler'], ['onayli', 'Onaylananlar'], ['hepsi', 'Tümü']].map(([k, l]) => `<option value="${k}" ${D.f === k ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}</div>
         ${govde}
