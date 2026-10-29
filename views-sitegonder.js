@@ -37,6 +37,14 @@
     render();
   }
 
+  // site kategorileri alt kategorileriyle (WEST POLO › ERKEK CÜZDANLARI gibi); sunucu okuyamazsa eski liste
+  async function katYukle() {
+    D.katYuk = true;
+    try { const r = await sor({ islem: 'site_kategoriler' }); if (!Array.isArray(r)) throw new Error(); D.kats = r.map(c => ({ id: c.id, path: c.path })); }
+    catch { D.kats = (await loadCategories()).map(c => ({ id: c.id, path: c.path })); }
+    D.katYuk = false; render();
+  }
+
   // sitedeki PRS ürünleri: paraşüt id → site ürünü
   let ixKaynak = null, ix = {};
   const sitede = () => {
@@ -116,11 +124,11 @@
   views.sitegonder = () => {
     if (!D.urunler && !D.yukleniyor && !D.hata) yukle(false);
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
-    if (!S.categories.length && !D.katYuk) { D.katYuk = true; loadCategories().then(() => render()); }
+    if (!D.kats && !D.katYuk) katYukle();
     const acts = `<button class="btn" data-act="sgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
     const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
-    const kats = S.categories || [];
+    const kats = D.kats || [];
     const katSecenek = kats.map(c => `<option value="${c.id}">${esc(c.path)}</option>`).join('');
     const liste = gorunen(), pk = pKategoriler(), n = Object.keys(taslak).length;
     const siteDurum = S.pErr ? `Site ürünleri okunamadı: ${esc(S.pErr)}` : !S.pLoaded ? `Sitedeki ürünler okunuyor${S.pProg ? ' (' + esc(S.pProg) + ')' : ''}; "Sitede" bilgisi bitince doğru görünür.` : '';
@@ -128,7 +136,7 @@
       <div class="card">
         <div class="sk-arac"><b>Kategori eşleştirme</b><span class="sk-say">Paraşüt kategorisindeki ürünler sitede bu kategoriye girer. Satırda ayrıca değiştirebilirsiniz.</span></div>
         ${kats.length ? `<div class="sg-es">${pk.map(([k, c]) => `<label><b>${esc(k)} <small>(${num(c)})</small></b><select data-katesle="${esc(k)}"><option value="">Seçilmedi</option>${D.katEs[k] ? katSecenek.replace(`value="${D.katEs[k]}"`, `value="${D.katEs[k]}" selected`) : katSecenek}</select></label>`).join('')}</div>`
-          : `<p class="sk-say">${D.katYuk && !S.categories.length ? 'Site kategorileri okunuyor… Sitede hiç kategori yoksa önce Qukasoft panelinde kategori açın.' : 'Site kategorileri okunuyor…'}</p>`}
+          : `<p class="sk-say">${D.kats ? 'Sitede kategori bulunamadı; önce Qukasoft panelinde kategori açın.' : 'Site kategorileri okunuyor…'}</p>`}
       </div>
       <div class="sk-filtre">${Object.entries(FILTRE).map(([k, [ad, f]]) => `<button class="sk-f" data-act="sgFiltre" data-k="${k}" aria-pressed="${D.filtre === k}"><b>${num(D.urunler.filter(f).length)}</b><small>${ad}</small></button>`).join('')}</div>
       <div class="card">
@@ -219,7 +227,7 @@
 
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
-    if (act === 'sgYenile') { yukle(true); if (!S.pLoading) loadProducts(true); }
+    if (act === 'sgYenile') { yukle(true); if (!S.pLoading) loadProducts(true); D.kats = null; katYukle(); }
     else if (act === 'sgFiltre') { D.filtre = el.dataset.k; D.goster = 100; render(); }
     else if (act === 'sgDaha') { D.goster += 200; S.keepScroll = true; render(); }
     else if (act === 'sgHepsiSec') { gorunen().forEach(u => D.secili.add(u.id)); S.keepScroll = true; render(); }
