@@ -99,8 +99,16 @@
     const maliyet = r2(k.liste * (1 - k.indirim / 100)), fiyat = Number.isNaN(kar()) ? 0 : yukari5(maliyet * (1 + kar() / 100));
     return { ...k, maliyet, fiyat, satisTutar: r2(fiyat * k.miktar) };
   });
+  // satış faturası no: CLKWEST-SF + alış fatura no'sundan türeyen rakam-harf-rakam-harf (sunucudaki wpNo ile aynı hesap)
+  const wpNo = faturaNo => {
+    let h = 2166136261;
+    for (const c of 'wp' + faturaNo) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    const H = 'ABCDEFGHJKLMNPRSTUVYZ';
+    return 'CLKWEST-SF' + (h % 10) + H[(h >>> 4) % H.length] + ((h >>> 9) % 10) + H[(h >>> 13) % H.length];
+  };
+  const noYazi = () => D.fat ? wpNo(D.fat.no) : 'CLKWEST-SF…';
   const musteriAd = () => D.musteriler?.find(m => m.id === D.musteri)?.ad || '';
-  const eksik = () => !D.fat ? 'Önce PDF faturayı seçin.' : Number.isNaN(kar()) ? 'Kâr oranını girin.' : !D.musteri ? 'Müşteriyi seçin.' : !(+D.sira >= 1) ? 'Sıra numarasını girin.' : !D.tarih ? 'Satış tarihini girin.' : '';
+  const eksik = () => !D.fat ? 'Önce PDF faturayı seçin.' : Number.isNaN(kar()) ? 'Kâr oranını girin.' : !D.musteri ? 'Müşteriyi seçin.' : !D.tarih ? 'Satış tarihini girin.' : '';
   const alisFarki = k => {
     const once = D.alislar?.get(k.urun);
     if (!(once > 0) || Math.abs(once - k.maliyet) < 0.01) return '';
@@ -112,27 +120,27 @@
     const ks = kalemler();
     D.gonderiliyor = true; D.durum = 'Paraşüt\'e giriliyor: ürünler, satış ve alış faturası… (yarım dakika sürebilir)'; D.uyari = ''; render();
     try {
-      const r = await sor({ islem: 'westpolo', kayit: { faturaNo: D.fat.no, alisTarih: D.fat.tarih, satisTarih: D.tarih, musteriId: D.musteri, sira: +D.sira, faturaIsmi: D.isim.trim() || 'WEST POLO', zorla: !!zorla,
+      const r = await sor({ islem: 'westpolo', kayit: { faturaNo: D.fat.no, alisTarih: D.fat.tarih, satisTarih: D.tarih, musteriId: D.musteri, faturaIsmi: D.isim.trim() || 'WEST POLO', zorla: !!zorla,
         kalemler: ks.map(k => ({ urun: k.urun, miktar: k.miktar, alis: k.maliyet, satis: k.fiyat })) } });
       if (r.mukerrer) { D.uyari = r.mukerrer; D.durum = ''; }
       else {
         try { localStorage.setItem('clk-wp-musteri', D.musteri); } catch {}
         D.gecmis = [r, ...(D.gecmis || [])];
-        D.durum = r.hata ? `${r.seri} ${r.sira} satış faturası girildi, ama ${r.hata}` : `${r.seri} ${r.sira} Paraşüt'e girildi: satış ${tl(r.satisToplam)}, alış ${tl(r.alisToplam)}.${r.not?.length ? ' ' + r.not.join(', ') + '.' : ''}`;
+        D.durum = r.hata ? `${r.seri} satış faturası girildi, ama ${r.hata}` : `${r.seri} Paraşüt'e girildi: satış ${tl(r.satisToplam)}, alış ${tl(r.alisToplam)}.${r.not?.length ? ' ' + r.not.join(', ') + '.' : ''}`;
         toast(r.hata ? 'Satış girildi, alış girilemedi' : 'Paraşüt\'e girildi');
-        D.fat = null; D.dosya = ''; D.mesaj = ''; D.kar = ''; D.sira = String(r.sira + 1);
+        D.fat = null; D.dosya = ''; D.mesaj = ''; D.kar = '';
       }
     } catch (e) { D.durum = 'Gönderilemedi: ' + e.message; }
     D.gonderiliyor = false; render();
   }
-  const satisYazdir = () => { const ks = kalemler(); CLK.kontrolListesi('Satış Faturası', [['Müşteri', musteriAd()], ['Fatura no', `CLK-WEST ${D.sira}`], ['Tarih', trT(D.tarih)]], ks.map(k => ({ urun: k.urun, miktar: k.miktar, fiyat: k.fiyat, tutar: k.satisTutar }))); };
+  const satisYazdir = () => { const ks = kalemler(); CLK.kontrolListesi('Satış Faturası', [['Müşteri', musteriAd()], ['Fatura no', noYazi()], ['Tarih', trT(D.tarih)]], ks.map(k => ({ urun: k.urun, miktar: k.miktar, fiyat: k.fiyat, tutar: k.satisTutar }))); };
   const alisYazdir = () => CLK.kontrolListesi('Alış Faturası', [['Kayıt ismi', musteriAd() || '–'], ['Tedarikçi', 'WEST POLO'], ['Fatura no', D.fat.no], ['Tarih', trT(D.fat.tarih)], ['Kategori', 'WEST']],
     kalemler().map(k => ({ urun: k.urun, miktar: k.miktar, fiyat: k.maliyet, tutar: k.tutar })));
 
   views.westpolo = () => {
     if (!D.musteriler) hazirla();
     const ks = kalemler(), e = eksik(), k = kar();
-    return `${head('Paraşüt', 'West Polo', 'Han Dericilik PDF faturasını seçin, kâr oranını ve müşteriyi girin. "Paraşüt\'e gönder" satış (CLK-WEST) ve alış (WEST POLO) faturasını doğrudan Paraşüt\'e girer; eksik ürün kendiliğinden açılır.')}
+    return `${head('Paraşüt', 'West Polo', 'Han Dericilik PDF faturasını seçin, kâr oranını ve müşteriyi girin. "Paraşüt\'e gönder" satış (CLKWEST-SF…) ve alış (WEST POLO) faturasını doğrudan Paraşüt\'e girer; eksik ürün kendiliğinden açılır.')}
       <div class="card">
         <label class="wp-drop" id="wpDrop"><input type="file" id="wpDosya" accept="application/pdf" hidden>
           <b>${D.dosya ? esc(D.dosya) : 'Alış faturası PDF\'ini seçin'}</b><small>Buraya sürükleyin ya da dokunup seçin</small></label>
@@ -143,7 +151,6 @@
           <label>Kâr oranı (%)<input id="wpKar" inputmode="decimal" placeholder="örn. 15" value="${esc(D.kar)}" class="${Number.isNaN(k) ? 'wp-req' : ''}"></label>
           <div class="ek-mus ara-alan"><label for="wpMusteri">Müşteri (Paraşüt)</label>${araKutu('wpMusteri', D.musteriler, D.musteriler?.find(m => m.id === D.musteri)?.ad || '', 'wpMus', { sinif: D.musteri ? '' : 'wp-req', yer: D.musteriler ? 'Müşteri adı yazın (' + D.musteriler.length + ' müşteri)' : 'Müşteriler yükleniyor…' })}</div>
           <label>Satış tarihi<input id="wpTarih" type="date" value="${esc(D.tarih)}"></label>
-          <label>Fatura sıra (CLK-WEST)<input id="wpSira" inputmode="numeric" value="${esc(D.sira)}" placeholder="${D.gecmis ? '' : 'alınıyor…'}"></label>
           <label>Fatura ismi<input id="wpIsim" value="${esc(D.isim)}"></label>
         </div>
         <p class="wp-not">Listede olmayan yeni müşteriyi önce Paraşüt'te açın; sonra Paraşüt sayfasındaki "Şimdi eşitle" ile listeye gelir.</p>
@@ -162,11 +169,11 @@
           <button class="btn" data-act="wpSatisYaz" ${e ? 'disabled' : ''}>Satışı yazdır</button>
           <button class="btn" data-act="wpAlisYaz" ${D.fat ? '' : 'disabled'}>Alışı yazdır</button>
         </div>
-        <p class="ek-durum" role="status">${esc(D.durum || e || `CLK-WEST ${D.sira} numarasıyla, ${musteriAd()} adına girilecek.`)}</p>
+        <p class="ek-durum" role="status">${esc(D.durum || e || `${noYazi()} numarasıyla, ${musteriAd()} adına girilecek.`)}</p>
       </div>
       ${D.gecmis?.length ? `<div class="card"><h3 class="wp-h">Paraşüt'e girilenler</h3>
         <div class="ul-tablo"><table class="wp-tablo"><thead><tr><th>Girildi</th><th>Fatura</th><th>Müşteri</th><th>Satış</th><th>Alış</th><th>Not</th></tr></thead>
-          <tbody>${D.gecmis.slice(0, 15).map(g => `<tr><td>${new Date(g.zaman).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${esc(g.seri)} ${esc(g.sira)}<br><small>${esc(g.faturaNo)}</small></td><td>${esc(g.musteri)}</td><td>${tl(g.satisToplam)}</td><td>${g.hata ? '<b class="wp-hata">girilemedi</b>' : tl(g.alisToplam)}</td><td class="wp-notlar">${esc([g.hata, ...(g.not || [])].filter(Boolean).join(', '))}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+          <tbody>${D.gecmis.slice(0, 15).map(g => `<tr><td>${new Date(g.zaman).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${esc(g.seri)}${g.sira ? ' ' + esc(g.sira) : ''}<br><small>${esc(g.faturaNo)}</small></td><td>${esc(g.musteri)}</td><td>${tl(g.satisToplam)}</td><td>${g.hata ? '<b class="wp-hata">girilemedi</b>' : tl(g.alisToplam)}</td><td class="wp-notlar">${esc([g.hata, ...(g.not || [])].filter(Boolean).join(', '))}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
   };
 
   views.bind_westpolo = () => {
@@ -176,7 +183,7 @@
     drop?.addEventListener('dragleave', () => drop.classList.remove('on'));
     drop?.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('on'); e.dataTransfer.files[0] && oku(e.dataTransfer.files[0]); });
     const alan = (id, k, olay = 'input') => $(id)?.addEventListener(olay, e => { D[k] = e.target.value; D.uyari = ''; S.keepScroll = true; render(); });
-    alan('#wpKar', 'kar'); alan('#wpSira', 'sira'); alan('#wpIsim', 'isim');
+    alan('#wpKar', 'kar'); alan('#wpIsim', 'isim');
     alan('#wpTarih', 'tarih', 'change');
   };
 
