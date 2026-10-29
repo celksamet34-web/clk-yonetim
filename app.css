@@ -636,3 +636,4 @@ body{font-size:15px;letter-spacing:0}
 .ul-tablo .sg-tablo .sk-num{width:84px}
 .sg-tablo td:nth-child(3),.sg-tablo th:nth-child(3),.sg-tablo td:nth-child(9),.sg-tablo th:nth-child(9),.sg-tablo th:last-child{text-align:left}
 .ul-tablo select.fk-uyari{border-color:#d97706;background:#fff4e5}
+.fk-hepsi td{background:var(--gold-soft)}

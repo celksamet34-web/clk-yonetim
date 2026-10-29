@@ -51,7 +51,7 @@
           <span class="sk-say">Oranın altındaki rakam, örnek alış fiyatıyla çıkan satış fiyatıdır. Yuvarlama yukarı yapılır.</span>
         </div>
         <div class="ul-tablo"><table class="sk-tablo fk-tablo"><thead><tr><th>Kategori</th>${ALAN.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
-          <tbody>${D.kurallar.map(satir).join('')}</tbody></table></div>
+          <tbody><tr class="fk-hepsi"><td class="sk-ad"><b>Tüm kategoriler</b><small class="fk-ornek" style="text-align:left">Yazılan oran hepsine geçer</small></td>${ALAN.map(([a]) => `<td><div class="fk-hucre"><input class="sk-in sk-num" data-hepsi="${a}" inputmode="decimal" placeholder="—" aria-label="Tüm kategoriler ${a} oranı"><span>%</span></div></td>`).join('')}</tr>${D.kurallar.map(satir).join('')}</tbody></table></div>
         <p class="sk-say">KATEGORİSİZ: Paraşüt'te kategorisi boş olan ürünler. Turuncu site oranı: bayi oranından düşük, perakende fiyat bayiden ucuz çıkar.</p>
       </div>
       <div class="sk-cubuk"><span>${n ? `${n} kategoride değişiklik var, kaydedilmedi` : 'Değişiklik yok'}</span>
@@ -69,7 +69,19 @@
     $('#fkYuvarla')?.addEventListener('change', e => ayarYaz('yuvarla', e.target.value));
     $('#fkOrnek')?.addEventListener('change', e => { const v = sayi(e.target.value); if (v > 0) ayarYaz('ornek_alis', v); });
     $('.fk-tablo')?.addEventListener('change', e => {
-      const el = e.target; if (!el.dataset.a) return;
+      const el = e.target;
+      // "Tüm kategoriler" satırı: oran her kategorinin taslağına yazılır, Kaydet ile kaydolur
+      if (el.dataset.hepsi) {
+        const a = el.dataset.hepsi, v = sayi(el.value);
+        if (v == null || Number.isNaN(v)) { if (Number.isNaN(v)) toast('Oran sayı olmalı (örn. 30 ya da 12,5)'); return; }
+        for (const r of D.kurallar) {
+          const t = { ...(D.taslak[r.kategori] || {}) };
+          if (v === (r[a] == null ? null : Number(r[a]))) delete t[a]; else t[a] = v;
+          if (Object.keys(t).length) D.taslak[r.kategori] = t; else delete D.taslak[r.kategori];
+        }
+        S.keepScroll = true; render(); toast('Oran tüm kategorilere yazıldı; Kaydet\'e basın'); return;
+      }
+      if (!el.dataset.a) return;
       const r = D.kurallar.find(x => x.kategori === el.dataset.k), a = el.dataset.a, v = sayi(el.value);
       if (Number.isNaN(v)) { toast('Oran sayı olmalı (örn. 30 ya da 12,5)'); S.keepScroll = true; render(); return; }
       const t = { ...(D.taslak[r.kategori] || {}) };
