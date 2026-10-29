@@ -99,12 +99,12 @@
     const maliyet = r2(k.liste * (1 - k.indirim / 100)), fiyat = Number.isNaN(kar()) ? 0 : yukari5(maliyet * (1 + kar() / 100));
     return { ...k, maliyet, fiyat, satisTutar: r2(fiyat * k.miktar) };
   });
-  // satış faturası no: CLKWEST-SF + alış fatura no'sundan türeyen rakam-harf-rakam-harf (sunucudaki wpNo ile aynı hesap)
+  // satış faturası no: seri CLKWEST-SF + alış fatura no'sundan türeyen 4 haneli numara (sunucudaki wpNum ile aynı hesap).
+  // Paraşüt seriyi en çok 10 karakter, numarayı yalnız rakam kabul ediyor.
   const wpNo = faturaNo => {
     let h = 2166136261;
     for (const c of 'wp' + faturaNo) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
-    const H = 'ABCDEFGHJKLMNPRSTUVYZ';
-    return 'CLKWEST-SF' + (h % 10) + H[(h >>> 4) % H.length] + ((h >>> 9) % 10) + H[(h >>> 13) % H.length];
+    return 'CLKWEST-SF ' + (1000 + h % 9000);
   };
   const noYazi = () => D.fat ? wpNo(D.fat.no) : 'CLKWEST-SF…';
   const musteriAd = () => D.musteriler?.find(m => m.id === D.musteri)?.ad || '';
