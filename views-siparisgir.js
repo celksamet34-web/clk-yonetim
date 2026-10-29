@@ -140,11 +140,11 @@
     const eksik = !m ? 'Müşteri seçilmedi' : !ta ? 'Adet yazılmadı' : T.satirlar.some(s => !(birim(s) >= 0) || Number.isNaN(birim(s))) ? 'Fiyatı hatalı ürün var' : '';
     return `<div class="sg-baslik"><span class="sg-no">3</span><h3>Özet</h3></div>
       <dl><div><dt>Müşteri</dt><dd>${m ? esc(m.ad) : '—'}</dd></div><div><dt>Ürün</dt><dd>${n}</dd></div><div><dt>Toplam adet</dt><dd>${ta}</dd></div><div class="sg-genel"><dt>Toplam</dt><dd>${fmt(toplam())} ₺</dd></div></dl>
-      <fieldset class="sg-teslim"><legend>Teslimat</legend>
-        <label><input type="radio" name="sgTeslim" value="kargo" ${T.teslim ? '' : 'checked'}><span><b>Kargo ile gönderilecek</b><small>Sitede "Kargolandı" yapılınca Paraşüt'e geçer</small></span></label>
-        <label><input type="radio" name="sgTeslim" value="elden" ${T.teslim ? 'checked' : ''}><span><b>Elden teslim edildi</b><small>5 dakika içinde Paraşüt'e geçer</small></span></label></fieldset>
+      <fieldset class="sg-teslim"><legend>Sipariş türü</legend>
+        <label><input type="radio" name="sgTeslim" value="siparis" ${T.teslim ? '' : 'checked'}><span><b>Sipariş</b><small>Sitede "Hazırlanıyor" olarak açılır; durumunu siteden takip edin. Kargolanınca ya da teslim edilince Paraşüt'e geçer</small></span></label>
+        <label><input type="radio" name="sgTeslim" value="teslim" ${T.teslim ? 'checked' : ''}><span><b>Teslim</b><small>Ürün elden verildi: sitede "Teslim edildi" olarak açılır, 5 dakika içinde Paraşüt'e geçer</small></span></label></fieldset>
       <label class="sg-not">Sipariş notu (müşteri görür)<textarea id="sgNot" rows="2">${esc(T.not)}</textarea></label>
-      ${D.durum === 'onay' ? `<div class="sg-onay"><p><b>${esc(m.ad)}</b> carisine <b>${fmt(toplam())} ₺</b> tutarında, ${n} ürün / ${ta} adetlik sipariş açılacak.</p>
+      ${D.durum === 'onay' ? `<div class="sg-onay"><p><b>${esc(m.ad)}</b> carisine <b>${fmt(toplam())} ₺</b> tutarında, ${n} ürün / ${ta} adetlik ${T.teslim ? '<b>teslim</b> kaydı' : 'sipariş (<b>Hazırlanıyor</b>)'} açılacak.</p>
           <div class="sg-onay-dug"><button class="btn" data-act="sgVazgec">Geri dön</button><button class="btn dark" data-act="sgGonder">Onayla, siparişi aç</button></div></div>`
         : `<button class="btn dark sg-olustur" data-act="sgOnay" ${eksik || D.durum ? 'disabled' : ''}>${D.durum === 'gonderiliyor' ? 'Sipariş açılıyor…' : 'Siparişi oluştur'}</button>
           ${eksik ? `<p class="sg-soluk">${eksik}</p>` : ''}`}
@@ -157,7 +157,7 @@
     const ust = head('Satış', 'Sipariş gir', 'Müşteriyi seçin, ürünü arayıp tıklayın, renklerin adedini yazın. Sipariş sitede müşterinin carisine açılır; Paraşüt\'e tek satış faturası olarak gider (renkler toplanır).');
     if (D.hata) return ust + `<div class="card empty"><h3>Bilgiler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>`;
     if (D.sonuc) return ust + `<div class="card sg-tamam"><div class="pill ok">Sipariş açıldı</div><h3>${esc(D.sonuc.kod || 'Sipariş')}</h3>
-      <p>${esc(D.sonuc.musteri)} · ${fmt(D.sonuc.toplam)} ₺</p><p class="sg-soluk">${D.sonuc.teslim ? 'Elden teslim olarak açıldı, 5 dakika içinde Paraşüt\'e satış faturası olur.' : 'Sitede "Kargolandı" yapılınca Paraşüt\'e satış faturası olur.'}</p>
+      <p>${esc(D.sonuc.musteri)} · ${fmt(D.sonuc.toplam)} ₺</p><p class="sg-soluk">${D.sonuc.teslim ? 'Teslim olarak açıldı, 5 dakika içinde Paraşüt\'e satış faturası olur.' : 'Sitede "Hazırlanıyor" olarak açıldı. Kargolanınca ya da teslim edilince Paraşüt\'e satış faturası olur.'}</p>
       <div class="sg-tamam-dug"><button class="btn dark" data-act="sgYazdir">Listeyi yazdır</button><button class="btn" data-act="sgYeni">Yeni sipariş</button></div></div>`;
     const m = musteri(), n = T.satirlar.length, ta = toplamAdet();
     const musteriKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">1</span><h3>Müşteri</h3></div>
@@ -197,7 +197,7 @@
     // özet parça parça yenilendiği için olaylar kapsayıcıdan dinlenir
     const oz = $('#sgOzet');
     oz?.addEventListener('input', e => { if (e.target.id === 'sgNot') { T.not = e.target.value; sakla(); } });
-    oz?.addEventListener('change', e => { if (e.target.name === 'sgTeslim') { T.teslim = e.target.value === 'elden'; sakla(); oz.innerHTML = ozetHtml(); } });
+    oz?.addEventListener('change', e => { if (e.target.name === 'sgTeslim') { T.teslim = e.target.value === 'teslim'; sakla(); oz.innerHTML = ozetHtml(); } });
     const sat = $('.sg-satirlar');
     sat?.addEventListener('input', e => {
       const el = e.target, s = T.satirlar.find(x => x.pid === el.dataset.pid); if (!s) return;
@@ -242,7 +242,7 @@
   function yazdir(o) {
     if (!o?.liste?.length || !CLK.kontrolListesi) { toast('Yazdırılacak liste yok'); return; }
     const trTarih = new Date(o.zaman || Date.now()).toLocaleDateString('tr-TR');
-    CLK.kontrolListesi('Sipariş', [['Müşteri', o.musteri], o.kod && ['Sipariş no', o.kod], ['Tarih', trTarih], ['Teslimat', o.teslim ? 'Elden' : 'Kargo'], o.tel && ['Telefon', o.tel]].filter(Boolean), o.liste);
+    CLK.kontrolListesi('Sipariş', [['Müşteri', o.musteri], o.kod && ['Sipariş no', o.kod], ['Tarih', trTarih], ['Tür', o.teslim ? 'Teslim' : 'Sipariş'], o.tel && ['Telefon', o.tel]].filter(Boolean), o.liste);
   }
 
   const prevAct = views.onAct;
