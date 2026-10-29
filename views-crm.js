@@ -46,8 +46,12 @@
     const d = o.order || {}, c = o.customer || {}, s = o.summary || {}, items = O.items(o);
     const cost = items.reduce((a, i) => a + (Number(i.purchasePrice) || 0) * (Number(i.netQuantity ?? i.quantity) || 0), 0);
     const pm = {}; S.products.forEach(p => { pm[p.code] = p; });
-    const back = `<button class="btn sm gold" data-act="oYazdir" data-id="${esc(O.id(o))}">Yazdır</button>` + geri;
-    return head('Sipariş · ' + esc(d.platform || 'Site'), esc(d.code || ''), `${dtt(d.createdAt)} · ${st(Number(d.status))}`, back) + `
+    const id = esc(O.id(o)), acik = ![5, 6].includes(O.status(o)), is = OI.id === String(O.id(o)) ? OI : {};
+    const back = (acik ? `<button class="btn sm danger" data-act="oIptal" data-id="${id}" ${is.is ? 'disabled' : ''}>${is.is === 'iptal' ? 'İptal ediliyor…' : is.onay ? 'Evet, iptal et' : 'İptal et'}</button>
+      <button class="btn sm" data-act="oDuzelt" data-id="${id}" ${is.is ? 'disabled' : ''}>${is.is === 'duzelt' ? 'Yükleniyor…' : 'Düzelt'}</button>` : '')
+      + `<button class="btn sm gold" data-act="oYazdir" data-id="${id}">Yazdır</button>` + geri;
+    const uyari = is.mesaj ? `<div class="card o-uyari"><p>${esc(is.mesaj)}</p></div>` : is.onay ? `<div class="card o-uyari"><p>Sipariş sitede <b>iptal</b> edilecek, tutarı (${tl2(O.total(o))}) müşterinin carisine geri döner. Onaylamak için <b>Evet, iptal et</b>'e basın.</p></div>` : '';
+    return head('Sipariş · ' + esc(d.platform || 'Site'), esc(d.code || ''), `${dtt(d.createdAt)} · ${st(Number(d.status))}`, back) + uyari + `
       <div class="ed"><div class="stack">
         <div class="card"><div class="card-h"><div><h3>Ürünler</h3><p class="sub">${items.length} kalem</p></div></div>
           <ul class="rows">${items.map(i => { const p = pm[i.code]; return `<li ${p ? `data-edit="${esc(i.code)}"` : ''}>${p && P.img(p) ? `<img class="th" src="${esc(P.img(p))}" alt="">` : '<span class="th"></span>'}<div class="t"><b>${esc(i.name)}</b><small>${esc(i.code)}${i.variants ? ' · ' + esc(typeof i.variants === 'string' ? i.variants : Object.values(i.variants || {}).join(' / ')) : ''} · ${num(i.quantity)} × ${tl2(i.priceIncVat ?? i.price)}</small></div><b class="num">${tl2(i.totalPriceIncVat ?? i.totalPrice)}</b></li>`; }).join('')}</ul></div>
@@ -172,6 +176,27 @@
     $$('[data-ct]').forEach(b => b.addEventListener('click', () => { C.t = b.dataset.ct; render(); }));
   };
 
+  // İptal et ve Düzelt: sunucu Paraşüt'e geçmiş ya da Paraşüt'ten gelmiş siparişi reddeder (orada değiştirilir)
+  const OI = (S.ui.oi ||= {});
+  const oiSifirla = id => { for (const k of Object.keys(OI)) delete OI[k]; OI.id = String(id); };
+  async function siparisIptal(o) {
+    if (!OI.onay) { oiSifirla(O.id(o)); OI.onay = true; S.keepScroll = true; render(); setTimeout(() => { if (OI.onay && OI.id === String(O.id(o))) { OI.onay = false; if (S.route === 'siparis') { S.keepScroll = true; render(); } } }, 8000); return; }
+    oiSifirla(O.id(o)); OI.is = 'iptal'; S.keepScroll = true; render();
+    try {
+      const r = await CLK.spSor({ islem: 'siparis_iptal', kod: O.code(o) });
+      o.order.status = 6; oiSifirla('');
+      CLK.toast(r.zaten ? 'Sipariş zaten iptal edilmiş' : `Sipariş ${O.code(o)} iptal edildi, tutarı cariye geri döndü`);
+      go('siparisler'); return;
+    } catch (e) { OI.is = ''; OI.mesaj = 'İptal edilemedi: ' + e.message; }
+    S.keepScroll = true; render();
+  }
+  async function siparisDuzelt(o) {
+    oiSifirla(O.id(o)); OI.is = 'duzelt'; S.keepScroll = true; render();
+    try { const v = await CLK.spSor({ islem: 'siparis_oku', kod: O.code(o) }); oiSifirla(''); CLK.siparisDuzelt(v); return; }
+    catch (e) { OI.is = ''; OI.mesaj = 'Düzeltilemez: ' + e.message; }
+    S.keepScroll = true; render();
+  }
+
   // Sipariş detayındaki Yazdır: Sipariş gir çıktısıyla aynı sevkiyat ve kontrol listesi
   const varyant = v => !v ? '' : typeof v === 'string' ? v : Object.values(v).join(' / ');
   function siparisYazdir(o) {
@@ -190,6 +215,7 @@
   views.onAct = (act, el, e) => {
     if (act === 'oMore') { F.shown += 40; S.keepScroll = true; render(); }
     else if (act === 'bekleyenGit') { F.s = -1; F.q = ''; F.plat = ''; F.shown = 40; go('siparisler'); }
+    else if (act === 'oIptal' || act === 'oDuzelt') { const o = S.orders.find(x => String(O.id(x)) === el.dataset.id); if (o) (act === 'oIptal' ? siparisIptal : siparisDuzelt)(o); }
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'copy') { navigator.clipboard?.writeText(el.dataset.v).then(() => CLK.toast('Kopyalandı'), () => CLK.toast('Kopyalanamadı')); }
     else prevAct?.(act, el, e);

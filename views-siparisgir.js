@@ -26,6 +26,19 @@
     if (!r.ok || j?.hata) throw new Error(j?.hata || 'Sunucu ' + r.status);
     return j;
   }
+  CLK.spSor = sor;
+  // Siparişler › Düzelt: sitedeki sipariş forma yüklenir; kaydedince eski sipariş iptal edilir, yerine bu açılır
+  CLK.siparisDuzelt = v => {
+    yeniForm();
+    T.duzelt = v.kod; T.musteri = v.userId; T.teslim = !!v.teslim; T.not = v.not || '';
+    for (const x of v.satirlar) {
+      let s = T.satirlar.find(y => y.pid === x.pid);
+      if (!s) T.satirlar.push(s = { pid: x.pid, ad: urun(x.pid)?.ad || x.ad, fiyat: x.fiyat, acik: false, renkler: [] });
+      const r = s.renkler.find(y => y.renk === x.renk);
+      if (r) r.adet = String(Number(r.adet) + x.adet); else s.renkler.push({ renk: x.renk, adet: String(x.adet) });
+    }
+    CLK.go('siparisgir');
+  };
   // müşteriler: Paraşüt'le eşleşmiş site üyeleri; fiyat tanımı, iskonto ve bakiye sitedeki üye kartından
   async function musterileriAl() {
     const [{ data: es, error }] = await Promise.all([sb.from('sp_musteri_eslesme').select('site_ad,parasut_id,parasut_ad').not('parasut_id', 'is', null), CLK.loadUsers()]);
@@ -148,17 +161,19 @@
         <label><input type="radio" name="sgTeslim" value="siparis" ${T.teslim ? '' : 'checked'}><span><b>Sipariş</b><small>Sitede "Hazırlanıyor" olarak açılır; durumunu siteden takip edin. Kargolanınca ya da teslim edilince Paraşüt'e geçer</small></span></label>
         <label><input type="radio" name="sgTeslim" value="teslim" ${T.teslim ? 'checked' : ''}><span><b>Teslim</b><small>Ürün elden verildi: sitede "Teslim edildi" olarak açılır, 5 dakika içinde Paraşüt'e geçer</small></span></label></fieldset>
       <label class="sg-not">Sipariş notu (müşteri görür)<textarea id="sgNot" rows="2">${esc(T.not)}</textarea></label>
-      ${D.durum === 'onay' ? `<div class="sg-onay"><p><b>${esc(m.ad)}</b> carisine <b>${fmt(toplam())} ₺</b> tutarında, ${n} ürün / ${ta} adetlik ${T.teslim ? '<b>teslim</b> kaydı' : 'sipariş (<b>Hazırlanıyor</b>)'} açılacak.</p>
-          <div class="sg-onay-dug"><button class="btn" data-act="sgVazgec">Geri dön</button><button class="btn dark" data-act="sgGonder">Onayla, siparişi aç</button></div></div>`
-        : `<button class="btn dark sg-olustur" data-act="sgOnay" ${eksik || D.durum ? 'disabled' : ''}>${D.durum === 'gonderiliyor' ? 'Sipariş açılıyor…' : 'Siparişi oluştur'}</button>
+      ${D.durum === 'onay' ? `<div class="sg-onay"><p>${T.duzelt ? `Eski sipariş <b>${esc(T.duzelt)}</b> iptal edilecek (tutarı cariye geri döner) ve yerine ` : ''}<b>${esc(m.ad)}</b> carisine <b>${fmt(toplam())} ₺</b> tutarında, ${n} ürün / ${ta} adetlik ${T.teslim ? '<b>teslim</b> kaydı' : 'sipariş (<b>Hazırlanıyor</b>)'} açılacak.</p>
+          <div class="sg-onay-dug"><button class="btn" data-act="sgVazgec">Geri dön</button><button class="btn dark" data-act="sgGonder">${T.duzelt ? 'Onayla, düzelt' : 'Onayla, siparişi aç'}</button></div></div>`
+        : `<button class="btn dark sg-olustur" data-act="sgOnay" ${eksik || D.durum ? 'disabled' : ''}>${D.durum === 'gonderiliyor' ? (T.duzelt ? 'Düzeltiliyor…' : 'Sipariş açılıyor…') : T.duzelt ? 'Düzeltmeyi kaydet' : 'Siparişi oluştur'}</button>
           ${eksik ? `<p class="sg-soluk">${eksik}</p>` : ''}`}
-      ${n || m ? '<button class="btn ghost sm" data-act="sgTemizle">Formu temizle</button>' : ''}
+      ${n || m ? `<button class="btn ghost sm" data-act="sgTemizle">${T.duzelt ? 'Düzeltmeden vazgeç' : 'Formu temizle'}</button>` : ''}
       ${!n && sonVar() ? '<button class="btn ghost sm" data-act="sgSonYazdir">Son siparişin listesini yazdır</button>' : ''}`;
   }
 
   views.siparisgir = () => {
     if (!D.musteriler && !D.urunler && !D.hata && !yukle.basladi) { yukle.basladi = true; yukle(); }
-    const ust = head('Satış', 'Sipariş gir', 'Müşteriyi seçin, ürünü arayıp tıklayın, renklerin adedini yazın. Sipariş sitede müşterinin carisine açılır; Paraşüt\'e tek satış faturası olarak gider (renkler toplanır).',
+    const ust = T.duzelt ? head('Satış', 'Sipariş düzelt', `Sipariş <b>${esc(T.duzelt)}</b> forma yüklendi. Adetleri, renkleri, fiyatları ya da türü değiştirip kaydedin: eski sipariş sitede iptal edilir (tutarı cariye geri döner), yerine düzeltilmiş sipariş açılır.`,
+        '<button class="btn" data-act="sgTemizle">Vazgeç</button>')
+      : head('Satış', 'Sipariş gir', 'Müşteriyi seçin, ürünü arayıp tıklayın, renklerin adedini yazın. Sipariş sitede müşterinin carisine açılır; Paraşüt\'e tek satış faturası olarak gider (renkler toplanır).',
       T.musteri || T.satirlar.length ? '<button class="btn" data-act="sgTemizle">Temizle</button>' : '');
     if (D.hata) return ust + `<div class="card empty"><h3>Bilgiler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="sgYenile">Tekrar dene</button></div>`;
     if (D.sonuc) return ust + `<div class="card sg-tamam"><div class="pill ok">Sipariş açıldı</div><h3>${esc(D.sonuc.kod || 'Sipariş')}</h3>
@@ -233,12 +248,14 @@
     const satirlar = T.satirlar.flatMap(s => adetler(s).map(r => ({ pid: s.pid, renk: r.renk, adet: Number(r.adet), fiyat: birim(s) })));
     D.durum = 'gonderiliyor'; render();
     try {
-      const r = await sor({ islem: 'siparis_gir', siparis: { istek: T.istek, userId: m.id, satirlar, not: T.not, teslim: T.teslim } });
+      const r = await sor({ islem: 'siparis_gir', siparis: { istek: T.istek, userId: m.id, satirlar, not: T.not, teslim: T.teslim, ...(T.duzelt ? { duzelt: T.duzelt } : {}) } });
+      // eski sipariş sitede iptal edildi: listede hemen gizlensin
+      if (r.eski) { const o = S.orders.find(x => String(CLK.O.code(x)) === String(r.eski)); if (o?.order) o.order.status = 6; }
       // çıktı için: renk renk satırlar, müşteri bilgisi ve teslimat sonuçla birlikte saklanır (sayfa yenilense de yazdırılabilir)
       D.sonuc = { ...r, tel: m.tel, adres: m.adres, liste: T.satirlar.flatMap(s => adetler(s).map(x => ({ urun: s.ad + (x.renk ? ' – ' + x.renk : ''), miktar: Number(x.adet), fiyat: birim(s), tutar: Math.round(Number(x.adet) * birim(s) * 100) / 100 }))) };
       try { localStorage.setItem('clk-siparis-son', JSON.stringify(D.sonuc)); } catch {}
       T = BOS(); sakla(); D.durum = '';
-      toast(`Sipariş ${r.kod || ''} açıldı`);
+      toast(r.eski ? `Sipariş ${r.eski} düzeltildi, yeni no ${r.kod || ''}` : `Sipariş ${r.kod || ''} açıldı`);
     } catch (e) { D.durum = ''; toast(/Oturum gerekli/.test(e.message) ? 'Siparişi siteye gönderme henüz açılmadı (sunucu güncellemesi bekleniyor). Taslak saklandı.' : 'Sipariş açılamadı: ' + e.message); }
     render();
   }
