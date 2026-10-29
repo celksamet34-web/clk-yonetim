@@ -157,10 +157,10 @@ window.CLK = (() => {
       return `<button data-go="${k}" class="${k === 'siparisgir' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
     }).join('');
     return `<div class="shell">
-      <aside class="side"><div class="logo" data-go="panel" role="link" tabindex="0" title="Ana sayfa">CLK<small>ÇANTA · YÖNETİM</small></div>
+      <aside class="side"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK<small>ÇANTA · YÖNETİM</small></div>
         <nav class="nav">${nav}<button class="add" data-go="siparisgir" ${S.route === 'siparisgir' ? 'aria-current="page"' : ''}>${ICONS.siparisgir}<span>Sipariş gir</span></button><button class="add" data-go="yeni">${ICONS.plus}<span>Yeni ürün</span></button>${esitleBtn()}</nav>
         <div class="foot"><b>${esc(S.user?.email || '')}</b><button class="link" data-act="logout">Çıkış yap</button></div></aside>
-      <header class="mtop"><div class="logo" data-go="panel" role="link" tabindex="0" title="Ana sayfa">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
+      <header class="mtop"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
       <div class="sheet-more" id="more" data-act="moreKapat" ${S.more ? '' : 'hidden'}><div class="sheet-in">${[['siparisgir', 'Sipariş gir'], ['stok', 'Stok'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['siparisler', 'Siparişler'], ['banner', 'Banner'], ['eslestirme', 'Paraşüt'], ['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları'], ['fiyat', 'Fiyat kuralları'], ['ekstre', 'Müşteri ekstresi']].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}${esitleBtn()}</div></div></div>`;
@@ -243,6 +243,8 @@ window.CLK = (() => {
   }
   document.addEventListener('click', e => {
     const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); go(g.dataset.go, g.dataset.arg); return; }
+    // CLK logosu: ana sayfaya dönüp sayfayı baştan yükler (celik isteği 29.10.2026; yeni sürüm de böylece gelir)
+    if (e.target.closest('[data-act="yenile"]')) { history.replaceState(null, '', '#panel'); location.reload(); return; }
     const a = e.target.closest('[data-act]'); if (!a) return;
     const act = a.dataset.act;
     if (act === 'moreKapat') { if (e.target === a) { S.more = false; S.keepScroll = true; render(); } return; }
