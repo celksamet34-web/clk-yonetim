@@ -63,7 +63,7 @@
     <div class="stack">
       <div class="kpis">
         <div class="kpi hero"><div class="k">Son ${per === 365 ? '12 ay' : per + ' gün'} ciro</div><div class="v">${tlc(s30.rev)}</div><div class="s">${num(s30.cnt)} sipariş · tahmini brüt kâr ${tlc(s30.profit)}</div></div>
-        <div class="kpi"><div class="k">Bekleyen sipariş</div><div class="v">${num(pend.length)}</div><div class="s">yeni ve hazırlanan</div></div>
+        <div class="kpi tikla" data-act="bekleyenGit" role="link" tabindex="0" title="Bekleyen siparişleri aç"><div class="k">Bekleyen sipariş</div><div class="v">${num(pend.length)}</div><div class="s">yeni ve hazırlanan</div></div>
         <div class="kpi"><div class="k">Stok değeri</div><div class="v">${tlc(cost)}</div><div class="s">${num(PR.length)} ürün · alış fiyatıyla</div></div>
         <div class="kpi ${debt < 0 ? 'bad' : ''}"><div class="k">Açık cari</div><div class="v">${tlc(Math.abs(debt))}</div><div class="s">${num(S.users.filter(u => (Number(u.balance) || 0) < 0).length)} müşteri borçlu</div></div>
       </div>
@@ -75,7 +75,7 @@
           ${top.length ? `<ul class="rows">${top.map((t, i) => `<li data-edit="${esc(t.code)}"><span class="rank">${i + 1}</span><div class="t"><b>${esc(t.name)}</b><small>${esc(t.code)} · ${tl(t.rev)}</small></div><span class="pill gold">${num(t.q)} adet</span></li>`).join('')}</ul>` : '<p class="sub">Henüz satış yok.</p>'}</div>
       </div>
       <div class="grid2">
-        <div class="card"><div class="card-h"><div><h3>Bekleyen siparişler</h3><p class="sub">Hazırlanması gereken siparişler</p></div></div>
+        <div class="card"><div class="card-h"><div><h3>Bekleyen siparişler</h3><p class="sub">Hazırlanması gereken siparişler</p></div><button class="btn sm ghost" data-act="bekleyenGit">Tümü</button></div>
           ${pend.length ? `<ul class="rows">${pend.slice(0, 6).map(o => `<li data-order="${O.id(o)}"><span class="th ord">${esc(String(O.code(o)).slice(-4))}</span><div class="t"><b>${esc(O.cust(o))}</b><small>${esc(O.code(o))} · ${dt(O.date(o))} · ${O.items(o).length} kalem</small></div><b class="num">${tl(O.total(o))}</b></li>`).join('')}</ul>` : '<p class="sub">Bekleyen sipariş yok.</p>'}</div>
         <div class="card"><div class="card-h"><div><h3>Stok uyarıları</h3><p class="sub">Aktif ürünlerde tükenen ve kritik seviyedekiler</p></div>${out.length + low.length ? `<button class="btn sm ghost" data-act="toAlerts">Tümü (${out.length + low.length})</button>` : ''}</div>
           ${alerts.length ? `<ul class="rows">${alerts.map(p => `<li data-edit="${esc(p.code)}">${thumb(p)}<div class="t"><b>${esc(p.name)}</b><small>${esc(p.code)} · ${esc(P.cat(p))}</small></div><span class="pill ${P.qty(p) <= 0 ? 'bad' : 'warn'}">${P.qty(p) <= 0 ? 'Tükendi' : P.qty(p) + ' adet'}</span></li>`).join('')}</ul>` : '<p class="sub">Uyarı yok.</p>'}</div>

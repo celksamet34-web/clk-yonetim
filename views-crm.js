@@ -17,7 +17,7 @@
     if (F.s > 4) F.s = 0;
     const q = F.q.trim().toLocaleLowerCase('tr');
     const T = S.orders.filter(O.counts); // iade ve iptaller listede gösterilmez
-    const L = T.filter(o => (!F.s || O.status(o) === F.s) && (!F.plat || O.platform(o) === F.plat) &&
+    const L = T.filter(o => (!F.s || (F.s === -1 ? [1, 2].includes(O.status(o)) : O.status(o) === F.s)) && (!F.plat || O.platform(o) === F.plat) &&
       (!q || [O.code(o), O.cust(o), o.customer?.phone, o.customer?.email, ...O.items(o).map(i => i.name + ' ' + i.code)].join(' ').toLocaleLowerCase('tr').includes(q)));
     const valid = L.filter(O.counts), rev = valid.reduce((a, o) => a + O.total(o), 0);
     const cnt = s => T.filter(o => O.status(o) === s).length;
@@ -26,7 +26,7 @@
       <div class="mini-kpis"><div><span>Listelenen</span><b>${num(L.length)}</b></div><div><span>Ciro</span><b>${tl(rev)}</b></div><div><span>Ortalama sepet</span><b>${tl(valid.length ? rev / valid.length : 0)}</b></div><div><span>Bekleyen</span><b>${num(cnt(1) + cnt(2))}</b></div></div>
       <div class="card"><div class="tools"><input type="search" id="oq" placeholder="Sipariş no, müşteri, telefon veya ürün ara" value="${esc(F.q)}">
         ${plats.length > 1 ? `<select id="oplat"><option value="">Tüm kanallar</option>${plats.map(p => `<option ${p === F.plat ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>` : ''}</div>
-        <div class="chips">${[[0, 'Tümü'], [1, 'Yeni'], [2, 'Hazırlanıyor'], [3, 'Kargoda'], [4, 'Teslim']].map(([k, l]) => `<button class="chip" data-os="${k}" aria-pressed="${F.s === k}">${l} <b>${k ? cnt(k) : T.length}</b></button>`).join('')}</div>
+        <div class="chips">${[[0, 'Tümü'], [-1, 'Bekleyen'], [1, 'Yeni'], [2, 'Hazırlanıyor'], [3, 'Kargoda'], [4, 'Teslim']].map(([k, l]) => `<button class="chip" data-os="${k}" aria-pressed="${F.s === k}">${l} <b>${k === -1 ? cnt(1) + cnt(2) : k ? cnt(k) : T.length}</b></button>`).join('')}</div>
         <div class="olist">${L.slice(0, F.shown).map(o => `<button class="orow" data-order="${O.id(o)}">
           <div class="o1"><b>${esc(O.cust(o))}</b><small>${esc(O.code(o))} · ${dtt(O.date(o))} · ${esc(O.platform(o))}</small></div>
           <div class="o2">${O.items(o).slice(0, 3).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}${O.items(o).length > 3 ? `<span>+${O.items(o).length - 3}</span>` : ''}</div>
@@ -189,6 +189,7 @@
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'oMore') { F.shown += 40; S.keepScroll = true; render(); }
+    else if (act === 'bekleyenGit') { F.s = -1; F.q = ''; F.plat = ''; F.shown = 40; go('siparisler'); }
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'copy') { navigator.clipboard?.writeText(el.dataset.v).then(() => CLK.toast('Kopyalandı'), () => CLK.toast('Kopyalanamadı')); }
     else prevAct?.(act, el, e);

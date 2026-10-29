@@ -618,3 +618,4 @@ body{font-size:15.5px;letter-spacing:0}
 .sg-tamam-dug{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .logo[data-go]{cursor:pointer}
 .sg-mus-degis{all:unset;cursor:pointer;float:right;margin:8px 2px 0;font-size:12px;font-weight:600;color:var(--muted)}.sg-mus-degis:hover{color:var(--bad)}
+.kpi.tikla{cursor:pointer;transition:background .15s}.kpi.tikla:hover{background:rgba(185,148,92,.08)}

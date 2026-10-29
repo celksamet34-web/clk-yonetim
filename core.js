@@ -151,10 +151,10 @@ window.CLK = (() => {
   function shell(content) {
     const nav = NAV.map(([k, l]) => `<button data-go="${k}" ${S.route === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
     const more = ['siparisler', 'musteriler', 'cari'].includes(S.route);
-    const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['yeni', 'Ekle'], ['siparisler', 'Sipariş'], ['daha', 'Daha']].map(([k, l]) => {
-      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urungiris', 'westpolo', 'urunlistesi', 'stokkart', 'fiyat', 'ekstre', 'siparisgir'].includes(S.route));
-      const ic = k === 'yeni' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
-      return `<button data-go="${k}" class="${k === 'yeni' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
+    const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['daha', 'Daha']].map(([k, l]) => {
+      const cur = S.route === k || (k === 'daha' && ['stok', 'musteriler', 'cari', 'banner', 'eslestirme', 'urungiris', 'westpolo', 'urunlistesi', 'stokkart', 'fiyat', 'ekstre', 'yeni'].includes(S.route));
+      const ic = k === 'siparisgir' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
+      return `<button data-go="${k}" class="${k === 'siparisgir' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
     }).join('');
     return `<div class="shell">
       <aside class="side"><div class="logo" data-go="panel" role="link" tabindex="0" title="Ana sayfa">CLK<small>ÇANTA · YÖNETİM</small></div>
