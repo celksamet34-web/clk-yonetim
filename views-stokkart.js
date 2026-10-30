@@ -23,7 +23,7 @@
     D.yukleniyor = taze ? 'taze' : 'ilk'; D.hata = ''; render();
     try {
       const v = await sor({ islem: 'urunler', taze });
-      D.urunler = v.urunler.map(([id, ad, alis, satis, stok, ss, as, arsiv]) => ({ id: String(id), ad, alis, satis, stok, ss, as, arsiv: !!arsiv }));
+      D.urunler = v.urunler.map(([id, ad, alis, satis, stok, ss, as, arsiv, kat]) => ({ id: String(id), ad, alis, satis, stok, ss, as, arsiv: !!arsiv, kat: kat || '' }));
       D.zaman = v.zaman;
       // Paraşüt'teki değerle aynı olan taslak alanları düşer
       const ix = Object.fromEntries(D.urunler.map(u => [u.id, u]));
@@ -44,12 +44,15 @@
     sakla();
   }
   const arsivde = u => deger(u, 'arsiv');
+  // West Polo ürünleri bizim stoğumuz değil, tedarikçinin stok listesi: ana listelerde görünmez, yalnız "West Polo" düğmesinde (celik isteği 30.10.2026)
+  const west = u => buyuk(u.kat) === 'WEST' || buyuk(u.ad).startsWith('WEST POLO ');
   const FILTRE = {
-    hepsi: ['Tümü', u => !arsivde(u)],
-    stokta: ['Stokta var', u => !arsivde(u) && u.stok > 0],
-    eksi: ['Eksi stok', u => !arsivde(u) && u.stok < 0],
-    sifir: ['Stok 0', u => !arsivde(u) && u.stok === 0],
-    bos: ['Hiç kullanılmamış', u => !arsivde(u) && !u.ss && !u.as],
+    hepsi: ['Tümü', u => !arsivde(u) && !west(u)],
+    stokta: ['Stokta var', u => !arsivde(u) && !west(u) && u.stok > 0],
+    eksi: ['Eksi stok', u => !arsivde(u) && !west(u) && u.stok < 0],
+    sifir: ['Stok 0', u => !arsivde(u) && !west(u) && u.stok === 0],
+    bos: ['Hiç kullanılmamış', u => !arsivde(u) && !west(u) && !u.ss && !u.as],
+    west: ['West Polo', u => !arsivde(u) && west(u)],
     degisen: ['Değiştirilenler', u => !!taslak[u.id]],
     arsiv: ['Arşivde', u => arsivde(u)]
   };
