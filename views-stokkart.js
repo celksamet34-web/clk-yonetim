@@ -18,11 +18,15 @@
     if (!r.ok || j?.hata) throw new Error(j?.hata || 'Sunucu ' + r.status);
     return j;
   }
-  // taze: Paraşüt'ten yeniden okunur (yarım dakika kadar); değilse son okunan liste hemen gelir
+  // liste sunucuda sayfa sayfa tazelenir (CLK.urunTazele, Siteye gönder); taze ("Güncelle"): Paraşüt'ün o anki hâli okunana kadar beklenir
   async function yukle(taze) {
     D.yukleniyor = taze ? 'taze' : 'ilk'; D.hata = ''; render();
     try {
-      const v = await sor({ islem: 'urunler', taze });
+      if (taze) {
+        try { await CLK.urunTazele(true, (n, t) => { const b = $('[data-act="skYenile"]'); if (b) b.textContent = `Güncelleniyor… ${n}/${t}`; }); }
+        catch (e) { if (e.yok) await sor({ islem: 'urunler', taze: true }); else toast(e.message); }
+      } else CLK.urunTazele?.(false).catch(() => {});
+      const v = await sor({ islem: 'urunler' });
       D.urunler = v.urunler.map(([id, ad, alis, satis, stok, ss, as, arsiv, kat]) => ({ id: String(id), ad, alis, satis, stok, ss, as, arsiv: !!arsiv, kat: kat || '' }));
       D.zaman = v.zaman;
       // Paraşüt'teki değerle aynı olan taslak alanları düşer
@@ -30,8 +34,6 @@
       for (const [id, t] of Object.entries(taslak)) { for (const a of Object.keys(t)) if (!ix[id] || ix[id][a] === t[a]) delete t[a]; if (!Object.keys(t).length) delete taslak[id]; }
       sakla();
       D.yukleniyor = '';
-      // son okuma 1 saatten eskiyse arka planda yenilenir
-      if (!taze && Date.now() - Date.parse(v.zaman) > 36e5) return yukle(true);
     } catch (e) { D.hata = e.message; D.yukleniyor = ''; }
     render();
   }
