@@ -13,22 +13,6 @@
   const buyuk = s => String(s || '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('tr');
   const anahtar = a => buyuk(a).replace(/İ/g, 'I');
   const katAd = u => u.kat || 'KATEGORİSİZ';
-  // West Polo ürünleri ürün adındaki tipe göre sitedeki WEST POLO alt kategorisine düşer (celik isteği 30.10.2026);
-  // satırdaki seçimle değiştirilebilir. Adı yalnız koddan ibaret olan (renksiz) ürün, aynı koddaki diğer ürünün tipini alır; tip hiç yoksa çantadır.
-  const WEST_ALT = [[/EL PORTFÖY/, 'EL PORTFÖY ÇANTALARI'], [/(BAYAN|KADIN|PORTFÖY) CÜZDAN/, 'KADIN CÜZDANLARI'], [/CÜZDAN|KARTLIK/, 'ERKEK CÜZDANLARI']];
-  const westKod = ad => (ad.match(/^WEST POLO (\d+)/) || [])[1];
-  const westTip = ad => WEST_ALT.find(([re]) => re.test(ad))?.[1];
-  let westKodTip = null, westKodKaynak = null;
-  const westKat = u => {
-    const ad = buyuk(u.ad);
-    if (buyuk(u.kat) !== 'WEST' && !ad.startsWith('WEST POLO ')) return '';
-    if (westKodKaynak !== D.urunler) {
-      westKodKaynak = D.urunler; westKodTip = {};
-      for (const x of D.urunler || []) { const xa = buyuk(x.ad), k = westKod(xa), t = westTip(xa); if (k && t && !westKodTip[k]) westKodTip[k] = t; }
-    }
-    const alt = westTip(ad) || westKodTip[westKod(ad)] || 'KASALI ÇANTALAR';
-    return (D.kats || []).find(c => buyuk(c.path) === 'WEST POLO › ' + alt)?.id || '';
-  };
   // fiyat kutusunun altındaki kâr: alışa göre yüzde ve tutar (celik isteği 29.10.2026)
   const kar = (alis, f) => {
     if (!(alis > 0) || !(f > 0)) return { yazi: '', zarar: false };
@@ -94,7 +78,7 @@
     if (g && a in g) return g[a];
     const p = sitede()[u.id];
     if (a === 'ad') return p ? buyuk(p.name) : buyuk(u.ad);
-    if (a === 'kat') return p ? String(p.categoryId ?? p.categoryID ?? '') : String(westKat(u) || D.katEs[katAd(u)] || '');
+    if (a === 'kat') return p ? String(p.categoryId ?? p.categoryID ?? '') : String(D.katEs[katAd(u)] || '');
     if (a === 'acik') return p ? P.on(p) : false;
     if (a === 'alis') return u.alis || null;
     if (p) return Number(a === 'site' ? p.salePrice : p['dealerPrice' + a.slice(1)]) || null;
