@@ -76,8 +76,8 @@
     if (!u) return { f: 0, kaynak: '' };
     const alan = TIP.find(t => t[0] === tip())?.[2] || 'site';
     const kural = D.kurallar[buyuk(u.kat)] || D.kurallar['KATEGORİSİZ'];
-    const kuralli = CLK.fiyatla?.(u.alis, kural?.[alan], D.yuvarla);
-    let f = kuralli ?? u.satis, kaynak = kuralli != null ? `${u.kat || 'Kategorisiz'} %${String(kural[alan]).replace('.', ',')}` : 'Paraşüt satış fiyatı';
+    const kuralli = CLK.kuralFiyat?.(u.alis, kural, alan, D.yuvarla);
+    let f = kuralli ?? u.satis, kaynak = kuralli != null ? `${u.kat || 'Kategorisiz'} ${alan === 'site' && kural.b1 != null && kural.b1 !== '' ? 'Bayi 1 üstüne ' : ''}%${String(kural[alan]).replace('.', ',')}` : 'Paraşüt satış fiyatı';
     const isk = Number(musteri()?.iskonto) || 0;
     if (isk) { f = Math.round(f * (1 - isk / 100) * 100) / 100; kaynak += `, iskonto %${isk}`; }
     return { f, kaynak };

@@ -69,8 +69,10 @@
   };
   const sitedeMi = u => !!(sitede()[u.id] || D.sonuc[u.id]?.id);
   const kural = (u, a) => {
-    const r = D.kurallar?.[anahtar(katAd(u))], oran = r?.[a];
-    return CLK.fiyatla?.(Number(deger(u, 'alis')) || 0, oran == null || oran === '' ? null : Number(oran), D.yuvarla) ?? null;
+    const r = D.kurallar?.[anahtar(katAd(u))], oran = r?.[a], alis = Number(deger(u, 'alis')) || 0;
+    // site (perakende) fiyatı satırdaki Bayi 1 fiyatının üstüne hesaplanır (celik 30.10.2026); Bayi 1 yoksa alışın üstüne
+    const taban = a === 'site' ? Number(deger(u, 'b1')) || alis : alis;
+    return CLK.fiyatla?.(taban, oran == null || oran === '' ? null : Number(oran), D.yuvarla) ?? null;
   };
   // kutudaki ilk değer: son gönderilen, sitedeki ürün, yoksa Paraşüt adı ve fiyat kuralı
   const varsayilan = (u, a) => {
