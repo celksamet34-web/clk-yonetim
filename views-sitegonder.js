@@ -49,6 +49,7 @@
       D.kuralAdlar = k.data.map(r => r.kategori);
       for (const r of a.data || []) { if (r.ad === 'yuvarla') D.yuvarla = r.deger; if (r.ad === 'site_kategori' && r.deger && typeof r.deger === 'object') D.katEs = r.deger; }
       D.yukleniyor = '';
+      otoEsle();
       // Paraşüt listesi 10 dakikadan eskiyse eldeki liste gösterilir, arkadan yenisi okunur
       if (!taze && Date.now() - Date.parse(v.zaman) > 6e5) { render(); return yukle(true); }
     } catch (e) { D.hata = e.message; D.yukleniyor = ''; }
@@ -60,7 +61,31 @@
     D.katYuk = true;
     try { const r = await sor({ islem: 'site_kategoriler' }); if (!Array.isArray(r)) throw new Error(); D.kats = r.map(c => ({ id: c.id, path: c.path })); }
     catch { D.kats = (await loadCategories()).map(c => ({ id: c.id, path: c.path })); }
-    D.katYuk = false; render();
+    D.katYuk = false; otoEsle(); render();
+  }
+  // eşleştirilmemiş Paraşüt kategorisi adı benzeyen site kategorisine kendiliğinden bağlanır ve kaydedilir (celik: "eşleştirmelerle uğraştırma", 30.10.2026):
+  // ad aynıysa ya da biri ötekiyle başlıyorsa (VALİZ → VALİZLER), olmazsa ilk kelime (EVRAK Ç. → EVRAK ÇANTALARI, SPOR SEYAHAT → SPOR ÇANTA)
+  const sade = a => anahtar(a).replace(/[^A-Z0-9ÇĞÖŞÜ ]/g, '').trim();
+  function katTahmin(k) {
+    const a = sade(k), ilk = a.split(' ')[0];
+    if (!a || a === 'KATEGORISIZ' || a === 'KDV') return '';
+    const son = c => sade(c.path.split('›').pop());
+    const bul = f => (D.kats || []).filter(c => f(son(c))).sort((x, y) => x.path.length - y.path.length)[0];
+    const c = bul(b => b === a) || bul(b => b.startsWith(a) || a.startsWith(b)) || (ilk.length >= 4 ? bul(b => b.split(' ')[0] === ilk) : null);
+    return c ? String(c.id) : '';
+  }
+  let otoEsliyor = false;
+  async function otoEsle() {
+    if (otoEsliyor || !D.kats?.length || !D.urunler) return;
+    const yeni = pKategoriler().map(([k]) => k).filter(k => !D.katEs[k]).map(k => [k, katTahmin(k)]).filter(([, id]) => id);
+    if (!yeni.length) return;
+    otoEsliyor = true;
+    for (const [k, id] of yeni) D.katEs[k] = id;
+    const { error } = await sb.from('fiyat_ayar').upsert({ ad: 'site_kategori', deger: D.katEs, guncel: new Date().toISOString() });
+    otoEsliyor = false;
+    if (error) toast('Kategori eşleştirmesi kaydedilemedi: ' + error.message);
+    else toast(`${yeni.length} yeni kategori siteye kendiliğinden eşleştirildi: ${yeni.map(([k]) => k).join(', ')}`);
+    render();
   }
 
   // sitedeki PRS ürünleri: paraşüt id → site ürünü
