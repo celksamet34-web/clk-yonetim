@@ -82,7 +82,11 @@
     izleniyor = true;
     try {
       while (S.route === 'sitegonder') {
-        try { await CLK.urunTazele(true); } catch { await new Promise(s => setTimeout(s, 6e4)); continue; }
+        try { await CLK.urunTazele(true); } catch (e) {
+          // sunucuda tazeleme kurulmadıysa eski yol: liste 10 dakikadan eskiyse hepsi bir seferde okunur
+          if (!(e.yok && Date.now() - (Date.parse(D.zaman) || 0) > 6e5)) { await new Promise(s => setTimeout(s, 6e4)); continue; }
+          await sor({ islem: 'urunler', taze: true }).catch(() => new Promise(s => setTimeout(s, 6e4)));
+        }
         if (S.route !== 'sitegonder' || D.gonderiyor || D.yukleniyor) continue;
         const once = D.urunler;
         try { await oku(); } catch { continue; }
