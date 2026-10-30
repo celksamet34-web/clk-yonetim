@@ -46,9 +46,11 @@
       D.urunler = v.urunler.filter(x => !x[7]).map(([id, ad, alis, satis, stok, , , , kat]) => ({ id: String(id), ad, alis: Number(alis) || 0, satis: Number(satis) || 0, stok: Number(stok) || 0, kat: kat || '' }));
       D.zaman = v.zaman;
       D.kurallar = Object.fromEntries(k.data.map(r => [anahtar(r.kategori), r]));
+      D.kuralAdlar = k.data.map(r => r.kategori);
       for (const r of a.data || []) { if (r.ad === 'yuvarla') D.yuvarla = r.deger; if (r.ad === 'site_kategori' && r.deger && typeof r.deger === 'object') D.katEs = r.deger; }
       D.yukleniyor = '';
-      if (!taze && Date.now() - Date.parse(v.zaman) > 36e5) return yukle(true);
+      // Paraşüt listesi 10 dakikadan eskiyse eldeki liste gösterilir, arkadan yenisi okunur
+      if (!taze && Date.now() - Date.parse(v.zaman) > 6e5) { render(); return yukle(true); }
     } catch (e) { D.hata = e.message; D.yukleniyor = ''; }
     render();
   }
@@ -114,6 +116,9 @@
   const pKategoriler = () => {
     const say = {};
     for (const u of D.urunler || []) say[katAd(u)] = (say[katAd(u)] || 0) + 1;
+    // Paraşüt'te yeni açılan kategori (Fiyat kuralları her dakika eşitlenir) ürün listesi yenilenmeden de eşleştirmede görünür
+    const var_ = new Set(Object.keys(say).map(anahtar));
+    for (const k of D.kuralAdlar || []) if (!var_.has(anahtar(k))) say[k] = 0;
     return Object.entries(say).sort((a, b) => (a[0] === 'KATEGORİSİZ') - (b[0] === 'KATEGORİSİZ') || b[1] - a[1]);
   };
 
