@@ -149,9 +149,9 @@ window.CLK = (() => {
   // Menü grupları (celik 31.10: "menü sıralamasını düzeltelim"). Masaüstü yan menü ve mobil "Daha" sayfası aynı sırayı kullanır.
   const MENU = [
     ['', [['panel', 'Panel']]],
-    ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi']]],
+    ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['urunlistesi', 'Satış faturası'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi']]],
     ['Site ürünleri', [['yeni', 'Yeni ürün'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['banner', 'Banner']]],
-    ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['urunlistesi', 'Ürün listesi'], ['stokkart', 'Stok kartları']]],
+    ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
     ['Eşitleme', [['stokesitle', 'Stok eşitle'], ['eslestirme', 'Eşleştirme']]]
   ];
   const ARTI = ['siparisgir', 'yeni']; // sık kullanılan "ekle" işlemleri altın renkte

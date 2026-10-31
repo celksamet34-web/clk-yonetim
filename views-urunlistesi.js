@@ -182,7 +182,7 @@
   views.urunlistesi = () => {
     if (!D.musteriler) musteriler().catch(e => { D.durum = 'Müşteri listesi alınamadı: ' + e.message; D.musteriler = []; render(); });
     const sat = D.satislar;
-    return `${head('Paraşüt', 'Ürün listesi', 'Müşteriyi ve Paraşüt\'teki bir ya da birkaç satışı seçin, her satış kendi tarihiyle ayrı bölümde listelenir; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
+    return `${head('Satış', 'Satış faturası', 'Müşteriyi ve Paraşüt\'teki bir ya da birkaç satışı seçin, her satış kendi tarihiyle ayrı bölümde listelenir; ürünler sevkiyatta işaretlenecek kontrol listesi olarak yazdırılır.')}
       <div class="card">
         <div class="ek-form ul-sec">
           <div class="ek-mus ara-alan"><label for="ulAra">Müşteri</label>${araKutu('ulAra', D.musteriler, secilenAd(), 'ulMus', { yer: D.musteriler ? 'Müşteri adı yazın (' + D.musteriler.length + ' müşteri)' : 'Müşteriler yükleniyor…' })}</div>
