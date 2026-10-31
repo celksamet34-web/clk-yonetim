@@ -374,6 +374,26 @@
     // opakta ürün: beyaz olmayan (krem/beyaz ürün de sayılsın diye eşik yüksek), ama açık renksiz gri (önceki gölge) olmayan piksel
     const urun = alfa ? o => p[o + 3] >= 250 : o => { const m = mn(o); return m < 247 && !(m >= 212 && mx(o) - m <= 4); };
     const fx = W * 0.78, fy = H * 0.93; // sağ alttaki eski filigran ürün sayılmaz
+    {
+      // koyu ya da orta renkli üründe alttaki çok açık renksiz pus (zemin yansıması) uzun da olsa temizlenir (celik 31.10, ikinci kez
+      // "altta beyazlık"; 18:08 görselinde eğik duran çantanın sağ altında ~60–115 px açık gri alan ölçüldü). Her sütunda alttan yukarı ilk
+      // koyu ürün pikseline kadar olan her şey silinir (şeffafta saydam, opakta beyaz). Açık renkli üründe (beyaz, krem) yapılmaz.
+      const lum = o => 0.299 * p[o] + 0.587 * p[o + 1] + 0.114 * p[o + 2];
+      const cokAcik = o => lum(o) >= 232 && mx(o) - mn(o) <= 12;
+      const h2 = new Uint32Array(256); let say = 0;
+      for (let o = 0; o < p.length; o += 4 * 7) if (urun(o) && !(!alfa && (o / 4) % W > fx && (o / 4) / W > fy)) { h2[Math.round(lum(o))]++; say++; }
+      let orta = 255; for (let v = 0, t = 0; v < 256; v++) { t += h2[v]; if (t >= say / 2) { orta = v; break; } }
+      if (say && orta < 170) {
+        const d = x.getImageData(0, 0, W, H), q0 = d.data; let sil = 0;
+        for (let i = 0; i < W; i++) {
+          let y = H - 1;
+          for (; y >= 0; y--) { const o = (y * W + i) * 4; if (!alfa && i > fx && y > fy) continue; if (urun(o) && !cokAcik(o)) break; }
+          if (y < 0) continue;
+          for (let k = y + 1; k < H; k++) { const o = (k * W + i) * 4; if (!alfa && i > fx && k > fy) continue; if (alfa) { if (q0[o + 3]) { q0[o + 3] = 0; sil++; } } else if (q0[o] < 255 || q0[o + 1] < 255 || q0[o + 2] < 255) { q0[o] = q0[o + 1] = q0[o + 2] = 255; sil++; } }
+        }
+        if (sil) { x.putImageData(d, 0, 0); p = q0; }
+      }
+    }
     let x0 = W, y0 = H, x1 = -1, y1 = -1;
     for (let y = 0; y < H; y += 2) for (let i = 0; i < W; i += 2) {
       if (!alfa && i > fx && y > fy) continue;
@@ -391,6 +411,9 @@
       p = x.getImageData(0, 0, W, H).data;
     }
     const taban = y1; // ürünün alt kenarı: gölge buraya oturur
+    // her sütunda ürünün en alt pikseli: eğik duran çantada gölge alt kenarı izler (celik 31.10: gölge çantanın tek köşesinde kalıyordu)
+    const alt = []; const lim = Math.max(4, (taban - y0) * 0.15);
+    for (let i = x0; i <= x1; i += 2) for (let y = y1; y >= y0; y--) { if (urun((y * W + i) * 4)) { if (taban - y <= lim) alt.push([i, y]); break; } }
     x0 = Math.max(0, x0 - 6); y0 = Math.max(0, y0 - 6); x1 = Math.min(W - 1, x1 + 6); y1 = Math.min(H - 1, y1 + 6);
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
     // çok hafif ışık açma: yalnız ürün pikselleri, en koyu ton yerinde kalır (hiçbir şey koyulaşmaz), en çok %8
@@ -409,10 +432,28 @@
     ox.fillStyle = '#fff'; ox.fillRect(0, 0, PW, PH);
     // çok küçük çekilmiş üründe aşırı büyütme bulanıklaştırır: en çok 2,5 kat
     const sc = Math.min(PW * VITRIN.gen / bw, PH * VITRIN.yuk / bh, VITRIN.buyut), w = bw * sc, h = bh * sc, dx = (PW - w) / 2, dy = PH * VITRIN.orta - h / 2;
-    // yere değme gölgesi: radyal geçişli yassı elips (her tarayıcıda aynı), merkezi ürünün alt kenarında (arada beyaz boşluk kalmaz)
-    ox.save(); ox.translate(PW / 2, dy + (taban - y0) * sc - 2); ox.scale(w * 0.42, Math.max(10, h * 0.03));
+    // yere değme gölgesi: radyal geçişli yassı elips (her tarayıcıda aynı), ürünün alt kenarına oturur; alt kenar eğikse elips de o kadar
+    // döner (en çok ~11°). Alt kenar boyunca ayrıca ince temas gölgesi. İkisi 'darken' ile birleşir: en koyu yer 222'nin altına inmez,
+    // böylece vitrine ikinci kez basınca gölge ürün sayılmaz.
+    const O = (i, y) => [dx + (i - x0) * sc, dy + (y - y0) * sc];
+    let ex = PW / 2, ey = dy + (taban - y0) * sc - 2, aci = 0;
+    if (alt.length >= 4) {
+      const n2 = alt.length, mxi = alt.reduce((t, a) => t + a[0], 0) / n2, myi = alt.reduce((t, a) => t + a[1], 0) / n2;
+      const sxx = alt.reduce((t, a) => t + (a[0] - mxi) ** 2, 0), egim = sxx ? alt.reduce((t, a) => t + (a[0] - mxi) * (a[1] - myi), 0) / sxx : 0;
+      aci = Math.max(-0.2, Math.min(0.2, Math.atan(egim)));
+      [ex, ey] = O(mxi, myi + (taban - myi) * 0.35); ey -= 2;
+    }
+    ox.save(); ox.translate(ex, ey); ox.rotate(aci); ox.scale(w * 0.42, Math.max(10, h * 0.03));
     const gr = ox.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, 'rgba(0,0,0,0.13)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
     ox.fillStyle = gr; ox.beginPath(); ox.arc(0, 0, 1, 0, Math.PI * 2); ox.fill(); ox.restore();
+    if (alt.length) {
+      const S = 8, m = document.createElement('canvas'); m.width = Math.ceil(PW / S); m.height = Math.ceil(PH / S); const mc = m.getContext('2d');
+      const kal = Math.max(1.5, h * 0.014 / S);
+      for (const [i, y] of alt) { const [X, Y] = O(i, y); mc.fillStyle = `rgba(0,0,0,${(1 - (taban - y) / lim * 0.6).toFixed(3)})`; mc.fillRect(X / S, Y / S - kal * 0.4, Math.max(1, 2 * sc / S), kal); }
+      const k2 = document.createElement('canvas'); k2.width = PW; k2.height = PH; const kc = k2.getContext('2d');
+      kc.fillStyle = '#fff'; kc.fillRect(0, 0, PW, PH); kc.globalAlpha = 0.13; kc.imageSmoothingEnabled = true; kc.imageSmoothingQuality = 'high'; kc.drawImage(m, 0, 0, PW, PH);
+      ox.save(); ox.globalCompositeOperation = 'darken'; ox.drawImage(k2, 0, 0); ox.restore();
+    }
     // görsel bütün olarak taşınır (kesme kenarı oluşmaz); şeffafsa gölgenin üstüne normal, opaksa çarpma kipiyle konur
     ox.save(); if (!alfa) ox.globalCompositeOperation = 'multiply'; ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
     ox.drawImage(c, dx - x0 * sc, dy - y0 * sc, W * sc, H * sc); ox.restore();
