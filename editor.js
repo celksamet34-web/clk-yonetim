@@ -357,6 +357,17 @@
     else { // dekupe çantanın altında ve çevresinde yarı saydam açık renkli pus (zemin, yansıma) bırakabiliyor: silinir (celik 31.10: "altında beyazlık var")
       const d = x.getImageData(0, 0, W, H), q0 = d.data; let sil = 0;
       for (let o = 0; o < q0.length; o += 4) { const a = q0[o + 3]; if (a && a < 220 && 0.299 * q0[o] + 0.587 * q0[o + 1] + 0.114 * q0[o + 2] > 150) { q0[o + 3] = 0; sil++; } }
+      // tam opak pus: Photoroom çantanın altındaki zemini de ürün sanabiliyor (açık renksiz şerit, 31.10 ölçüldü: ~35 px). Her sütunda en alttan
+      // yukarı açık renksiz pikseller sayılır; kısa şeritten (boyun %4,5'i) sonra ürün ya da boşluk geliyorsa şerit silinir.
+      // Beyaz ürünün gövdesi uzun olduğundan ona dokunulmaz.
+      const acik = o => { const a = q0[o], b = q0[o + 1], c = q0[o + 2]; return 0.299 * a + 0.587 * b + 0.114 * c >= 200 && Math.max(a, b, c) - Math.min(a, b, c) <= 14; };
+      const en = Math.round(H * 0.045);
+      for (let i = 0; i < W; i++) {
+        let y = H - 1; while (y >= 0 && !q0[(y * W + i) * 4 + 3]) y--; if (y < 0) continue;
+        let t = y; while (t >= 0 && y - t <= en && q0[(t * W + i) * 4 + 3] && acik((t * W + i) * 4)) t--;
+        if (t === y || y - t > en) continue;
+        for (let k = t + 1; k <= y; k++) q0[(k * W + i) * 4 + 3] = 0; sil++;
+      }
       if (sil) { x.putImageData(d, 0, 0); p = q0; }
     }
     const mn = o => Math.min(p[o], p[o + 1], p[o + 2]), mx = o => Math.max(p[o], p[o + 1], p[o + 2]);
