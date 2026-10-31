@@ -643,3 +643,12 @@ body{font-size:15px;letter-spacing:0}
 .ul-tablo .stg-tablo input.sk-deg,.ul-tablo .stg-tablo select.sk-deg{border-color:#3b6fd8;background:#eef3ff}
 .stg-tablo .sk-satir-deg td{background:#f7f9ff}
 .ul-tablo .stg-tablo input.fk-uyari,.ul-tablo .stg-tablo select.fk-uyari{border-color:#d97706;background:#fff4e5}
+/* Stok eşitle */
+.ul-tablo td.se-renkler{text-align:left;white-space:normal;min-width:200px;max-width:360px}
+.se-renk{display:inline-block;font-size:12px;border:1px solid var(--line-2);border-radius:999px;padding:2px 8px;margin:2px 4px 2px 0;white-space:nowrap}
+.se-renk b{font-weight:700}
+.se-renksiz{font-size:12px;color:var(--muted)}
+.se-not{display:block;font-size:11.5px;color:var(--warn)}
+.se-arti{color:var(--ok);font-weight:700}.se-eksi{color:var(--bad);font-weight:700}
+.ul-tablo td.se-durum{text-align:left;white-space:normal;font-size:12.5px;color:var(--muted);min-width:140px}
+.se-uyari{background:var(--bad-soft);border-color:var(--bad);color:var(--bad);font-weight:600;margin-bottom:14px}
