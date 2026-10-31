@@ -342,6 +342,13 @@ body{font-size:15px;letter-spacing:0}
 .gal-strip button{flex:0 0 auto;width:64px;height:64px;border-radius:10px;overflow:hidden;border:2px solid transparent;padding:0;background:#222;cursor:pointer}
 .gal-strip button.on{border-color:var(--gold-2)}
 .gal-strip img{width:100%;height:100%;object-fit:cover}
+.gal-main{overflow:hidden;touch-action:none}
+.gal-main img{transform-origin:50% 50%;transition:transform .15s ease-out;cursor:zoom-in;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.gal.surukle .gal-main img{transition:none}
+.gal.zoom .gal-main img{cursor:grab}.gal.zoom.surukle .gal-main img{cursor:grabbing}
+.gal.zoom .gal-nav{display:none}
+.gal-ipucu{display:block;font-weight:400;font-size:11.5px;color:#a89f90;margin-top:2px}
+.gal-top>span{min-width:0}
 /* kategori yolu */
 .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-8px 0 16px;font-size:13px}
 .crumbs button{border:0;background:none;padding:4px 2px;color:var(--gold-ink);cursor:pointer;font:600 13px var(--f-b);text-decoration:underline;text-underline-offset:3px}

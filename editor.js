@@ -170,18 +170,59 @@
     const list = galleryList(); if (!list.length) return;
     let cur = Math.max(0, Math.min(i, list.length - 1));
     const box = document.createElement('div'); box.className = 'gal'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    // yakınlaştırma (celik 31.10: "görselleri aç dediğimde net göremiyorum"): çift dokunma/çift tık, iki parmak, fare tekerleği
+    // ya da Yakınlaştır düğmesi; yakınken parmakla/fareyle sürüklenir. Görsel tam çözünürlükte (1200×1600) açılır.
+    let z = 1, tx = 0, ty = 0, bas = null, iki = null, coklu = false, sonDokun = 0; const PT = new Map();
+    const ana = () => box.querySelector('.gal-main'), im = () => box.querySelector('.gal-main img');
+    const uygula = () => {
+      const i = im(), a = ana(); if (!i || !a) return; if (z <= 1.01) { z = 1; tx = 0; ty = 0; }
+      const r = a.getBoundingClientRect(), oran = (i.naturalWidth || 3) / (i.naturalHeight || 4), cw = Math.min(i.offsetWidth, i.offsetHeight * oran), ch = cw / oran;
+      const mx = Math.max(0, (cw * z - r.width) / 2), my = Math.max(0, (ch * z - r.height) / 2);
+      tx = Math.max(-mx, Math.min(mx, tx)); ty = Math.max(-my, Math.min(my, ty));
+      i.style.transform = `translate(${tx}px,${ty}px) scale(${z})`; box.classList.toggle('zoom', z > 1);
+      const b = box.querySelector('[data-g="z"]'); if (b) b.textContent = z > 1 ? 'Sığdır' : 'Yakınlaştır';
+    };
+    const yaklas = (cx, cy, z2) => { const a = ana(); if (!a) return; z2 = Math.max(1, Math.min(5, z2)); const r = a.getBoundingClientRect(), px = cx - (r.left + r.width / 2), py = cy - (r.top + r.height / 2);
+      tx = px - (px - tx) * z2 / z; ty = py - (py - ty) * z2 / z; z = z2; uygula(); };
+    const degistir = (cx, cy) => { if (z > 1) { z = 1; uygula(); } else yaklas(cx, cy, 2.5); };
+    const git = d => { cur = (cur + d + list.length) % list.length; draw(); };
     const draw = () => {
-      const it = list[cur];
-      box.innerHTML = `<div class="gal-top"><span>${esc(it.t)} · ${cur + 1}/${list.length}</span><div><a class="btn sm" href="${esc(it.src.startsWith('data:') ? '#' : it.src)}" target="_blank" rel="noopener" ${it.src.startsWith('data:') ? 'hidden' : ''}>Yeni sekmede aç</a><button class="btn sm dark" data-g="x">Kapat</button></div></div>
-        <div class="gal-main"><button class="gal-nav" data-g="p" aria-label="Önceki" ${list.length < 2 ? 'hidden' : ''}>‹</button><img src="${esc(it.src)}" alt="${esc(it.t)}"><button class="gal-nav" data-g="n" aria-label="Sonraki" ${list.length < 2 ? 'hidden' : ''}>›</button></div>
+      const it = list[cur]; z = 1; tx = 0; ty = 0; box.classList.remove('zoom');
+      box.innerHTML = `<div class="gal-top"><span>${esc(it.t)} · ${cur + 1}/${list.length}<small class="gal-ipucu">Çift dokun ya da iki parmakla yakınlaştır</small></span><div><button class="btn sm" data-g="z">Yakınlaştır</button><a class="btn sm" href="${esc(it.src.startsWith('data:') ? '#' : it.src)}" target="_blank" rel="noopener" ${it.src.startsWith('data:') ? 'hidden' : ''}>Yeni sekmede aç</a><button class="btn sm dark" data-g="x">Kapat</button></div></div>
+        <div class="gal-main"><button class="gal-nav" data-g="p" aria-label="Önceki" ${list.length < 2 ? 'hidden' : ''}>‹</button><img src="${esc(it.src)}" alt="${esc(it.t)}" draggable="false"><button class="gal-nav" data-g="n" aria-label="Sonraki" ${list.length < 2 ? 'hidden' : ''}>›</button></div>
         <div class="gal-strip">${list.map((x, j) => `<button data-g="${j}" class="${j === cur ? 'on' : ''}"><img src="${esc(x.src)}" alt=""></button>`).join('')}</div>`;
     };
     const close = () => { box.remove(); document.removeEventListener('keydown', key); };
-    const key = e => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') { cur = (cur + 1) % list.length; draw(); } if (e.key === 'ArrowLeft') { cur = (cur - 1 + list.length) % list.length; draw(); } };
+    const key = e => { if (e.key === 'Escape') { if (z > 1) { z = 1; uygula(); } else close(); } if (e.key === 'ArrowRight') git(1); if (e.key === 'ArrowLeft') git(-1);
+      if (e.key === '+' || e.key === '=') { const r = ana().getBoundingClientRect(); yaklas(r.left + r.width / 2, r.top + r.height / 2, z * 1.5); }
+      if (e.key === '-') { const r = ana().getBoundingClientRect(); yaklas(r.left + r.width / 2, r.top + r.height / 2, z / 1.5); } };
     box.addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (!g) { if (e.target === box) close(); return; } const v = g.dataset.g;
-      if (v === 'x') close(); else if (v === 'n') cur = (cur + 1) % list.length; else if (v === 'p') cur = (cur - 1 + list.length) % list.length; else cur = +v; if (v !== 'x') draw(); });
-    let sx = 0; box.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
-    box.addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) { cur = (cur + (dx < 0 ? 1 : -1) + list.length) % list.length; draw(); } });
+      if (v === 'x') close(); else if (v === 'z') { const r = ana().getBoundingClientRect(); degistir(r.left + r.width / 2, r.top + r.height / 2); }
+      else if (v === 'n') git(1); else if (v === 'p') git(-1); else { cur = +v; draw(); } });
+    // dokunma ve fare: tek parmak yakın değilken yana kaydırınca sonraki görsel, yakınken sürükleme; iki parmak yakınlaştırır
+    box.addEventListener('pointerdown', e => {
+      if (!e.target.closest('.gal-main') || e.target.closest('.gal-nav')) return;
+      PT.set(e.pointerId, [e.clientX, e.clientY]); try { ana().setPointerCapture(e.pointerId); } catch {} box.classList.add('surukle');
+      if (PT.size === 1) { bas = { x: e.clientX, y: e.clientY, tx, ty, t: Date.now() }; coklu = false; }
+      if (PT.size === 2) { const [a, b] = [...PT.values()]; coklu = true; iki = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z, tx, ty, cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2 }; }
+    });
+    box.addEventListener('pointermove', e => {
+      if (!PT.has(e.pointerId)) return; PT.set(e.pointerId, [e.clientX, e.clientY]);
+      if (PT.size >= 2 && iki) { const [a, b] = [...PT.values()]; z = iki.z; tx = iki.tx; ty = iki.ty; yaklas(iki.cx, iki.cy, iki.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / iki.d); }
+      else if (PT.size === 1 && bas && z > 1 && !coklu) { tx = bas.tx + e.clientX - bas.x; ty = bas.ty + e.clientY - bas.y; uygula(); }
+    });
+    const birak = e => {
+      if (!PT.has(e.pointerId)) return; PT.delete(e.pointerId); if (PT.size < 2) iki = null; if (PT.size) return;
+      box.classList.remove('surukle');
+      if (bas && !coklu && e.type === 'pointerup') {
+        const dx = e.clientX - bas.x, dy = e.clientY - bas.y;
+        if (z === 1 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.2) git(dx < 0 ? 1 : -1);
+        else if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && Date.now() - bas.t < 350) { const t = Date.now(); if (t - sonDokun < 350) { sonDokun = 0; degistir(e.clientX, e.clientY); } else sonDokun = t; }
+      }
+      bas = null;
+    };
+    box.addEventListener('pointerup', birak); box.addEventListener('pointercancel', birak);
+    box.addEventListener('wheel', e => { if (!e.target.closest('.gal-main')) return; e.preventDefault(); yaklas(e.clientX, e.clientY, z * (e.deltaY < 0 ? 1.25 : 0.8)); }, { passive: false });
     document.addEventListener('keydown', key); draw(); document.body.append(box);
   }
   views.yeni = views.duzenle = () => {
