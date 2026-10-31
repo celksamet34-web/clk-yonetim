@@ -7,7 +7,7 @@
   const MARKETS = ['n11','hb','ty','cs','amz','eptt','ms','paz','far','idef','lcw','temu'];
   const AUDIENCES = [['kadin','Kadın'],['erkek','Erkek'],['kiz-cocuk','Kız çocuk'],['erkek-cocuk','Erkek çocuk']];
   const HEIGHTS = { kadin: 170, erkek: 182, 'kiz-cocuk': 135, 'erkek-cocuk': 138 }; // sunucudaki manken boylarıyla aynı
-  const CARRIES = [['capraz','Çapraz / göğüs'],['omuz','Omuz'],['el','Elde (yakın çekim)'],['sirt','Sırt']];
+  const CARRIES = [['capraz','Çapraz / göğüs'],['omuz','Omuz'],['el','Elde'],['sirt','Sırt']];
   const mHeight = () => (+D.mh >= 80 && +D.mh <= 220 ? +D.mh : HEIGHTS[D.audience]);
   const hexOf = n => (COLORS.find(c => c[0] === String(n).toLocaleUpperCase('tr')) || [0, '#ddd'])[1];
 
@@ -336,11 +336,15 @@
   }
   async function scaleRef(du) {
     const L = await bagBox(du); if (!L) return null;
-    const N = 1024, ppc = N * 0.93 / (mHeight() * 0.62);
+    // kadraj sunucudaki FRAME ile aynı: elde göğüsten baldır ortasına (boyun %50'si), diğerleri baştan uyluk ortasına (%62)
+    const H = mHeight(), el = D.carry === 'el', N = 1024, ppc = N * 0.93 / (H * (el ? 0.5 : 0.62));
     // 0.6: modeller (Seedream, OpenAI) tam çözünürlüklü ürün görselini de gördüğü için çantayı rehberdekinden büyük çiziyor; denemelerle ayarlandı
     const s = 0.6 * Math.min(+D.w > 0 ? +D.w * ppc / L.bw : Infinity, +D.h > 0 ? +D.h * ppc / L.bh : Infinity);
-    // Sırt çantası sırtın üstünde durur (manken arkadan çekilir); diğerleri bel-göğüs hizasında
-    const r = { x: Math.round((N - L.bw * s) / 2), y: Math.round(N * (D.carry === 'sirt' ? 0.45 : 0.55) - L.bh * s / 2), w: Math.round(L.bw * s), h: Math.round(L.bh * s) };
+    // Sırt çantası sırtın üstünde durur (manken arkadan çekilir); diğerleri bel-göğüs hizasında.
+    // Elde: sarkan elde, gövdenin üstü boyun ~%40'ı hizasında (kadrajın üstü %72); çanta gerçek boyuyla kadraja sığacak kadar yukarıda, biraz yanda
+    const gercek = L.bh * s / 0.6;
+    const cy = el ? Math.min(N * 0.035 + (0.72 - 0.4) * H * ppc + gercek / 2, N * 0.965 - gercek / 2) : N * (D.carry === 'sirt' ? 0.45 : 0.55);
+    const r = { x: Math.round(N * (el ? 0.56 : 0.5) - L.bw * s / 2), y: Math.round(cy - L.bh * s / 2), w: Math.round(L.bw * s), h: Math.round(L.bh * s) };
     const o = document.createElement('canvas'); o.width = o.height = N; const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, N, N);
     ox.drawImage(L.c, L.x0, L.y0, L.bw, L.bh, r.x, r.y, r.w, r.h);
     return { du: o.toDataURL('image/jpeg', 0.92), rect: r, bag: cutBag(L, r.w, r.h) };
@@ -436,8 +440,8 @@
   async function modelImage(du) {
     modelImage.focus = {}; pasteBag.last = null; trimBorder.last = null;
     // Kategori gönderilmez: yanlış kategorili üründe (ör. portföy sanılan göğüs çantası) kullanım şeklini bozuyor.
-    // "Elde" seçiminde manken yok, yakın çekim el: kadraj rehberi uymaz, ölçek el boyuna göre yazıyla verilir
-    const ref = hasSize() && D.carry !== 'el' ? await scaleRef(du).catch(() => null) : null;
+    // "Elde" orta mesafe (göğüsten baldır ortasına) çekilir, ölçek rehberi onda da gider
+    const ref = hasSize() ? await scaleRef(du).catch(() => null) : null;
     // Ölçek rehberi varsa ilk görsel tam çözünürlüklü ürün (detay ve logo), ikinci görsel rehber (boyut ve konum)
     const img = await siteImage({ action: 'model', image: du, guide: ref?.du, scaled: !!ref, audience: D.audience, carry: D.carry, height: mHeight(), size: { w: D.w, d: D.d, h: D.h } });
     if (!img) { toast('Manken seçimi henüz etkin değil, varsayılan mankenle üretiliyor.'); return null; }

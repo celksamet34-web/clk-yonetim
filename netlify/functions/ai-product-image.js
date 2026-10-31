@@ -14,7 +14,7 @@ const cm = v => { const n = Number(v); return n > 0 && n < 300 ? Math.round(n) :
 const CARRY = {
   capraz: 'worn crossbody on the chest, with its shoulder strap running diagonally over the opposite shoulder',
   omuz: 'hanging at the hip from its strap over the near shoulder',
-  el: 'held by its handle in the hand, arm relaxed at the side',
+  el: 'held by its handle in one hand, arm hanging relaxed at the side, so the bag hangs beside the thigh',
   // Sırtta: logo kameraya baksın diye manken arkadan çekilir (önden çekimde çanta göğse geliyordu)
   sirt: 'worn as a backpack on the back with both shoulder straps over the shoulders. The model is photographed from behind (rear view, back to the camera, head may turn slightly to the side), so the backpack sits on the upper back and its front panel with the logo faces the camera. Never show the model from the front and never place the bag on the chest'
 };
@@ -22,23 +22,20 @@ const CARRY = {
 const GUIDE_POSE = {
   sirt: 'Show the model from behind so the backpack is worn on the back exactly there, both shoulder straps over the shoulders',
   capraz: 'Pose the person so the bag sits naturally there, worn with its strap across the body',
-  omuz: 'Pose the person so the bag sits naturally there, hanging from its strap over the shoulder'
+  omuz: 'Pose the person so the bag sits naturally there, hanging from its strap over the shoulder',
+  el: 'Pose the person in a relaxed, slightly three-quarter stance holding the bag by its handle in one hand, arm hanging naturally, so the bag hangs exactly there beside the thigh'
 };
-// "Elde" seçiminde manken yerine yakın çekim el: kimin eli ve ölçek için el boyu (bilekten parmak ucuna, cm)
-const HAND = { kadin: ["a woman's hand", 17.5], erkek: ["a man's hand", 19], 'kiz-cocuk': ["a young girl's hand", 14], 'erkek-cocuk': ["a young boy's hand", 14.5] };
-function handPrompt(audience, size) {
-  const [who, hand] = HAND[audience] || HAND.kadin, w = cm(size?.w), h = cm(size?.h), d = cm(size?.d), r = v => Math.round(v * 10) / 10;
-  const dims = [w && `${w} cm wide`, h && `${h} cm tall`, d && `${d} cm deep`].filter(Boolean).join(', ');
-  const scale = w || h
-    ? ` True scale is critical: the bag is ${dims} and the hand is about ${hand} cm long from wrist to fingertip, so ${[h && `the bag's height is about ${r(h / hand)} times the hand length`, w && `its width about ${r(w / hand)} times the hand length`].filter(Boolean).join(' and ')}. Render the bag at exactly this real size relative to the hand; never enlarge or shrink it for styling.`
-    : ' Keep the bag at a realistic real-world size relative to the hand.';
-  return `Create a photorealistic premium ecommerce close-up product photo of the exact bag in the reference photo, held by its handle in ${who}. Show only the hand, wrist and a little of the forearm entering the frame from above or the side; no face, no full body. Preserve the bag's exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions; never redraw, reinterpret, replace, correct or invent a logo or text. The bag hangs naturally from the hand, front-facing and upright, with the logo side facing the camera, flat, sharp and not covered by the fingers.${scale} Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, exactly one bag, no text.`;
-}
+// Kadraj: elde orta mesafe (celik isteği 31.10.2026: ne uzak ne yakın), göğüsten baldır ortasına; diğerleri baştan uyluk ortasına.
+// Panelin ölçek rehberi aynı kadrajla çizer (editor.js scaleRef): kadrajın kapladığı boy oranı ve tarifi
+const FRAME = {
+  el: [0.5, 'shows the model from the chest (top edge; head and shoulders are outside the frame) down to mid-calf (bottom edge)', 'a medium shot from the chest down to mid-calf (head and shoulders outside the frame), so the hand, the bag and the legs show the real size'],
+  diger: [null, 'shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge)', 'a full body or three-quarter framing that makes the size comparison obvious']
+};
 // Görüntü modelleri santimetreyi zayıf anlar; ölçüyü mankenin baş boyu ve gövdesi cinsinden de tarif ederiz.
 // scaled: ikinci görsel ölçek rehberi (panel çantayı kadraja göre gerçek boyunda yerleştirdi)
 function scaleText(size, height, child, scaled, carry) {
   const w = cm(size?.w), h = cm(size?.h), d = cm(size?.d);
-  if (!w && !h) return `Keep the bag at a realistic real-world size relative to a person about ${height} cm tall.`;
+  if (!w && !h) return `Keep the bag at a realistic real-world size relative to a person about ${height} cm tall.${carry === 'el' ? ` Use ${FRAME.el[2]}.` : ''}`;
   const head = height / (child ? 6.5 : 7.5), torso = height * 0.3, shoulders = height * (child ? 0.22 : 0.25);
   const r = v => Math.round(v * 10) / 10;
   const dims = [w && `${w} cm wide`, h && `${h} cm tall`, d && `${d} cm deep`].filter(Boolean).join(', ');
@@ -47,13 +44,14 @@ function scaleText(size, height, child, scaled, carry) {
     w && `its width is about ${r(w / head)} head heights, about ${Math.round(w / shoulders * 100)}% of the shoulder width`
   ].filter(Boolean).join('; ');
   // Kadraj baştan uyluk ortasına (boyun ~%62'si) olduğunda çantanın karede kaplaması gereken oran
-  const frame = height * (child ? 0.66 : 0.62) / 0.93;
+  const kadraj = FRAME[carry] || FRAME.diger;
+  const frame = height * (kadraj[0] || (child ? 0.66 : 0.62)) / 0.93;
   const pct = [h && `its height must be about ${Math.round(h / frame * 100)}% of the image height`, w && `its width about ${Math.round(w / frame * 100)}% of the image width`].filter(Boolean).join(' and ');
   const share = scaled && pct ? ` In the final image ${pct}; the bag must look small relative to the body, never dominant.` : '';
   // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
   const guide = scaled
-    ? ` Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge). Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. ${GUIDE_POSE[carry] || 'Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle)'}; hands, hair and straps must not cover the bag.`
-    : ' Choose a framing (full body or three-quarter) that makes the size comparison obvious.';
+    ? ` Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which ${kadraj[1]}. Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. ${GUIDE_POSE[carry] || 'Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle)'}; hands, hair and straps must not cover the bag.`
+    : ` Use ${kadraj[2]}.`;
   return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}${share}`;
 }
 
@@ -242,10 +240,10 @@ exports.handler = async event => {
     if (bytes.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük. Daha küçük bir görsel seç.' });
     if (action === 'original') return reply(200, { success: true, action, image: body.image });
     // Ölçek rehberi ikinci görsel olarak gider; ilk görsel (ürün) en yüksek sadakatle korunur
-    const guideMatch = action === 'model' && body.scaled === true && body.carry !== 'el' ?/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
+    const guideMatch = action === 'model' && body.scaled === true ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
     const guideBytes = guideMatch ? Buffer.from(guideMatch[2], 'base64') : null;
     if (guideBytes && guideBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Ölçek görseli çok büyük.' });
-    const prompt = action === 'model' && body.carry === 'el' ? handPrompt(body.audience, body.size) : action === 'cutout'
+    const prompt = action === 'cutout'
       ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
       : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person}, about ${height} cm tall, with the bag ${carryText}${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true && !!guideBytes, body.carry)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
     // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
