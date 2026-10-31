@@ -194,7 +194,7 @@
     const actions = `<button class="btn dark" data-act="edSend">${D.isNew ? 'Qukasoft’a yükle' : 'Qukasoft’ta güncelle'}</button><button class="btn" data-act="edDraft">Taslak kaydet</button>`;
     return head(D.isNew ? 'Yeni ürün' : 'Ürünü düzenle', D.isNew ? 'Ürün ekle' : esc(D.name || D.code), D.isNew ? 'Fotoğrafla, alış fiyatını gir, gerisini sistem hesaplasın.' : esc(D.code) + ' · Qukasoft’taki kayıt güncellenir', `<button class="btn sm" data-go="${D.isNew ? 'panel' : 'urunler'}">← Geri</button>`) + `
     <div class="ed"><div class="steps">
-      <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, mağazanın oranında 1200×1600 (3:4) ve CLK filigranlı hazırlanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
+      <section class="step"><div class="step-h"><span class="no">01</span><div><h2>Fotoğraflar</h2><p>Telefonla çek ya da galeriden seç. Arka plan temizlenir, mağazanın oranında 1200×1600 (3:4) ve CLK filigranlı hazırlanır. Ön fotoğrafın ışığı ve keskinliği iyileştirilir, ürün vitrinde her üründe aynı büyüklükte ortalanır.</p></div>${galleryList().length ? `<button class="btn sm" data-act="edGallery" data-i="0" style="margin-left:auto">Görselleri aç (${galleryList().length})</button>` : ''}</div>
         <div class="step-b"><div class="shots">${SLOTS.map(([k, t, h]) => shot(k, t, h)).join('')}</div>
           <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
           <div class="f"><span>Taşıma şekli</span><div class="chips" style="margin:0">${CARRIES.map(([k, l]) => `<button class="chip" data-act="edCarry" data-c="${k}" aria-pressed="${D.carry === k}">${l}</button>`).join('')}</div></div>
@@ -271,7 +271,7 @@
     return `<div class="shot ${src ? 'has' : ''}"><span class="lb ${isModel ? 'auto' : ''}">${t}</span>
       ${src ? `<img src="${esc(src)}" alt="${t}">` : `<div class="empty-s">${CLK.ICONS.cam}<b>${t}</b><span>${h}</span></div>`}
       ${s?.busy ? `<div class="busy">${esc(s.busy)}</div>` : ''}
-      ${src ? `<div class="ops">${auto ? `<button data-act="${act}">Yeniden</button>` : `<button data-act="edCut" data-k="${k}">Dekupe</button>`}<button class="x" data-act="edShotDel" data-k="${k}">Sil</button></div>` :
+      ${src ? `<div class="ops">${auto ? `<button data-act="${act}">Yeniden</button>` : `<button data-act="edCut" data-k="${k}">Dekupe</button>${k === 'front' ? `<button data-act="edVitrin" data-k="${k}" title="Işık, keskinlik ve vitrin boyutu (ücretsiz)">Vitrin</button>` : ''}`}<button class="x" data-act="edShotDel" data-k="${k}">Sil</button></div>` :
         auto ? `<div class="ops"><button data-act="${act}" ${D.shots.front ? '' : 'disabled'}>Manken üret</button></div>` : `<label><input type="file" accept="image/*" capture="environment" data-shot="${k}" hidden></label>`}</div>`;
   }
 
@@ -295,8 +295,63 @@
       const s = Math.min(PW * 0.92 / im.width, PH * 0.92 / im.height); const w = im.width * s, h = im.height * s;
       x.drawImage(im, (PW - w) / 2, (PH - h) / 2, w, h);
     }
-    if (mark) { x.save(); x.globalAlpha = 0.18; x.fillStyle = '#121110'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); }
+    if (mark) filigran(x);
     return c.toDataURL('image/jpeg', 0.9);
+  }
+  const filigran = x => { x.save(); x.globalAlpha = 0.18; x.fillStyle = '#121110'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); };
+  // Vitrin (ön fotoğraf, celik isteği 31.10.2026): dekupeden sonra ürün bulunur; ışık, renk ve keskinlik hafifçe iyileştirilir, ürün 3:4 karede
+  // her üründe aynı büyüklükte ortalanır (anasayfa vitrini ve mobildeki 2'li ızgara aynı görünsün), altına hafif gölge konur.
+  // Ürün yeniden çizilmez: logo, yazı ve biçim aynen kalır, yalnız ton ve keskinlik ayarlanır. Zemin beyaz değilse eski yol (portrait).
+  const VITRIN = { gen: 0.84, yuk: 0.76, orta: 0.47 };
+  async function vitrin(src, mark) {
+    const im = await loadImg(src), W = im.naturalWidth || im.width, H = im.naturalHeight || im.height;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(im, 0, 0);
+    const p = x.getImageData(0, 0, W, H).data, fx = W * 0.78, fy = H * 0.93; // sağ alttaki eski filigran ürün sayılmaz
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y += 2) for (let i = 0; i < W; i += 2) {
+      if (i > fx && y > fy) continue;
+      const o = (y * W + i) * 4; if (Math.min(p[o], p[o + 1], p[o + 2]) < 236) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    if (x1 < 0 || (x1 - x0 > W * 0.96 && y1 - y0 > H * 0.96) || (x1 - x0 < W * 0.05 && y1 - y0 < H * 0.05)) return portrait(src, mark);
+    x0 = Math.max(0, x0 - 6); y0 = Math.max(0, y0 - 6); x1 = Math.min(W - 1, x1 + 6); y1 = Math.min(H - 1, y1 + 6);
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, u = x.getImageData(x0, y0, bw, bh), q = u.data;
+    // ürün pikseli ağırlığı: beyaza yaklaştıkça azalır (kenarlar yumuşak geçer, zemin beyaz kalır)
+    const ag = o => Math.max(0, Math.min(1, (250 - Math.min(q[o], q[o + 1], q[o + 2])) / 25));
+    const hist = new Uint32Array(256); let n = 0;
+    for (let o = 0; o < q.length; o += 4) if (ag(o) >= 1) { hist[Math.round(0.299 * q[o] + 0.587 * q[o + 1] + 0.114 * q[o + 2])]++; n++; }
+    const yuzde = r => { let t = 0; for (let v = 0; v < 256; v++) { t += hist[v]; if (t >= n * r) return v; } return 255; };
+    const lo = yuzde(0.01), hi = yuzde(0.99), k = hi > lo ? Math.max(1, Math.min(1.2, (245 - lo * 0.8) / (hi - lo))) : 1;
+    // keskinlik: bulanık kopyadan fark (tuval filtresi olmayan eski tarayıcıda keskinleştirme atlanır)
+    const bc = document.createElement('canvas'); bc.width = bw; bc.height = bh; const bx = bc.getContext('2d', { willReadFrequently: true });
+    bx.filter = 'blur(1.4px)'; bx.drawImage(c, x0, y0, bw, bh, 0, 0, bw, bh); const bl = bx.getImageData(0, 0, bw, bh).data;
+    const ton = v => lo * 0.8 + (v - lo) * k, kes = 'filter' in bx ? 0.6 : 0;
+    for (let o = 0; o < q.length; o += 4) {
+      const w = ag(o); if (!w) continue;
+      let r = ton(q[o] + kes * (q[o] - bl[o])), g = ton(q[o + 1] + kes * (q[o + 1] - bl[o + 1])), b = ton(q[o + 2] + kes * (q[o + 2] - bl[o + 2]));
+      const L = 0.299 * r + 0.587 * g + 0.114 * b; r = L + (r - L) * 1.08; g = L + (g - L) * 1.08; b = L + (b - L) * 1.08;
+      q[o] += w * (r - q[o]); q[o + 1] += w * (g - q[o + 1]); q[o + 2] += w * (b - q[o + 2]);
+    }
+    x.putImageData(u, x0, y0);
+    const o2 = document.createElement('canvas'); o2.width = PW; o2.height = PH; const ox = o2.getContext('2d');
+    ox.fillStyle = '#fff'; ox.fillRect(0, 0, PW, PH);
+    const sc = Math.min(PW * VITRIN.gen / bw, PH * VITRIN.yuk / bh), w = bw * sc, h = bh * sc, dx = (PW - w) / 2, dy = PH * VITRIN.orta - h / 2;
+    // yere değme gölgesi: radyal geçişli yassı elips (her tarayıcıda aynı)
+    ox.save(); ox.translate(PW / 2, dy + h - 4); ox.scale(w * 0.42, Math.max(10, h * 0.03));
+    const gr = ox.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, 'rgba(0,0,0,0.13)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ox.fillStyle = gr; ox.beginPath(); ox.arc(0, 0, 1, 0, Math.PI * 2); ox.fill(); ox.restore();
+    // ürün çarpma kipiyle konur: beyaz zemini gölgeyi örtmez
+    ox.save(); ox.globalCompositeOperation = 'multiply'; ox.imageSmoothingQuality = 'high'; ox.drawImage(c, x0, y0, bw, bh, dx, dy, w, h); ox.restore();
+    if (mark) filigran(ox);
+    return o2.toDataURL('image/jpeg', 0.92);
+  }
+  // kayıtlı ön fotoğrafı dekupe etmeden (ücretsiz) vitrin için yeniden hazırlar
+  async function vitrinYap(k) {
+    const s = D.shots[k], src = s?.preview || s?.url; if (!src || s.busy) return;
+    s.busy = 'İyileştiriliyor…'; render();
+    try { const fin = await vitrin(src, D.auto.mark); s.preview = fin; s.busy = 'Yükleniyor…'; render(); s.path = await upload(fin); delete s.busy; delete s.url; delete s.existing; }
+    catch (e) { delete s.busy; toast('Görsel iyileştirilemedi: ' + e.message); }
+    render();
   }
   const toBlob = du => fetch(du).then(r => r.blob());
   async function upload(du) {
@@ -463,7 +518,7 @@
     try {
       let base = await portrait(raw, false);
       if (D.auto.cutout) { s.busy = 'Arka plan temizleniyor…'; render(); try { base = await aiImage(base, 'cutout'); } catch (e) { toast('Dekupe yapılamadı, orijinal kullanıldı.'); } }
-      const final = await portrait(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
+      const final = k === 'front' ? await vitrin(base, D.auto.mark) : await portrait(base, D.auto.mark); s.preview = final; s.raw = raw; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
       if (k === 'front' && !D.shots.model && hasSize()) makeModel();
     } catch (e) { s.busy = ''; toast(e.message); }
@@ -675,6 +730,7 @@
     else if (act === 'edAttrDel') { D.attrs.splice(+el.dataset.i, 1); S.keepScroll = true; render(); }
     else if (act === 'edSeo') { fillSeo(); S.keepScroll = true; render(); }
     else if (act === 'edShotDel') { delete D.shots[el.dataset.k]; S.keepScroll = true; render(); }
+    else if (act === 'edVitrin') vitrinYap(el.dataset.k);
     else if (act === 'edCut') { const s = D.shots[el.dataset.k]; if (!s) return; const was = D.auto.cutout; D.auto.cutout = true; const src = s.raw || s.preview || s.url; (src.startsWith('data:') ? Promise.resolve(src) : portrait(src, false)).then(du => processShot(el.dataset.k, du)).finally(() => { D.auto.cutout = was; }); }
     else if (act === 'edModel') makeModel();
     else if (act === 'edAud') { D.audience = el.dataset.a; S.keepScroll = true; render(); }
