@@ -2,12 +2,13 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://prkzzaqinfeptmmbkqsd.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_0sbTUikCycbokrRbzxtBAg_JGTfJtr4';
 
-// Manken seçimi: panelde seçilen kitleye göre görseldeki kişi ve ölçek için boyu (cm)
+// Manken seçimi: panelde seçilen kitleye göre görseldeki kişi ve ölçek için boyu (cm). Mankenler açık tenli (celik isteği 31.10.2026)
+const TEN = 'with a fair, light skin tone';
 const AUDIENCE = {
-  kadin: ['one adult Turkish female fashion model', 170],
-  erkek: ['one adult Turkish male fashion model', 182],
-  'kiz-cocuk': ['one Turkish girl child model, around 8 to 10 years old, in modest age-appropriate casual clothing', 135],
-  'erkek-cocuk': ['one Turkish boy child model, around 8 to 10 years old, in modest age-appropriate casual clothing', 138]
+  kadin: [`one adult Turkish female fashion model ${TEN}`, 170],
+  erkek: [`one adult Turkish male fashion model ${TEN}`, 182],
+  'kiz-cocuk': [`one Turkish girl child model ${TEN}, around 8 to 10 years old, in modest age-appropriate casual clothing`, 135],
+  'erkek-cocuk': [`one Turkish boy child model ${TEN}, around 8 to 10 years old, in modest age-appropriate casual clothing`, 138]
 };
 const cm = v => { const n = Number(v); return n > 0 && n < 300 ? Math.round(n) : 0; };
 // Taşıma şekli: panelde seçilir, mankenin çantayı nasıl taşıdığı
