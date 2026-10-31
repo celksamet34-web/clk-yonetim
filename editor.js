@@ -313,9 +313,14 @@
     let p = x.getImageData(0, 0, W, H).data;
     const alfa = (() => { let n = 0; for (let o = 3; o < p.length; o += 4 * 61) if (p[o] < 128 && ++n > 50) return true; return false; })();
     if (!alfa) { x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.globalCompositeOperation = 'source-over'; p = x.getImageData(0, 0, W, H).data; }
+    else { // dekupe çantanın altında ve çevresinde yarı saydam açık renkli pus (zemin, yansıma) bırakabiliyor: silinir (celik 31.10: "altında beyazlık var")
+      const d = x.getImageData(0, 0, W, H), q0 = d.data; let sil = 0;
+      for (let o = 0; o < q0.length; o += 4) { const a = q0[o + 3]; if (a && a < 220 && 0.299 * q0[o] + 0.587 * q0[o + 1] + 0.114 * q0[o + 2] > 150) { q0[o + 3] = 0; sil++; } }
+      if (sil) { x.putImageData(d, 0, 0); p = q0; }
+    }
     const mn = o => Math.min(p[o], p[o + 1], p[o + 2]), mx = o => Math.max(p[o], p[o + 1], p[o + 2]);
     // opakta ürün: beyaz olmayan (krem/beyaz ürün de sayılsın diye eşik yüksek), ama açık renksiz gri (önceki gölge) olmayan piksel
-    const urun = alfa ? o => p[o + 3] > 40 : o => { const m = mn(o); return m < 247 && !(m >= 212 && mx(o) - m <= 4); };
+    const urun = alfa ? o => p[o + 3] >= 250 : o => { const m = mn(o); return m < 247 && !(m >= 212 && mx(o) - m <= 4); };
     const fx = W * 0.78, fy = H * 0.93; // sağ alttaki eski filigran ürün sayılmaz
     let x0 = W, y0 = H, x1 = -1, y1 = -1;
     for (let y = 0; y < H; y += 2) for (let i = 0; i < W; i += 2) {
@@ -323,19 +328,17 @@
       if (urun((y * W + i) * 4)) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     }
     if (x1 < 0 || (x1 - x0 < W * 0.05 && y1 - y0 < H * 0.05)) return portrait(src, mark);
-    let golgeVar = false;
     if (!alfa) {
       // dekupe olmamış fotoğraf: kutunun çevresi neredeyse hep doluysa zemin beyaz değildir
       let dolu = 0, say = 0;
       for (let t = 0; t <= 1; t += 0.01) for (const [i, y] of [[x0 + (x1 - x0) * t, y0 + 2], [x0 + (x1 - x0) * t, y1 - 2], [x0 + 2, y0 + (y1 - y0) * t], [x1 - 2, y0 + (y1 - y0) * t]]) { say++; if (urun(((y | 0) * W + (i | 0)) * 4)) dolu++; }
       if (dolu > say * 0.9) return portrait(src, mark);
-      // önceki vitrinin gölgesi ürünün hemen altında duruyorsa yenisi eklenmez
-      let g = 0, m = 0; const gy = Math.min(H - 1, y1 + 4);
-      for (let i = x0 + (x1 - x0) * 0.35; i < x0 + (x1 - x0) * 0.65; i += 3) { const o = (gy * W + (i | 0)) * 4, v = mn(o); m++; if (v >= 200 && v <= 248 && mx(o) - v <= 4) g++; }
-      golgeVar = g > m * 0.6;
-      // eski filigranı ürüne değmiyorsa sil (yenisi en son yazılır)
-      if (!(x1 > fx && y1 > fy)) { x.fillStyle = '#fff'; x.fillRect(fx, fy, W - fx, H - fy); p = x.getImageData(0, 0, W, H).data; }
+      // ürün kutusunun dışı beyazlanır: önceki gölge, pus ve eski filigran gider (gölge her seferinde yeniden çizilir)
+      const k0 = Math.max(0, x0 - 3), k1 = Math.min(W - 1, x1 + 3), m0 = Math.max(0, y0 - 3), m1 = Math.min(H - 1, y1 + 3);
+      x.fillStyle = '#fff'; x.fillRect(0, 0, W, m0); x.fillRect(0, m1 + 1, W, H - m1 - 1); x.fillRect(0, m0, k0, m1 - m0 + 1); x.fillRect(k1 + 1, m0, W - k1 - 1, m1 - m0 + 1);
+      p = x.getImageData(0, 0, W, H).data;
     }
+    const taban = y1; // ürünün alt kenarı: gölge buraya oturur
     x0 = Math.max(0, x0 - 6); y0 = Math.max(0, y0 - 6); x1 = Math.min(W - 1, x1 + 6); y1 = Math.min(H - 1, y1 + 6);
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
     // çok hafif ışık açma: yalnız ürün pikselleri, en koyu ton yerinde kalır (hiçbir şey koyulaşmaz), en çok %8
@@ -354,11 +357,10 @@
     ox.fillStyle = '#fff'; ox.fillRect(0, 0, PW, PH);
     // çok küçük çekilmiş üründe aşırı büyütme bulanıklaştırır: en çok 2,5 kat
     const sc = Math.min(PW * VITRIN.gen / bw, PH * VITRIN.yuk / bh, VITRIN.buyut), w = bw * sc, h = bh * sc, dx = (PW - w) / 2, dy = PH * VITRIN.orta - h / 2;
-    if (!golgeVar) { // yere değme gölgesi: radyal geçişli yassı elips (her tarayıcıda aynı)
-      ox.save(); ox.translate(PW / 2, dy + h - 4); ox.scale(w * 0.42, Math.max(10, h * 0.03));
-      const gr = ox.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, 'rgba(0,0,0,0.13)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      ox.fillStyle = gr; ox.beginPath(); ox.arc(0, 0, 1, 0, Math.PI * 2); ox.fill(); ox.restore();
-    }
+    // yere değme gölgesi: radyal geçişli yassı elips (her tarayıcıda aynı), merkezi ürünün alt kenarında (arada beyaz boşluk kalmaz)
+    ox.save(); ox.translate(PW / 2, dy + (taban - y0) * sc - 2); ox.scale(w * 0.42, Math.max(10, h * 0.03));
+    const gr = ox.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, 'rgba(0,0,0,0.13)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ox.fillStyle = gr; ox.beginPath(); ox.arc(0, 0, 1, 0, Math.PI * 2); ox.fill(); ox.restore();
     // görsel bütün olarak taşınır (kesme kenarı oluşmaz); şeffafsa gölgenin üstüne normal, opaksa çarpma kipiyle konur
     ox.save(); if (!alfa) ox.globalCompositeOperation = 'multiply'; ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
     ox.drawImage(c, dx - x0 * sc, dy - y0 * sc, W * sc, H * sc); ox.restore();
