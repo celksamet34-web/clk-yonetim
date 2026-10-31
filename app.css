@@ -652,3 +652,14 @@ body{font-size:15px;letter-spacing:0}
 .se-arti{color:var(--ok);font-weight:700}.se-eksi{color:var(--bad);font-weight:700}
 .ul-tablo td.se-durum{text-align:left;white-space:normal;font-size:12.5px;color:var(--muted);min-width:140px}
 .se-uyari{background:var(--bad-soft);border-color:var(--bad);color:var(--bad);font-weight:600;margin-bottom:14px}
+/* Ürün formu: ölçü rehberi */
+.olcu{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:16px 18px;align-items:start}
+.olcu-rehber{border:1px solid var(--line);border-radius:14px;background:var(--sunk);padding:8px 10px 10px}
+.olcu-rehber svg{width:100%;height:auto;display:block}
+.olcu-rehber p{font-size:12px;color:var(--muted);margin:4px 0 0;line-height:1.45}
+.olcu-rehber .ok-g{cursor:pointer;transition:opacity .2s}
+.olcu-rehber[data-aktif] .ok-g{opacity:.25}
+.olcu-rehber[data-aktif="w"] .ok-w,.olcu-rehber[data-aktif="h"] .ok-h,.olcu-rehber[data-aktif="d"] .ok-d{opacity:1}
+.olcu-rehber[data-aktif="w"] .ok-w line,.olcu-rehber[data-aktif="h"] .ok-h line,.olcu-rehber[data-aktif="d"] .ok-d line{stroke-width:4}
+.olcu-nokta{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+@media(max-width:620px){.olcu{grid-template-columns:1fr}.olcu-rehber{order:-1;max-width:320px;width:100%;margin:0 auto}}

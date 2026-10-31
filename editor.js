@@ -131,6 +131,30 @@
   const fld = (label, html, cls = '') => `<label class="f ${cls}"><span>${label}</span>${html}</label>`;
   const inp = (k, attrs = '') => `<input type="text" data-k="${k}" value="${esc(D[k] ?? '')}" ${attrs}>`;
   const ninp = (k, attrs = '') => `<input type="number" inputmode="decimal" step="0.01" data-k="${k}" value="${esc(D[k] ?? '')}" ${attrs}>`;
+  // ölçü rehberi (celik isteği 31.10.2026): çanta çizimi üzerinde En, Yükseklik ve Derinlik'in nereden ölçüldüğü; kutuya yazılan değer çizimde görünür,
+  // kutuya girilince o ok öne çıkar, oka dokununca kutusu açılır
+  const OLCU = { w: ['En', '#2f6fd6'], h: ['Yükseklik', '#c46a12'], d: ['Derinlik', '#2f8a57'] };
+  const olcuYazi = (k, v) => OLCU[k][0] + (String(v ?? '').trim() && +v > 0 ? ' ' + String(v).replace('.', ',') + ' cm' : '');
+  const olcuEt = k => `<i class="olcu-nokta" style="background:${OLCU[k][1]}"></i>${OLCU[k][0]} (cm)`;
+  const olcuRehber = () => {
+    const ok = (k, x1, y1, x2, y2, uc, yazi) => `<g class="ok-g ok-${k}" data-olcu="${k}" role="button" tabindex="-1" aria-label="${OLCU[k][0]} kutusuna git" style="color:${OLCU[k][1]}">
+      ${uc}<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" marker-start="url(#olcuUc${k})" marker-end="url(#olcuUc${k})"/>${yazi}</g>`;
+    const uc = k => `<marker id="olcuUc${k}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${OLCU[k][1]}"/></marker>`;
+    return `<div class="olcu-rehber" aria-label="Ölçü rehberi">
+      <svg viewBox="0 0 250 215" role="img" aria-label="Çanta üzerinde En, Yükseklik ve Derinlik">
+        <defs>${uc('w')}${uc('h')}${uc('d')}</defs>
+        <path d="M40 70L90 40L210 40L160 70Z" fill="#ece7df" stroke="#8a8174" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M100 55Q125 2 150 55" fill="none" stroke="#8a8174" stroke-width="5" stroke-linecap="round"/>
+        <path d="M160 70L210 40L210 140L160 170Z" fill="#e2dbcf" stroke="#8a8174" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="40" y="70" width="120" height="100" fill="#f6f2ec" stroke="#8a8174" stroke-width="1.5"/>
+        <rect x="58" y="108" width="84" height="44" rx="4" fill="none" stroke="#b9b0a2" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <text x="100" y="94" text-anchor="middle" font-size="10" fill="#a39c91" letter-spacing="1">ÖN YÜZ</text>
+        ${ok('w', 44, 186, 156, 186, '<path d="M40 174V194M160 174V194" stroke="currentColor" stroke-width="1"/>', `<text data-yazi="w" x="100" y="207" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${esc(olcuYazi('w', D.w))}</text>`)}
+        ${ok('h', 24, 74, 24, 166, '<path d="M14 70H38M14 170H38" stroke="currentColor" stroke-width="1"/>', `<text data-yazi="h" x="12" y="120" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor" transform="rotate(-90 12 120)">${esc(olcuYazi('h', D.h))}</text>`)}
+        ${ok('d', 172, 181, 214, 156, '<path d="M162 172L170 186M212 142L220 156" stroke="currentColor" stroke-width="1"/>', `<text data-yazi="d" x="198" y="201" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${esc(olcuYazi('d', D.d))}</text>`)}
+      </svg>
+      <p><b style="color:${OLCU.w[1]}">En:</b> ön yüzün soldan sağa genişliği. <b style="color:${OLCU.h[1]}">Yükseklik:</b> gövdenin altından üstüne, sap hariç. <b style="color:${OLCU.d[1]}">Derinlik:</b> önden arkaya kalınlık; sitede “Boy” olarak görünür.</p></div>`;
+  };
   const isValiz = () => /VAL[İI]Z/i.test(D.categoryName || '');
   const hasSize = () => +D.w > 0 || +D.h > 0;
   function checks() {
@@ -174,7 +198,7 @@
         <div class="step-b"><div class="shots">${SLOTS.map(([k, t, h]) => shot(k, t, h)).join('')}</div>
           <div class="f"><span>Manken</span><div class="chips" style="margin:0">${AUDIENCES.map(([k, l]) => `<button class="chip" data-act="edAud" data-a="${k}" aria-pressed="${D.audience === k}">${l}</button>`).join('')}</div></div>
           <div class="f"><span>Taşıma şekli</span><div class="chips" style="margin:0">${CARRIES.map(([k, l]) => `<button class="chip" data-act="edCarry" data-c="${k}" aria-pressed="${D.carry === k}">${l}</button>`).join('')}</div></div>
-          <div class="fg three">${fld('En (cm)', ninp('w'))}${fld('Yükseklik (cm)', ninp('h'))}${fld('Derinlik (cm)', ninp('d'))}${fld('Manken boyu (cm)', ninp('mh', `placeholder="${HEIGHTS[D.audience]}"`))}</div>
+          <div class="olcu"><div class="fg">${fld(olcuEt('w'), ninp('w'))}${fld(olcuEt('h'), ninp('h'))}${fld(olcuEt('d'), ninp('d'))}${fld('Manken boyu (cm)', ninp('mh', `placeholder="${HEIGHTS[D.audience]}"`))}</div>${olcuRehber()}</div>
           <label class="toggle"><input type="checkbox" data-k="waterproof" ${D.waterproof ? 'checked' : ''}> Su geçirmez (ölçü görseline rozet ekler)</label>
           <p class="hint">Ürün ölçüleri girilince çanta mankenin boyuna göre gerçek ölçüsünde gösterilir; ölçü yoksa manken otomatik üretilmez. Seçimi ya da ölçüyü değiştirdikten sonra Manken kutusunda “Yeniden”e bas.</p>
           <div class="row-opts"><label class="toggle"><input type="checkbox" data-auto="cutout" ${D.auto.cutout ? 'checked' : ''}> Otomatik dekupe</label><label class="toggle"><input type="checkbox" data-auto="mark" ${D.auto.mark ? 'checked' : ''}> CLK filigranı</label></div></div></section>
@@ -590,6 +614,14 @@
   /* ---------- etkileşim ---------- */
   views.bind_yeni = views.bind_duzenle = () => {
     if (!D) return;
+    const rh = $('.olcu-rehber');
+    if (rh) for (const k of Object.keys(OLCU)) {
+      const el = document.querySelector(`input[data-k="${k}"]`); if (!el) continue;
+      el.addEventListener('focus', () => { rh.dataset.aktif = k; });
+      el.addEventListener('blur', () => { if (rh.dataset.aktif === k) delete rh.dataset.aktif; });
+      el.addEventListener('input', () => { const t = rh.querySelector(`[data-yazi="${k}"]`); if (t) t.textContent = olcuYazi(k, el.value); });
+      rh.querySelector(`[data-olcu="${k}"]`)?.addEventListener('click', () => el.focus());
+    }
     $$('[data-k]').forEach(el => {
       const k = el.dataset.k, ev = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input';
       el.addEventListener(ev, () => {
