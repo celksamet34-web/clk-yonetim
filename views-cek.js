@@ -1,5 +1,5 @@
 /* CLK Yönetim — Çek ve senet (celik isteği 31.10.2026: "paraşütte çekler senetler var, onlarla ilgili bir çalışma yap").
-   Paraşüt'teki bütün çek ve senetler yalnız okunur (sunucu: gider-cek, 10 dakika saklanır); giriş ve ödeme Paraşüt'ten yapılır.
+   Paraşüt'teki bütün çek ve senetler yalnız okunur (sunucu: gider-cek, 10 dakika saklanır); senet girişi Senet gir sayfasında (views-senet.js), çek girişi ve ödeme Paraşüt'ten.
    Verilen: firmanın kendi çek/senedi (ödenecek). Portföy: müşteriden alınıp elde duran. Ciro: müşteriden alınıp tedarikçiye verilen;
    Paraşüt'te kapanmış görünür ama vadesi gelene kadar müşteri ödemezse tedarikçi firmaya döner. */
 (() => {
@@ -233,8 +233,8 @@
 
   views.cek = () => {
     if (!D.v && !D.yuk && !D.hata) yukle();
-    const acts = `<button class="btn" data-act="csYenile" ${D.yuk ? 'disabled' : ''}>${D.yuk ? 'Paraşüt\'ten okunuyor…' : 'Yenile'}</button>`;
-    const ust = head('Finans', 'Çek ve senet', `Paraşüt'teki çek ve senetler${D.v ? ' (' + dtt(D.v.zaman) + ' itibarıyla)' : ''}. Bu sayfa yalnız gösterir; çek ve senet girişi, ödemesi Paraşüt'ten yapılır.`, acts);
+    const acts = `<button class="btn" data-act="csYenile" ${D.yuk ? 'disabled' : ''}>${D.yuk ? 'Paraşüt\'ten okunuyor…' : 'Yenile'}</button><button class="btn dark" data-go="senet">Senet gir</button>`;
+    const ust = head('Finans', 'Çek ve senet', `Paraşüt'teki çek ve senetler${D.v ? ' (' + dtt(D.v.zaman) + ' itibarıyla)' : ''}. Senet "Senet gir" sayfasından girilir; çek girişi ve ödemeler Paraşüt'ten yapılır.`, acts);
     if (!D.v) return ust + (D.hata ? `<div class="card empty"><h3>Liste alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="csYenile">Tekrar dene</button></div>`
       : '<div class="card"><p class="hint" style="margin-bottom:12px">Paraşüt\'ten bütün çek ve senetler okunuyor, yarım dakika sürebilir…</p><div class="skel" style="height:120px"></div><div class="skel" style="height:260px;margin-top:14px"></div></div>');
     const l = D.v.cekler || [];
