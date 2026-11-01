@@ -27,6 +27,14 @@
   const tur = c => (senetMi(c) ? 'Senet' : 'Çek');
   const banka = c => senetMi(c) ? '' : c.banka && c.banka !== 'OTHER' ? BANKA[c.banka] || baslik(c.banka) : baslik(c.bankaAd);
   const acik = c => (c.yon === 'verilen' || c.yon === 'alinan') ? c.kalan > 0.009 : c.yon === 'ciro' && c.vade >= bugun();
+  CLK.evrak = { senetMi, tur, banka };
+  // Senet gir sayfasında tedarikçiye çıkış bordrosu hazırlanmış ama Paraşüt'te henüz ciro edilmemiş evraklar: id → bordro
+  let AYR = {};
+  function ayrilanlar() {
+    const m = {}, l = D.v?.cekler || [];
+    for (const b of D.v?.bordrolar || []) for (const e of b.evraklar || []) { const c = l.find(x => x.id === e.id); if (c && c.yon === 'alinan' && c.kalan > 0.009) m[e.id] = b; }
+    return m;
+  }
   const SEKME = {
     odenecek: ['Ödenecek', c => c.yon === 'verilen' && c.kalan > 0.009],
     portfoy: ['Portföyde', c => c.yon === 'alinan' && c.kalan > 0.009],
@@ -73,7 +81,8 @@
 
   function satir(c) {
     const n = acik(c) ? gunFark(c.vade) : 99;
-    const b = banka(c), alt = [tur(c), b, c.seri ? 'No ' + c.seri : '', c.aciklama, (c.yon === 'verilen' ? 'veriliş ' : 'alış ') + dt(c.tarih)].filter(Boolean);
+    const bd = c.yon === 'alinan' ? AYR[c.id] : null;
+    const b = banka(c), alt = [tur(c), b, c.seri ? 'No ' + c.seri : '', c.aciklama, (c.yon === 'verilen' ? 'veriliş ' : 'alış ') + dt(c.tarih), bd ? `${bd.no} ile ${bd.kisi} firmasına verildi, Paraşüt'te ciro bekliyor` : ''].filter(Boolean);
     return `<li class="cs-r ${n < 0 ? 'gecti' : n <= 7 ? 'yakin' : ''} ${acik(c) ? '' : 'kapali'}">
       <div class="cs-vade"><b>${c.vade.slice(8, 10)}</b><small>${AYLAR[+c.vade.slice(5, 7) - 1]} ${c.vade.slice(2, 4)}</small></div>
       <div class="cs-orta"><b>${kimHtml(c)}</b><small>${alt.map(esc).join(' · ')}</small></div>
@@ -233,8 +242,8 @@
 
   views.cek = () => {
     if (!D.v && !D.yuk && !D.hata) yukle();
-    const acts = `<button class="btn" data-act="csYenile" ${D.yuk ? 'disabled' : ''}>${D.yuk ? 'Paraşüt\'ten okunuyor…' : 'Yenile'}</button><button class="btn dark" data-go="senet">Senet gir</button>`;
-    const ust = head('Finans', 'Çek ve senet', `Paraşüt'teki çek ve senetler${D.v ? ' (' + dtt(D.v.zaman) + ' itibarıyla)' : ''}. Senet "Senet gir" sayfasından girilir; çek girişi ve ödemeler Paraşüt'ten yapılır.`, acts);
+    const acts = `<button class="btn" data-act="csYenile" ${D.yuk ? 'disabled' : ''}>${D.yuk ? 'Paraşüt\'ten okunuyor…' : 'Yenile'}</button><button class="btn" data-act="csTedVer">Tedarikçiye ver</button><button class="btn dark" data-go="senet">Senet gir</button>`;
+    const ust = head('Finans', 'Çek ve senet', `Paraşüt'teki çek ve senetler${D.v ? ' (' + dtt(D.v.zaman) + ' itibarıyla)' : ''}. Senet "Senet gir" sayfasından girilir, portföydeki evraklar "Tedarikçiye ver" ile çıkış bordrosuna yazılır; çek girişi, ciro ve ödemeler Paraşüt'ten yapılır.`, acts);
     if (!D.v) return ust + (D.hata ? `<div class="card empty"><h3>Liste alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="csYenile">Tekrar dene</button></div>`
       : '<div class="card"><p class="hint" style="margin-bottom:12px">Paraşüt\'ten bütün çek ve senetler okunuyor, yarım dakika sürebilir…</p><div class="skel" style="height:120px"></div><div class="skel" style="height:260px;margin-top:14px"></div></div>');
     const l = D.v.cekler || [];
@@ -244,6 +253,9 @@
     const enYakin = [...od].sort((a, b) => a.vade.localeCompare(b.vade))[0];
     const bugunku = [...od, ...pf].filter(c => gunFark(c.vade) <= 0).sort((a, b) => a.vade.localeCompare(b.vade)), hafta = od.filter(c => gunFark(c.vade) > 0 && gunFark(c.vade) <= 7);
     const ciroHafta = ci.filter(c => gunFark(c.vade) <= 7);
+    AYR = ayrilanlar();
+    const bekBordro = Object.entries(AYR).map(([id, b]) => ({ c: l.find(x => x.id === id), b })), bekGrup = {};
+    for (const x of bekBordro) (bekGrup[x.b.no] ||= { b: x.b, n: 0 }).n++;
 
     // liste: sekme + ay + arama
     const q = buyukHarf(D.ara.trim());
@@ -261,7 +273,8 @@
         <div class="kpi"><div class="k">Portföyde</div><div class="v">${tl(toplam(pf))}</div><div class="s">${num(pf.length)} müşteri evrakı elde</div></div>
         <div class="kpi"><div class="k">Ciro edilen</div><div class="v">${tl(toplam(ci))}</div><div class="s">${num(ci.length)} evrak, vadesi gelmedi</div></div>
       </div>
-      ${bugunku.length || hafta.length || ciroHafta.length ? `<div class="cs-uyarilar">
+      ${bugunku.length || hafta.length || ciroHafta.length || bekBordro.length ? `<div class="cs-uyarilar">
+        ${bekBordro.length ? `<div class="cs-uy warn"><b>Tedarikçiye verildi, Paraşüt'te ciro edilmedi: ${num(bekBordro.length)} evrak, ${tl(bekBordro.reduce((t, x) => t + (x.c?.tutar || 0), 0))}</b><span>${Object.values(bekGrup).map(x => `${esc(x.b.no)} ${esc(x.b.kisi)} (${num(x.n)} evrak)`).join(' · ')}</span><small>Paraşüt'te tedarikçiye ödeme olarak girin (ödeme şekli çek/senet, portföyden seçin); girilince bu uyarı kalkar.</small></div>` : ''}
         ${bugunku.length ? `<div class="cs-uy bad"><b>Vadesi bugün ya da geçmiş: ${num(bugunku.length)} evrak, ${tl(toplam(bugunku))}</b><span>${bugunku.map(c => `${esc(tur(c))} ${c.yon === 'alinan' ? esc(c.kimden) + ' (tahsil edilecek)' : esc(c.kime)} ${tl(c.kalan)}, vade ${dt(c.vade)}`).join(' · ')}</span><small>Ödendiyse ya da tahsil edildiyse Paraşüt'te işlenmeli; bu sayfa Paraşüt'teki durumu gösterir.</small></div>` : ''}
         ${hafta.length ? `<div class="cs-uy warn"><b>7 gün içinde ödenecek: ${num(hafta.length)} evrak, ${tl(toplam(hafta))}</b><span>${hafta.map(c => `${esc(c.kime)} ${tl(c.kalan)} (${dt(c.vade)})`).join(' · ')}</span></div>` : ''}
         ${ciroHafta.length ? `<div class="cs-uy gold"><b>7 gün içinde vadesi gelen müşteri evrakı: ${num(ciroHafta.length)}, ${tl(toplam(ciroHafta))}</b><span>${ciroHafta.slice(0, 8).map(c => `${esc(c.kimden)} ${tl(c.tutar)}`).join(' · ')}${ciroHafta.length > 8 ? ' …' : ''}</span><small>Ciro ettiğiniz evraklar; müşteriye hatırlatmak isteyebilirsiniz.</small></div>` : ''}
@@ -293,6 +306,12 @@
   views.onAct = (act, el, e) => {
     const ciz = () => { S.keepScroll = true; render(); };
     if (act === 'csYenile') { D.hata = ''; yukle(true); }
+    else if (act === 'csTedVer') {
+      // Senet gir › Tedarikçiye verdik › Portföydeki müşteri evrakı açılır
+      const sn = S.ui.sn;
+      if (sn) { if (sn.f.yon !== 'verilen') { sn.f.yon = 'verilen'; sn.f.kisi = null; } sn.f.tur = 'portfoy'; sn.onay = false; if (D.v && !sn.c) sn.c = D.v; }
+      CLK.go('senet');
+    }
     else if (act === 'csSekme') { D.sekme = el.dataset.k; D.goster = 60; ciz(); }
     else if (act === 'csAy') {
       D.ay = D.ay === el.dataset.a ? '' : el.dataset.a; D.goster = 60;

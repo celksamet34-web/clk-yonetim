@@ -891,3 +891,28 @@ body{font-size:15px;letter-spacing:0}
 .kt-durum{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 .kt-durum button{position:relative;padding:0;border:0;background:none;cursor:pointer;display:block}
 .kt-durum button span{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:#1fa855;color:#fff;font:700 11px var(--f-b);letter-spacing:.04em;padding:5px 12px;border-radius:999px}
+/* Tedarikçiye çıkış bordrosu (Senet gir › Tedarikçiye verdik › Portföydeki müşteri evrakı) */
+.sn-tur button{padding:10px 16px}
+.sn-pf-ust{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sn-pf-ust .gd-seg b{font-weight:600;color:var(--muted);margin-left:3px;font-variant-numeric:tabular-nums}
+.sn-pf-ust input[type=search]{flex:1 1 200px;min-width:0;min-height:var(--tap);border:1px solid var(--line-2);border-radius:13px;padding:10px 14px;font:inherit;font-size:16px;background:#fff}
+.sn-pf-sec{display:flex;justify-content:space-between;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:13.5px;padding:10px 12px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.sn-pf-sec b{font-weight:700}
+.sn-pf-d{display:flex;gap:14px;flex-wrap:wrap}
+.sn-pf{list-style:none;margin:0;padding:0;max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+.sn-pf-r{display:grid;grid-template-columns:22px 52px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.sn-pf>li:last-child .sn-pf-r{border-bottom:0}
+.sn-pf-r input{width:20px;height:20px;accent-color:var(--ink);margin:0}
+.sn-pf-r.secili{background:var(--gold-soft)}
+.sn-pf-r.ayrik{opacity:.62;cursor:default}
+.sn-pf-r.yakin .cs-vade{background:var(--warn-soft);color:var(--warn)}
+.sn-pf-r.gecti .cs-vade{background:var(--bad-soft);color:var(--bad)}
+.sn-bordro .sn-sonuc-l span{display:inline-flex;gap:5px}
+.sn-b-on img{max-height:560px;width:auto}
+.gd-liste>li.sn-g-ciro{cursor:pointer}
+.gd-liste>li.sn-g-ciro:hover b{text-decoration:underline;text-underline-offset:3px}
+@media(max-width:900px){
+  .sn-pf-r{grid-template-columns:22px 46px minmax(0,1fr);gap:8px 10px}
+  .sn-pf-r .cs-sag{grid-column:3}
+  .sn-pf{max-height:none}
+}
