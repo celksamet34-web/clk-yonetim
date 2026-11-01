@@ -247,16 +247,24 @@
   /* Kurumsal durum (celik 01.11: "renk daha kurumsal, metaya uygun"): Meta reklam düzeni; açık stüdyo zemininde büyük ürün (beyaz fon çarpma ile zemine karışır),
      üstte ad, altta koyu bilgi bandı: fiyat, renkler, tek altın "Sipariş ver" düğmesi. Az yazı, marka renkleri (kömür, altın, beyaz). */
   function durumKurumsal(g, W, H, p, im) {
-    const zg = g.createLinearGradient(0, 0, 0, 1360); zg.addColorStop(0, '#ffffff'); zg.addColorStop(1, '#ece7df');
+    const zg = g.createLinearGradient(0, 360, 0, 1360); zg.addColorStop(0, '#ffffff'); zg.addColorStop(1, '#ece7df');
     g.fillStyle = zg; g.fillRect(0, 0, W, H);
-    const m = 72, ust = 262;
-    if (logoKoyu) { const lh = 58, lw = logoKoyu.width / logoKoyu.height * lh; g.drawImage(logoKoyu, m, ust - lh + 6, lw, lh); g.font = F(700, 21); g.fillStyle = RENK.INK; g.letterSpacing = '6px'; g.fillText('ÇANTA', m + lw + 14, ust); g.letterSpacing = '0px'; }
+    const m = 72;
+    // üst marka bandı (alttaki bantla aynı kömür renk): ortada altın logo, CLK ÇANTA, ince altın çizgi
+    const ubh = 372;
+    g.fillStyle = RENK.INK; yuvarlak(g, 0, -60, W, ubh + 60, 56); g.fill();
+    if (logoAltin) { const lh = 64, lw = logoAltin.width / logoAltin.height * lh; g.drawImage(logoAltin, (W - lw) / 2, 214, lw, lh); }
+    g.textAlign = 'center'; g.font = F(700, 20); g.fillStyle = RENK.GOLD2; g.letterSpacing = '10px'; g.fillText('CLK ÇANTA', W / 2 + 5, 318); g.letterSpacing = '0px';
+    g.fillStyle = 'rgba(214,189,143,.45)'; g.fillRect(W / 2 - 230, 296, 130, 1.5); g.fillRect(W / 2 + 100, 296, 130, 1.5);
+    // kategori (küçük, altın) ve ürün adı ortalı
+    let y = ubh + 82;
     const kat = P.cat(p);
-    if (kat && kat !== 'Kategorisiz') { g.font = F(700, 20); g.fillStyle = '#8a6a33'; g.textAlign = 'right'; g.letterSpacing = '4px'; g.fillText(satirlar(g, buyuk(kat), 520, 1)[0], W - m, ust); g.letterSpacing = '0px'; g.textAlign = 'left'; }
-    // başlık: ürün adı
-    let y = ust + 96; g.font = F(700, 54); g.fillStyle = RENK.INK;
-    for (const l of satirlar(g, p.name, W - 2 * m, 2)) { g.fillText(l, m, y); y += 64; }
-    g.fillStyle = RENK.GOLD; g.fillRect(m, y - 30, 90, 5);
+    if (kat && kat !== 'Kategorisiz') { g.font = F(700, 20); g.fillStyle = '#8a6a33'; g.letterSpacing = '5px'; g.fillText(satirlar(g, buyuk(kat), W - 2 * m, 1)[0], W / 2, y); g.letterSpacing = '0px'; y += 62; }
+    else y += 20;
+    g.font = F(700, 50); g.fillStyle = RENK.INK;
+    for (const l of satirlar(g, p.name, W - 2 * m, 2)) { g.fillText(l, W / 2, y); y += 60; }
+    g.fillStyle = RENK.GOLD; g.fillRect(W / 2 - 45, y - 26, 90, 4);
+    g.textAlign = 'left';
     // ürün: fotoğraf çarpma ile çizilir, beyaz fonu açık zemine karışır
     const ay = y + 10, ah = 1330 - ay;
     // vitrin fotoğraflarının kendi gölgesi var; ayrıca zemin gölgesi çizilmez
