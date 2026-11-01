@@ -3,13 +3,14 @@
    Çanta satıcılarının en çok kullandığı üç gönderi: tek ürün (büyük fotoğraf, fiyat etiketi, renkler, WhatsApp/DM çağrısı),
    kaydırmalı (kapak + ürünün bütün fotoğrafları + son karede ölçü, malzeme, renk, fiyat) ve koleksiyon (2–4 ürün, "Yeni gelenler").
    Gönderi 4:5 (1080×1350, akışta en çok yer kaplayan boy) ya da hikâye 9:16 (1080×1920; üst ve alt Instagram arayüzü için boş).
-   Açıklama ve etiketler (hashtag) üründen yazılır, düzenlenebilir. Paylaşınca açıklama panoya kopyalanır. Sunucuya bir şey yazılmaz. */
+   Açıklama ve etiketler (hashtag) üründen yazılır, düzenlenebilir. Paylaşınca açıklama panoya kopyalanır. Sunucuya bir şey yazılmaz.
+   Tasarım 01.11 akşamı celik isteğiyle lüks düzene geçti: kemer fon, ince altın çerçeve, altın mühürde fiyat (aşağıda TEMA). */
 (() => {
   const { S, $, esc, num, toast, head, views, render, loadProducts, P } = CLK;
   const TEL = '0534 077 88 67', SITE = 'clkcanta.com';
   const RENK = { INK: '#121110', GOLD: '#b48f55', GOLD2: '#d6bd8f', CREAM: '#f6f4f0', LINE: '#e8e3db', MUTED: '#7a746b' };
   const TUR = {
-    tek: { ad: 'Tek ürün', not: 'Büyük fotoğraf, fiyat etiketi, renkler. Reklama en uygun.', en: 1 },
+    tek: { ad: 'Tek ürün', not: 'Kemer fonda büyük fotoğraf, altın mühürde fiyat, renkler.', en: 1 },
     kaydir: { ad: 'Kaydırmalı', not: 'Kapak, ürünün bütün fotoğrafları, son karede ölçü, malzeme, fiyat.', en: 1 },
     koleksiyon: { ad: 'Koleksiyon', not: '2–4 ürün tek karede: yeni gelenler, kampanya.', en: 4 }
   };
@@ -89,160 +90,230 @@
   }
   const sigdir = (g, im, x, y, w, h) => { const k = Math.min(w / im.width, h / im.height), iw = im.width * k, ih = im.height * k; g.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih); };
   const kapla = (g, im, x, y, w, h) => { const k = Math.max(w / im.width, h / im.height), iw = im.width * k, ih = im.height * k; g.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih); };
-  const T = () => D.tema === 'koyu'
-    ? { koyu: true, yazi: '#ffffff', soluk: '#b5ac9e', vurgu: RENK.GOLD2, kart: '#1f1c19', kartCizgi: 'rgba(214,189,143,.25)' }
-    : { koyu: false, yazi: RENK.INK, soluk: '#6f685e', vurgu: '#8a6a33', kart: '#ffffff', kartCizgi: RENK.LINE };
-
-  /* ortak parçalar: zemin, üst marka satırı, alt bant, fiyat etiketi, renk noktaları, ürün fotoğrafı */
-  function zemin(g, W, H) {
-    const t = T();
-    if (t.koyu) { const r = g.createRadialGradient(W / 2, H * 0.25, 60, W / 2, H * 0.4, H * 0.95); r.addColorStop(0, '#2c2824'); r.addColorStop(1, '#121110'); g.fillStyle = r; }
-    else { const l = g.createLinearGradient(0, 0, 0, H); l.addColorStop(0, '#ffffff'); l.addColorStop(1, '#ebe5dc'); g.fillStyle = l; }
-    g.fillRect(0, 0, W, H);
+  /* lüks tasarım (celik 01.11: "tasarımı biraz daha lüks yap"): bol boşluk, ince altın çift çerçeve, kemer (arch) fon içinde ürün,
+     Cormorant Garamond başlıklar, harf aralıklı küçük büyük harf etiketler, altın varak mühürde fiyat, hafif kâğıt dokusu.
+     Ağır siyah bantlar ve hap etiketler kaldırıldı. Ürün fotoğrafının piksellerine dokunulmaz (doku yalnız zemine). */
+  const TEMA = {
+    acik: { ad: 'Fildişi', zemin: ['#f8f4ed', '#ebe2d4'], isik: [255, 255, 255, 0.8], kemer: ['#eee5d8', '#e2d6c5'], yazi: '#1f1a15', soluk: '#7d7265', altin: '#9a7741', cizgi: 'rgba(154,119,65,.5)', koyu: false },
+    mocha: { ad: 'Mocha', zemin: ['#4b3629', '#271c15'], isik: [120, 88, 62, 0.55], kemer: ['#f3ebdf', '#e5d9c7'], yazi: '#f5ecdf', soluk: '#cbb9a2', altin: '#dcc08b', cizgi: 'rgba(220,192,139,.55)', koyu: true },
+    koyu: { ad: 'Siyah ve altın', zemin: ['#1c1916', '#0a0908'], isik: [92, 78, 58, 0.5], kemer: ['#f1eadf', '#e3d9c9'], yazi: '#f6f0e5', soluk: '#a99f90', altin: '#d8bf90', cizgi: 'rgba(216,191,144,.5)', koyu: true }
+  };
+  const T = () => TEMA[D.tema] || TEMA.acik;
+  const SERIF = '"Cormorant Garamond", "Playfair Display", Georgia, serif';
+  const FS = (b, z, it) => `${it ? 'italic ' : ''}${b} ${Math.round(z)}px ${SERIF}`;
+  // fiyat rakamları Playfair ile: Cormorant'ın eski usul rakamları (1.249) küçük ve zor okunuyor
+  const FP = (b, z) => `${b} ${Math.round(z)}px "Playfair Display", Georgia, serif`;
+  // altın varak: koyu temada açık parlak, açık temada koyu altın geçişi
+  function varak(g, x0, x1, koyu = T().koyu) {
+    const gr = g.createLinearGradient(x0, 0, x1, 0);
+    (koyu ? [[0, '#b08b52'], [0.3, '#f0dcaf'], [0.5, '#c9a76c'], [0.75, '#ead3a2'], [1, '#a5814a']] : [[0, '#7f6232'], [0.35, '#b8955a'], [0.6, '#8d6d39'], [1, '#a98549']]).forEach(([o, c]) => gr.addColorStop(o, c));
+    return gr;
   }
-  function marka(g, W, sag) {
-    const t = T(), lg = t.koyu ? logoAltin : logoKoyu, m = 64, y = 84;
-    if (lg) { const lh = 40, lw = lg.width / lg.height * lh; g.drawImage(lg, m, y - lh * 0.82, lw, lh); g.font = F(700, 17); g.fillStyle = t.yazi; g.letterSpacing = '6px'; g.fillText('ÇANTA', m + lw + 14, y - 2); g.letterSpacing = '0px'; }
-    else { g.font = F(700, 30, true); g.fillStyle = t.yazi; g.fillText('CLK ÇANTA', m, y); }
-    if (sag) { g.font = F(700, 18); g.fillStyle = t.vurgu; g.textAlign = 'right'; g.letterSpacing = '4px'; g.fillText(satirlar(g, buyuk(sag), 560, 1)[0], W - m, y - 4); g.letterSpacing = '0px'; g.textAlign = 'left'; }
+  // harf aralıklı büyük harf yazı; ortalıda son harfin aralığı da hesaba katılır
+  function aralikli(g, t, x, y, z, ara, renk, hiza = 'center', b = 600, maxW = 0) {
+    t = buyuk(t); g.font = F(b, z); g.letterSpacing = ara + 'px';
+    while (maxW && z > 11 && g.measureText(t).width > maxW) { z -= 1; g.font = F(b, z); }
+    g.fillStyle = renk; g.textAlign = hiza; g.fillText(t, x + (hiza === 'center' ? ara / 2 : hiza === 'right' ? ara : 0), y);
+    const w = g.measureText(t).width; g.letterSpacing = '0px'; g.textAlign = 'left'; return w;
   }
-  // alt bant: hikâyede tuvalin altına kadar uzar
-  // hikâyede alt bant kenarlardan içeride, köşeleri yuvarlak bir kart olur (altı Instagram'ın yanıt kutusuna kalır)
-  function bant(g, W, alt, ipucu) {
-    const y = 1200, m = 64, hik = alt > 1400;
-    g.fillStyle = D.tema === 'koyu' ? '#0b0a09' : RENK.INK;
-    if (hik) yuvarlak(g, 28, y, W - 56, 150, 36); else yuvarlak(g, 0, y, W, alt - y + 60, 44);
-    g.fill();
-    if (D.tema === 'koyu' && !hik) { g.fillStyle = 'rgba(214,189,143,.35)'; g.fillRect(m, y, W - 2 * m, 1.5); }
-    g.font = F(700, 18); g.fillStyle = RENK.GOLD2; g.letterSpacing = '5px'; g.fillText('SİPARİŞ VE BİLGİ', m, y + 56); g.letterSpacing = '0px';
-    g.fillStyle = '#fff'; sigYazi(g, `DM  ·  WhatsApp ${TEL}`, m, y + 106, 640, 34, 700);
-    g.textAlign = 'right';
-    if (ipucu) { g.font = F(700, 20); g.fillStyle = RENK.GOLD2; g.letterSpacing = '3px'; g.fillText('KAYDIR  ›', W - m, y + 56); g.letterSpacing = '0px'; }
-    g.font = F(600, 24); g.fillStyle = '#a39c91'; g.fillText(SITE, W - m, y + 104);
-    g.textAlign = 'left';
+  // iki yanında ince çizgi olan etiket: ——  OKUL  ——
+  function cizgiliEtiket(g, t, cx, y, z = 20) {
+    const s = T(), w = aralikli(g, t, cx, y, z, 7, s.altin, 'center', 600, 560), u = 54, b = 22;
+    g.fillStyle = s.cizgi; g.fillRect(cx - w / 2 - b - u, y - z * 0.36, u, 1.4); g.fillRect(cx + w / 2 + b, y - z * 0.36, u, 1.4);
   }
-  function etiket(g, f, sag, ust, buyukluk = 42) {
+  let grenDesen = null;
+  function gren(g, W, H, a) {
+    if (!grenDesen) {
+      const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d'), d = x.createImageData(180, 180);
+      for (let i = 0; i < d.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 120; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+      x.putImageData(d, 0, 0); grenDesen = c;
+    }
+    g.save(); g.globalAlpha = a; g.globalCompositeOperation = 'overlay'; g.fillStyle = g.createPattern(grenDesen, 'repeat'); g.fillRect(0, 0, W, H); g.restore();
+  }
+  // zemin: tonlu geçiş, kemerin arkasında yumuşak ışık, doku ve ince altın çift çerçeve (bütün tuval; hikâyede de)
+  function zemin(g, W, H, oy = 0) {
+    const s = T(), l = g.createLinearGradient(0, 0, 0, H); l.addColorStop(0, s.zemin[0]); l.addColorStop(1, s.zemin[1]); g.fillStyle = l; g.fillRect(0, 0, W, H);
+    const r = g.createRadialGradient(W / 2, oy + 520, 40, W / 2, oy + 560, 760); const [ir, ig, ib, ia] = s.isik; r.addColorStop(0, `rgba(${ir},${ig},${ib},${ia})`); r.addColorStop(1, `rgba(${ir},${ig},${ib},0)`); g.fillStyle = r; g.fillRect(0, 0, W, H);
+    gren(g, W, H, s.koyu ? 0.09 : 0.06);
+    g.strokeStyle = s.cizgi; g.lineWidth = 1.6; g.strokeRect(30, 30, W - 60, H - 60);
+    g.globalAlpha = 0.55; g.lineWidth = 1; g.strokeRect(40, 40, W - 80, H - 80); g.globalAlpha = 1;
+  }
+  // üstte ortalı logo ve aralıklı ÇANTA
+  function marka(g, W) {
+    const s = T(), lg = s.koyu ? logoAltin : logoKoyu;
+    if (lg) { const lh = 50, lw = lg.width / lg.height * lh; g.drawImage(lg, (W - lw) / 2, 66, lw, lh); }
+    else { g.font = FS(700, 44); g.fillStyle = s.yazi; g.textAlign = 'center'; g.fillText('CLK', W / 2, 108); g.textAlign = 'left'; }
+    aralikli(g, 'ÇANTA', W / 2, 146, 15, 11, s.koyu ? s.altin : s.soluk, 'center', 600);
+  }
+  const kemerYol = (g, x, y, w, h) => { const r = w / 2; g.beginPath(); g.moveTo(x, y + h); g.lineTo(x, y + r); g.arc(x + r, y + r, r, Math.PI, 0); g.lineTo(x + w, y + h); g.closePath(); };
+  // fotoğrafın kenarları beyazsa (vitrin fotoğrafı) kemerin içine çarpma ile oturur; değilse kemeri doldurur
+  const fonBellek = new WeakMap();
+  function beyazFon(im) {
+    if (fonBellek.has(im)) return fonBellek.get(im);
+    let sonuc = true;
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 40; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 40, 40);
+      const d = x.getImageData(0, 0, 40, 40).data; let ak = 0, top = 0;
+      for (let i = 0; i < 40; i++) for (const [px, py] of [[i, 0], [i, 39], [0, i], [39, i]]) { const k = (py * 40 + px) * 4; top++; if (Math.min(d[k], d[k + 1], d[k + 2]) > 228) ak++; }
+      sonuc = ak / top > 0.7;
+    } catch {}
+    fonBellek.set(im, sonuc); return sonuc;
+  }
+  // ürünün (ve gölgesinin) kutusu: beyaz olmayan piksellerin sınırı + %4 pay
+  const icBellek = new WeakMap();
+  function icerik(im) {
+    if (icBellek.has(im)) return icBellek.get(im);
+    let kutu = [0, 0, im.width, im.height];
+    try {
+      const n = 160, k = Math.min(1, n / Math.max(im.width, im.height)), cw = Math.max(1, Math.round(im.width * k)), ch = Math.max(1, Math.round(im.height * k));
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d'); x.drawImage(im, 0, 0, cw, ch);
+      const d = x.getImageData(0, 0, cw, ch).data; let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) { const i = (yy * cw + xx) * 4; if (Math.min(d[i], d[i + 1], d[i + 2]) < 238) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; } }
+      if (x1 > x0 && y1 > y0) {
+        const px = (x1 - x0) * 0.04, py = (y1 - y0) * 0.04;
+        const a0 = Math.max(0, (x0 - px) / k), b0 = Math.max(0, (y0 - py) / k), a1 = Math.min(im.width, (x1 + 1 + px) / k), b1 = Math.min(im.height, (y1 + 1 + py) / k);
+        kutu = [a0, b0, a1 - a0, b1 - b0];
+      }
+    } catch {}
+    icBellek.set(im, kutu); return kutu;
+  }
+  function kemerFoto(g, im, x, y, w, h, cerceve = true) {
+    const s = T(), gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, s.kemer[0]); gr.addColorStop(1, s.kemer[1]);
+    if (cerceve) { g.save(); g.strokeStyle = s.cizgi; g.lineWidth = 1.4; kemerYol(g, x - 14, y - 14, w + 28, h + 14); g.stroke(); g.restore(); }
+    g.save(); g.shadowColor = s.koyu ? 'rgba(0,0,0,.45)' : 'rgba(80,60,30,.10)'; g.shadowBlur = s.koyu ? 50 : 30; g.shadowOffsetY = 12; kemerYol(g, x, y, w, h); g.fillStyle = gr; g.fill(); g.restore();
+    g.save(); kemerYol(g, x, y, w, h); g.clip();
+    if (!im) { g.fillStyle = '#8b8174'; g.font = F(600, 24); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', x + w / 2, y + h / 2); g.textAlign = 'left'; }
+    else if (beyazFon(im)) {
+      // fotoğrafın beyaz kenarları kadrajdan çıkar (pikseller değişmez); ürün kemerin tabanına oturur, üstte kemer boşluğu kalır
+      const [sx, sy, sw, sh] = icerik(im), kw = w * 0.78, kx = x + (w - kw) / 2, ky = y + w * 0.2, kh = h - w * 0.2 - h * 0.075;
+      const k = Math.min(kw / sw, kh / sh, 3), iw = sw * k, ih = sh * k;
+      g.globalCompositeOperation = 'multiply'; g.drawImage(im, sx, sy, sw, sh, kx + (kw - iw) / 2, ky + kh - ih, iw, ih);
+    } else kapla(g, im, x, y, w, h);
+    g.restore();
+  }
+  // altın varak mühür: fiyat
+  function muhur(g, cx, cy, r, f) {
     if (!f) return;
-    // bayi fiyatında hapın içinde küçük "BAYİ" yazar
-    const t = fmt(f), lz = Math.round(buyukluk * 0.4), et = bayi() ? 'BAYİ' : '';
-    g.font = F(700, lz); g.letterSpacing = '3px'; const lw = et ? g.measureText(et).width + buyukluk * 0.35 : 0; g.letterSpacing = '0px';
-    g.font = F(700, buyukluk); const tw = g.measureText(t).width, bw = lw + tw + buyukluk * 0.95, bh = buyukluk * 1.6, bx = sag - bw, by = ust;
-    g.save(); g.shadowColor = 'rgba(0,0,0,.22)'; g.shadowBlur = 18; g.shadowOffsetY = 6;
-    yuvarlak(g, bx, by, bw, bh, bh / 2); const gr = g.createLinearGradient(bx, by, bx + bw, by + bh); gr.addColorStop(0, RENK.GOLD); gr.addColorStop(1, '#cfae72'); g.fillStyle = gr; g.fill(); g.restore();
-    g.fillStyle = '#1b150b'; g.textBaseline = 'middle'; const x0 = bx + buyukluk * 0.475;
-    if (et) { g.font = F(700, lz); g.letterSpacing = '3px'; g.globalAlpha = 0.72; g.fillText(et, x0, by + bh / 2 + 1); g.globalAlpha = 1; g.letterSpacing = '0px'; }
-    g.font = F(700, buyukluk); g.fillText(t, x0 + lw, by + bh / 2 + 2); g.textBaseline = 'alphabetic';
+    g.save(); g.shadowColor = 'rgba(40,25,5,.35)'; g.shadowBlur = 26; g.shadowOffsetY = 10;
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); const gr = g.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    [[0, '#a8834b'], [0.32, '#efd9a9'], [0.55, '#c7a368'], [0.8, '#e6cd99'], [1, '#9c7840']].forEach(([o, c]) => gr.addColorStop(o, c)); g.fillStyle = gr; g.fill(); g.restore();
+    g.strokeStyle = 'rgba(60,40,10,.35)'; g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy, r - 9, 0, 7); g.stroke();
+    aralikli(g, bayi() ? 'BAYİ FİYATI' : 'FİYAT', cx, cy - r * 0.3, Math.max(12, r * 0.15), 4, 'rgba(43,31,14,.75)', 'center', 700);
+    g.fillStyle = '#2b1f0e'; g.textAlign = 'center'; sigYaziF(g, fmt(f), cx, cy + r * 0.2, r * 1.5, r * 0.4, 700, false, FP); g.textAlign = 'left';
+    g.fillStyle = 'rgba(43,31,14,.45)'; g.fillRect(cx - r * 0.18, cy + r * 0.42, r * 0.36, 1.2);
   }
-  // renk noktaları ve adları ortalı tek satır
-  function renkSatiri(g, rl, cx, y, maxW, r = 14) {
+  function sigYaziF(g, t, x, y, maxW, z, b, it, yaz = FS) {
+    let s = z; g.font = yaz(b, s, it);
+    while (s > z / 2 && g.measureText(t).width > maxW) { s -= 2; g.font = yaz(b, s, it); }
+    g.fillText(t, x, y); return s;
+  }
+  // renk noktaları ve aralıklı adlar, ortalı
+  function renkSatiri(g, rl, cx, y, maxW, r = 12) {
     if (!rl.length) return;
-    const t = T(), nok = rl.filter(renkKod).slice(0, 8), z = Math.round(r * 1.75);
-    g.font = F(600, z); const adlar = rl.map(guzelAd).join(', ');
-    const dw = nok.length ? nok.length * (2 * r + 10) + 8 : 0;
-    const yazi = dw + g.measureText(adlar).width <= maxW ? adlar : `${rl.length} renk`, tw = g.measureText(yazi).width;
+    const s = T(), nok = rl.filter(renkKod).slice(0, 8);
+    g.font = F(600, 20); g.letterSpacing = '3px';
+    const adlar = rl.join('  ·  '), dw = nok.length ? nok.length * (2 * r + 9) + 14 : 0;
+    const yazi = dw + g.measureText(adlar).width <= maxW ? adlar : `${rl.length} RENK`, tw = g.measureText(yazi).width;
+    g.letterSpacing = '0px';
     let x = cx - (dw + tw) / 2;
-    for (const k of nok) { g.beginPath(); g.arc(x + r, y - r * 0.55, r, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 2.5; g.strokeStyle = t.koyu ? 'rgba(255,255,255,.75)' : 'rgba(18,17,16,.22)'; g.stroke(); x += 2 * r + 10; }
-    g.fillStyle = t.soluk; g.fillText(yazi, x + (nok.length ? 8 : 0), y);
+    for (const k of nok) { g.beginPath(); g.arc(x + r, y - 6, r, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 1.5; g.strokeStyle = s.koyu ? 'rgba(255,255,255,.7)' : 'rgba(31,26,21,.25)'; g.stroke(); x += 2 * r + 9; }
+    aralikli(g, yazi, x + (nok.length ? 5 : 0), y, 20, 3, s.soluk, 'left', 600);
   }
-  // açık temada fotoğraf çarpma ile zemine karışır (vitrin fotoğrafının beyaz fonu kaybolur); koyu temada beyaz kartta durur
-  function urunFoto(g, im, x, y, w, h) {
-    if (!im) { g.fillStyle = T().soluk; g.font = F(600, 30); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', x + w / 2, y + h / 2); g.textAlign = 'left'; return; }
-    if (!T().koyu) { g.save(); g.globalCompositeOperation = 'multiply'; sigdir(g, im, x, y, w, h); g.restore(); return; }
-    g.save(); g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 40; g.shadowOffsetY = 14; yuvarlak(g, x, y, w, h, 28); g.fillStyle = '#fff'; g.fill(); g.restore();
-    g.save(); yuvarlak(g, x, y, w, h, 28); g.clip(); sigdir(g, im, x + 20, y + 20, w - 40, h - 40); g.restore();
+  // alt bilgi: kısa çizgi, sipariş satırı, site
+  function altBilgi(g, W, ipucu) {
+    const s = T(), y = 1194;
+    g.fillStyle = s.cizgi; g.fillRect(W / 2 - 60, y, 120, 1.4);
+    g.save(); g.translate(W / 2, y + 0.7); g.rotate(Math.PI / 4); g.fillStyle = s.altin; g.fillRect(-4, -4, 8, 8); g.restore();
+    aralikli(g, `Sipariş için DM  ·  WhatsApp ${TEL}`, W / 2, y + 50, 23, 3, s.yazi, 'center', 600, W - 170);
+    g.font = FS(500, 32, true); g.fillStyle = s.altin; g.textAlign = 'center'; g.fillText(SITE, W / 2, y + 92); g.textAlign = 'left';
+    if (ipucu) aralikli(g, 'KAYDIR  →', W - 78, y + 90, 18, 4, s.soluk, 'right', 600);
   }
-  const bilgiYazi = p => { const b = bilgi(p), k = D.kod ? kodAl(p) : ''; return [D.olcu && b.olcu, D.olcu && b.malzeme, D.olcu && b.su, k && 'Kod: ' + k].filter(Boolean).join('  ·  '); };
+  const bilgiYazi = p => { const b = bilgi(p), k = D.kod ? kodAl(p) : ''; return [D.olcu && b.olcu, D.olcu && b.malzeme, D.olcu && b.su, k].filter(Boolean).join('  ·  '); };
+  // başlık (üst yazı): koyu temada varak, açıkta mürekkep; italik serif
+  function baslik(g, t, W, y, z) {
+    const s = T(); g.font = FS(500, z, true); g.textAlign = 'center';
+    let zz = z; while (zz > z / 2 && g.measureText(t).width > W - 200) { zz -= 2; g.font = FS(500, zz, true); }
+    const w = g.measureText(t).width; g.fillStyle = s.koyu ? varak(g, W / 2 - w / 2, W / 2 + w / 2) : s.yazi; g.fillText(t, W / 2, y); g.textAlign = 'left';
+  }
 
   /* 1) tek ürün ve kaydırmalının kapağı */
   function tekCiz(g, W, alt, p, im, ipucu) {
-    const t = T(), m = 64, kat = P.cat(p);
-    marka(g, W, kat && kat !== 'Kategorisiz' ? kat : '');
-    let py = 128;
-    if (D.ust.trim()) {
-      g.textAlign = 'center'; g.fillStyle = t.koyu ? RENK.GOLD2 : RENK.INK;
-      sigYazi(g, D.ust.trim(), W / 2, 214, W - 2 * m, 80, 700, true);
-      if (D.alt.trim()) { g.fillStyle = t.soluk; sigYazi(g, D.alt.trim(), W / 2, 266, W - 2 * m, 28, 600); }
-      g.textAlign = 'left'; py = D.alt.trim() ? 300 : 260;
-    }
-    const fx = t.koyu ? 150 : 80, fy = py + (t.koyu ? 10 : 0), fh = 905 - fy;
-    urunFoto(g, im, fx, fy, W - 2 * fx, fh);
-    etiket(g, fiyatAl(p), W - m, fy + 8);
-    // ad, bilgi satırı, renkler
-    let y = 978;
-    g.textAlign = 'center'; g.fillStyle = t.yazi; g.font = F(600, 52, true);
-    const sat = satirlar(g, guzelAd(p.name), W - 2 * m, 2);
-    if (sat.length > 1) { g.font = F(600, 46, true); y = 966; }
-    for (const l of satirlar(g, guzelAd(p.name), W - 2 * m, 2)) { g.fillText(l, W / 2, y); y += 56; }
+    const s = T(), kat = P.cat(p), ust = D.ust.trim(), altY = D.alt.trim();
+    marka(g, W);
+    let ay = 236;
+    if (ust) { baslik(g, ust, W, 238, 64); if (altY) aralikli(g, altY, W / 2, 284, 19, 6, s.altin, 'center', 600, W - 220); ay = altY ? 318 : 290; }
+    else if (kat && kat !== 'Kategorisiz') cizgiliEtiket(g, kat, W / 2, 204);
+    const aw = 600, ax = (W - aw) / 2, ab = 890;
+    kemerFoto(g, im, ax, ay, aw, ab - ay);
+    muhur(g, ax + aw - 14, ay + aw * 0.3, 88, fiyatAl(p));
+    // ad, bilgi, renkler
+    g.textAlign = 'center'; g.fillStyle = s.yazi; g.font = FS(600, 60);
+    let sat = satirlar(g, guzelAd(p.name), W - 200, 2), y = 974;
+    if (sat.length > 1) { g.font = FS(600, 50); sat = satirlar(g, guzelAd(p.name), W - 200, 2); y = 960; }
+    for (const l of sat) { g.fillText(l, W / 2, y); y += 52; }
+    g.textAlign = 'left';
     const bi = bilgiYazi(p);
-    if (bi) { g.font = F(600, 25); g.fillStyle = t.soluk; g.fillText(satirlar(g, bi, W - 2 * m, 1)[0], W / 2, y - 4); y += 46; }
-    g.textAlign = 'left';
-    if (D.renk) renkSatiri(g, renkler(p), W / 2, Math.min(y + 4, 1168), W - 2 * m);
-    bant(g, W, alt, ipucu);
+    if (bi) { aralikli(g, bi, W / 2, y + 2, 21, 3, s.soluk, 'center', 600, W - 180); y += 52; }
+    if (D.renk) renkSatiri(g, renkler(p), W / 2, Math.min(y + 6, 1150), W - 180);
+    altBilgi(g, W, ipucu);
   }
 
-  /* 2) kaydırmalının ara kareleri: ürünün diğer fotoğrafları, tam kare; köşede küçük logo */
-  function fotoCiz(g, W, H, im, hikaye) {
-    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-    if (im) { if (hikaye) { zemin(g, W, H); g.save(); yuvarlak(g, 0, 250, W, H - 500, 0); g.clip(); g.fillStyle = '#fff'; g.fillRect(0, 250, W, H - 500); sigdir(g, im, 0, 250, W, H - 500); g.restore(); } else kapla(g, im, 0, 0, W, H); }
-    if (logoKoyu) {
-      const lh = 26, lw = logoKoyu.width / logoKoyu.height * lh, px = 18, bw = lw + 2 * px, bh = lh + 22, x = 40, y = H - (hikaye ? 290 : 40) - bh;
-      g.save(); g.shadowColor = 'rgba(0,0,0,.12)'; g.shadowBlur = 12; yuvarlak(g, x, y, bw, bh, bh / 2); g.fillStyle = 'rgba(255,255,255,.88)'; g.fill(); g.restore();
-      g.drawImage(logoKoyu, x + px, y + 11, lw, lh);
-    }
+  /* 2) kaydırmalının ara kareleri: ürünün diğer fotoğrafları büyük kemerde; altında ad ve kare numarası */
+  function fotoCiz(g, W, alt, p, im, no, top) {
+    const s = T();
+    marka(g, W);
+    const aw = 760, ax = (W - aw) / 2, ay = 196;
+    kemerFoto(g, im, ax, ay, aw, 1140 - ay);
+    g.textAlign = 'center'; g.fillStyle = s.yazi; g.font = FS(500, 42, true);
+    g.fillText(satirlar(g, guzelAd(p.name), W - 220, 1)[0], W / 2, 1222); g.textAlign = 'left';
+    aralikli(g, `${String(no).padStart(2, '0')}  /  ${String(top).padStart(2, '0')}`, W / 2, 1278, 19, 6, s.altin, 'center', 600);
   }
 
-  /* 3) kaydırmalının son karesi: ürün bilgileri ve sipariş */
+  /* 3) kaydırmalının son karesi: ürün bilgileri (solda kemer, sağda özellik çizelgesi) */
   function bilgiCiz(g, W, alt, p, im) {
-    const t = T(), m = 64;
-    marka(g, W, 'ÜRÜN BİLGİLERİ');
-    g.textAlign = 'center'; g.fillStyle = t.yazi; g.font = F(600, 50, true);
-    let y = 200;
-    for (const l of satirlar(g, guzelAd(p.name), W - 2 * m, 2)) { g.fillText(l, W / 2, y); y += 58; }
+    const s = T();
+    marka(g, W);
+    cizgiliEtiket(g, 'Ürün bilgileri', W / 2, 204);
+    g.textAlign = 'center'; g.fillStyle = s.yazi; g.font = FS(600, 52);
+    let y = 272; for (const l of satirlar(g, guzelAd(p.name), W - 200, 2)) { g.fillText(l, W / 2, y); y += 54; }
     g.textAlign = 'left';
-    const fw = 300, fh = 360, fy = y - 10;
-    urunFoto(g, im, (W - fw) / 2, fy, fw, fh);
     const b = bilgi(p), rl = renkler(p), f = fiyatAl(p), kod = kodAl(p);
     const sat = [['Ölçü', b.olcu], ['Malzeme', b.malzeme], ['Özellik', b.su], ['Renkler', rl.length ? rl.map(guzelAd).join(', ') : ''], ['Kod', kod], [bayi() ? 'Bayi fiyatı' : 'Fiyat', f ? fmt(f) : 'Mesaj atın, hemen iletelim']].filter(([, v]) => v);
-    const ky = fy + fh + 24, kh = Math.min(1170 - ky, sat.length * 72 + 24), sh = (kh - 24) / sat.length;
-    g.save(); g.shadowColor = t.koyu ? 'rgba(0,0,0,.4)' : 'rgba(18,17,16,.08)'; g.shadowBlur = 24; g.shadowOffsetY = 6; yuvarlak(g, m, ky, W - 2 * m, kh, 24); g.fillStyle = t.kart; g.fill(); g.restore();
-    if (t.koyu) { g.strokeStyle = t.kartCizgi; g.lineWidth = 1.5; yuvarlak(g, m, ky, W - 2 * m, kh, 24); g.stroke(); }
+    const ay = y + 6, aw = 400, ax = 92, ab = 1120;
+    kemerFoto(g, im, ax, ay, aw, ab - ay);
+    const sx = ax + aw + 64, sw = W - 92 - sx, sh = Math.min(118, (ab - ay) / sat.length), sy0 = ay + (ab - ay - sh * sat.length) / 2;
     sat.forEach(([k, v], i) => {
-      const sy = ky + 12 + i * sh, orta = sy + sh / 2 + 9, son = i === sat.length - 1;
-      if (i) { g.fillStyle = t.kartCizgi; g.fillRect(m + 28, sy, W - 2 * m - 56, 1.5); }
-      g.font = F(700, 19); g.fillStyle = t.vurgu; g.letterSpacing = '3px'; g.fillText(buyuk(k), m + 32, orta - 2); g.letterSpacing = '0px';
-      g.textAlign = 'right'; g.fillStyle = son && f ? (t.koyu ? RENK.GOLD2 : '#6a5226') : t.yazi;
-      sigYazi(g, v, W - m - 32, orta, W - 2 * m - 300, son && f ? 38 : 29, 700);
-      g.textAlign = 'left';
+      const sy = sy0 + i * sh, son = i === sat.length - 1 && f;
+      if (i) { g.fillStyle = s.cizgi; g.fillRect(sx, sy, sw, 1.2); }
+      aralikli(g, k, sx, sy + sh * 0.38, 18, 4, s.altin, 'left', 600);
+      g.fillStyle = son ? (s.koyu ? varak(g, sx, sx + sw) : s.yazi) : s.yazi;
+      const satir = (() => { g.font = son ? FP(600, 38) : FS(600, 32); return satirlar(g, v, sw, 2); })();
+      if (satir.length > 1 && !son) { g.font = FS(600, 26); const s2 = satirlar(g, v, sw, 2); s2.forEach((t, j) => g.fillText(t, sx, sy + sh * 0.4 + 34 + j * 28)); }
+      else sigYaziF(g, v, sx, sy + sh * 0.4 + (son ? 48 : 42), sw, son ? 38 : 32, 600, false, son ? FP : FS);
     });
-    bant(g, W, alt, false);
+    altBilgi(g, W, false);
   }
 
-  /* 4) koleksiyon: 2–4 ürün, başlık ve alt başlık */
+  /* 4) koleksiyon: 2–4 ürün yan yana kemerlerde, italik başlık */
   function koleksiyonCiz(g, W, alt, l, imgs) {
-    const t = T(), m = 64, n = l.length;
-    marka(g, W, D.fiyat !== 'yok' && bayi() ? 'BAYİ FİYATLARI' : '');
-    g.textAlign = 'center'; g.fillStyle = t.koyu ? RENK.GOLD2 : RENK.INK;
-    sigYazi(g, D.ust.trim() || 'Yeni Gelenler', W / 2, 206, W - 2 * m, 76, 700, true);
-    g.fillStyle = t.soluk; sigYazi(g, D.alt.trim() || `${guzelAd(new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }))}  ·  ${n} model`, W / 2, 254, W - 2 * m, 26, 600);
-    g.textAlign = 'left';
-    const sut = n === 4 ? 2 : n, sir = n === 4 ? 2 : 1, gap = 22, x0 = m - 16, y0 = 290, gw = W - 2 * x0, gh = 1176 - y0;
-    const cw = (gw - gap * (sut - 1)) / sut, ch = (gh - gap * (sir - 1)) / sir;
+    const s = T(), n = l.length;
+    marka(g, W);
+    baslik(g, D.ust.trim() || 'Yeni Gelenler', W, 252, 78);
+    aralikli(g, D.alt.trim() || `${guzelAd(new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }))}  ·  ${n} model${bayi() ? '  ·  bayi fiyatları' : ''}`, W / 2, 300, 19, 5, s.altin, 'center', 600, W - 200);
+    const sut = n === 4 ? 2 : n, sir = n === 4 ? 2 : 1, yazH = n === 4 ? 96 : 112, gx = n === 3 ? 34 : 56, gy = 26, y0 = 350, bot = 1168;
+    const aw = Math.min(n === 2 ? 400 : n === 3 ? 282 : 300, (W - 180 - gx * (sut - 1)) / sut), ah = (bot - y0 - sir * yazH - gy * (sir - 1)) / sir;
+    const x0 = (W - (aw * sut + gx * (sut - 1))) / 2;
     l.forEach((p, i) => {
-      const x = x0 + (i % sut) * (cw + gap), y = y0 + Math.floor(i / sut) * (ch + gap), pad = 16, altH = n === 4 ? 104 : 128;
-      g.save(); g.shadowColor = t.koyu ? 'rgba(0,0,0,.45)' : 'rgba(18,17,16,.10)'; g.shadowBlur = 22; g.shadowOffsetY = 6; yuvarlak(g, x, y, cw, ch, 22); g.fillStyle = '#fff'; g.fill(); g.restore();
-      const ix = x + pad, iy = y + pad, iw = cw - 2 * pad, ih = ch - altH - pad;
-      if (imgs[i]) { g.save(); yuvarlak(g, ix, iy, iw, ih, 14); g.clip(); sigdir(g, imgs[i], ix, iy, iw, ih); g.restore(); }
-      const f = fiyatAl(p);
-      g.font = F(700, n === 4 ? 23 : 25); g.fillStyle = RENK.INK;
-      g.fillText(satirlar(g, guzelAd(p.name), iw, 1)[0], ix + 2, iy + ih + 38);
-      let ry = iy + ih + (n === 4 ? 76 : 80);
-      if (f) { g.font = F(700, n === 4 ? 27 : 30); g.fillStyle = '#6a5226'; g.fillText(fmt(f), ix + 2, ry); }
-      const rl = D.renk ? renkler(p) : [], nok = rl.filter(renkKod).slice(0, 5);
-      if (nok.length) { let rx = ix + iw - 12; for (const k of nok.slice().reverse()) { g.beginPath(); g.arc(rx, ry - 9, 11, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(18,17,16,.22)'; g.stroke(); rx -= 28; } }
-      else if (rl.length) { g.font = F(600, 19); g.fillStyle = RENK.MUTED; g.textAlign = 'right'; g.fillText(`${rl.length} renk`, ix + iw - 2, ry); g.textAlign = 'left'; }
-      if (!f && n < 4) { g.font = F(600, 20); g.fillStyle = RENK.MUTED; g.fillText(satirlar(g, bilgiYazi(p), iw - 150, 1)[0] || '', ix + 2, ry); }
+      const x = x0 + (i % sut) * (aw + gx), y = y0 + Math.floor(i / sut) * (ah + yazH + gy);
+      kemerFoto(g, imgs[i], x, y, aw, ah, false);
+      const cx = x + aw / 2, f = fiyatAl(p);
+      g.textAlign = 'center'; g.fillStyle = s.yazi; g.font = FS(600, n === 2 ? 36 : 30);
+      g.fillText(satirlar(g, guzelAd(p.name), aw + gx - 12, 1)[0], cx, y + ah + 44); g.textAlign = 'left';
+      const ry = y + ah + (n === 4 ? 84 : 92);
+      if (f) { g.font = FP(600, n === 2 ? 30 : 26); g.textAlign = 'center'; const t = fmt(f), w = g.measureText(t).width; g.fillStyle = s.koyu ? varak(g, cx - w / 2, cx + w / 2) : s.altin; g.fillText(t, cx, ry); g.textAlign = 'left'; }
+      else { const rl = D.renk ? renkler(p) : []; aralikli(g, rl.length ? `${rl.length} renk` : (kodAl(p) || ''), cx, ry - 4, 18, 4, s.soluk, 'center', 600, aw); }
     });
-    bant(g, W, alt, false);
+    altBilgi(g, W, false);
   }
 
   /* resimleri hazırla: tuval → JPEG; ayar değişince kendiliğinden yenilenir */
@@ -253,22 +324,23 @@
     if (!l.length || (D.tur === 'koleksiyon' && l.length < 2)) { temizle(); onizlemeYenile(); return; }
     const benim = ++sayac; D.kirli = false; D.calisiyor = true; durumYaz('Hazırlanıyor…');
     try {
-      await Promise.all([logolar(), document.fonts?.load?.('700 40px Inter'), document.fonts?.load?.('600 40px "Playfair Display"'), document.fonts?.load?.('700 40px "Playfair Display"')].map(x => Promise.resolve(x).catch(() => null)));
+      await Promise.all([logolar(), document.fonts?.load?.('700 40px Inter'), document.fonts?.load?.('600 40px Inter'), document.fonts?.load?.('600 40px "Cormorant Garamond"'), document.fonts?.load?.('700 40px "Cormorant Garamond"'), document.fonts?.load?.('italic 500 40px "Cormorant Garamond"'), document.fonts?.load?.('600 40px "Playfair Display"')].map(x => Promise.resolve(x).catch(() => null)));
       const W = 1080, H = BICIM[D.bicim][1], hik = D.bicim === 'hikaye', oy = hik ? 285 : 0, alt = H - oy;
       const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
       const kareler = [];
       const ciz = async fn => { g.save(); g.clearRect(0, 0, W, H); g.letterSpacing = '0px'; await fn(); g.restore(); kareler.push(await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92))); };
       if (D.tur === 'koleksiyon') {
         const imgs = await Promise.all(l.slice(0, tur.en).map(p => gorsel(P.img(p))));
-        await ciz(() => { zemin(g, W, H); g.translate(0, oy); koleksiyonCiz(g, W, alt, l.slice(0, tur.en), imgs); });
+        await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); koleksiyonCiz(g, W, alt, l.slice(0, tur.en), imgs); });
       } else {
         const p = l[0], fotolar = P.imgs(p), im = await gorsel(fotolar[0]);
-        await ciz(() => { zemin(g, W, H); g.translate(0, oy); tekCiz(g, W, alt, p, im, D.tur === 'kaydir' && !hik); });
+        await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); tekCiz(g, W, alt, p, im, D.tur === 'kaydir' && !hik); });
         if (D.tur === 'kaydir') {
           // kaydırmalı en çok 10 kare: kapak + 8 fotoğraf + bilgi
           const digerleri = fotolar.slice(1, 9), ims = await Promise.all(digerleri.map(gorsel));
-          for (const x of ims.filter(Boolean)) await ciz(() => fotoCiz(g, W, H, x, hik));
-          await ciz(() => { zemin(g, W, H); g.translate(0, oy); bilgiCiz(g, W, alt, p, im); });
+          const digerIm = ims.filter(Boolean), top = digerIm.length + 2;
+          for (const [i, x] of digerIm.entries()) await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); fotoCiz(g, W, alt, p, x, i + 2, top); });
+          await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); bilgiCiz(g, W, alt, p, im); });
         }
       }
       if (benim !== sayac) return;
@@ -395,7 +467,7 @@
             <div class="ig-turler">${Object.entries(TUR).map(([k, v]) => `<button type="button" class="ig-tur" data-act="igTur" data-v="${k}" aria-pressed="${D.tur === k}"><b>${v.ad}</b><small>${v.not}</small></button>`).join('')}</div>
             <div class="ig-satir">
               <div class="gd-seg" role="group" aria-label="Boyut">${Object.entries(BICIM).map(([k, [ad]]) => `<button data-act="igBicim" data-v="${k}" aria-pressed="${D.bicim === k}">${ad}</button>`).join('')}</div>
-              <div class="gd-seg" role="group" aria-label="Tasarım">${[['acik', 'Açık'], ['koyu', 'Siyah ve altın']].map(([k, ad]) => `<button data-act="igTema" data-v="${k}" aria-pressed="${D.tema === k}">${ad}</button>`).join('')}</div>
+              <div class="gd-seg" role="group" aria-label="Tasarım">${Object.entries(TEMA).map(([k, { ad }]) => `<button data-act="igTema" data-v="${k}" aria-pressed="${D.tema === k}">${ad}</button>`).join('')}</div>
             </div>
           </div>
           <div class="card">
