@@ -11,7 +11,7 @@
   const RENK = { INK: '#121110', INK2: '#1d1b19', GOLD: '#b48f55', GOLD2: '#d6bd8f', CREAM: '#f6f4f0', LINE: '#e8e3db', MUTED: '#7a746b' };
   const ayYil = () => new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
-  const VARS = { tema: 'kurumsal', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, kat: '', stokta: true, aktif: true };
+  const VARS = { tema: 'kurumsal', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, olcu: true, kat: '', stokta: true, aktif: true };
   let kayit = {};
   try { kayit = JSON.parse(localStorage.getItem('clk-katalog') || '{}'); } catch {}
   const D = (S.ui.kt ||= { ...VARS, ...kayit, cikar: new Set(kayit.cikar || []), ara: '', goster: 60, durum: '', calisiyor: false, url: '', blob: null, onizleme: [] });
@@ -28,6 +28,17 @@
   };
   // PRS-<paraşüt id> ve rastgele CLK-xxxxxxxxxxxx kodları müşteriye anlamsız: model kodu varsa o, yoksa kod yazılmaz
   const kodAl = p => { const m = String(p.modelCode || '').trim(), c = String(p.code || '').trim(); return m || (/^(PRS|CLK)-/i.test(c) ? '' : c); };
+  // ürün nitelikleri (Qukasoft attributes): En × Yükseklik × Boy (derinlik), Malzeme, Su Geçirmez
+  const nitelik = (p, ad) => { const a = (Array.isArray(p.attributes) ? p.attributes : []).find(x => buyuk(x.name).replace(/İ/g, 'I') === buyuk(ad).replace(/İ/g, 'I')); return String(a?.value ?? '').trim(); };
+  const cm = v => String(v).replace(',', '.').replace(/\s*cm$/i, '').trim();
+  function bilgi(p) {
+    const o = ['En', 'Yükseklik', 'Boy'].map(k => cm(nitelik(p, k))).filter(Boolean);
+    const olcu = o.length ? o.map(x => x.replace('.', ',')).join(' × ') + (o.every(x => /^\d+([.,]\d+)?$/.test(x)) ? ' cm' : '') : '';
+    const malzeme = nitelik(p, 'Malzeme'), suV = buyuk(nitelik(p, 'Su Geçirmez'));
+    const su = /^(EVET|VAR|1|TRUE)$/.test(suV) || suV.includes('GEÇİRMEZ') ? 'Su geçirmez' : '';
+    return { olcu, malzeme: malzeme ? guzelAd(malzeme) : '', su };
+  }
+  const bilgiYazi = p => { if (!D.olcu) return ''; const b = bilgi(p); return [b.olcu, b.malzeme, b.su].filter(Boolean).join(' · '); };
   const renkler = p => {
     const l = (Array.isArray(p.variants) ? p.variants : []).filter(v => !D.stokta || (+v.quantity || 0) > 0).map(v => String(v.value1 || '').trim()).filter(Boolean);
     return [...new Set(l.map(buyuk))];
@@ -107,7 +118,7 @@
     const s = w / 500, pad = Math.round(18 * s), r = Math.round(22 * s);
     g.save(); g.shadowColor = 'rgba(18,17,16,.10)'; g.shadowBlur = 24 * s; g.shadowOffsetY = 8 * s;
     yuvarlak(g, x, y, w, h, r); g.fillStyle = '#fff'; g.fill(); g.restore();
-    const altH = Math.round(w * (+D.adet === 1 ? (D.renk ? 0.25 : 0.19) : D.renk ? 0.36 : 0.28)), ix = x + pad, iy = y + pad, iw = w - 2 * pad, ih = h - altH - pad;
+    const altH = Math.round(w * ((+D.adet === 1 ? (D.renk ? 0.25 : 0.19) : D.renk ? 0.36 : 0.28) + (D.olcu ? (+D.adet === 1 ? 0.03 : 0.05) : 0))), ix = x + pad, iy = y + pad, iw = w - 2 * pad, ih = h - altH - pad;
     g.save(); yuvarlak(g, ix, iy, iw, ih, Math.round(14 * s)); g.clip();
     g.fillStyle = '#fff'; g.fillRect(ix, iy, iw, ih);
     if (im) sigdir(g, im, ix, iy, iw, ih);
@@ -128,6 +139,8 @@
     for (const l of satirlar(g, p.name, iw, 2)) { g.fillText(l, ix, ty); ty += ad * 1.22; }
     const kod = D.kod ? kodAl(p) : '';
     if (kod) { g.font = F(500, 17 * s); g.fillStyle = RENK.MUTED; g.fillText(satirlar(g, 'Kod: ' + kod, iw, 1)[0] || '', ix, ty + 2 * s); ty += 26 * s; }
+    const bi = bilgiYazi(p);
+    if (bi) { g.font = F(600, 17 * s); g.fillStyle = '#4a453f'; g.fillText(satirlar(g, bi, iw, 1)[0] || '', ix, ty + 2 * s); ty += 26 * s; }
     if (D.renk) {
       const rl = renkler(p);
       if (rl.length) {
@@ -138,8 +151,10 @@
           g.lineWidth = Math.max(1, 1.5 * s); g.strokeStyle = 'rgba(18,17,16,.25)'; g.stroke(); rx += nr * 2 + 6 * s;
         }
         g.font = F(600, 16 * s); g.fillStyle = RENK.MUTED;
-        const yazi = rl.length === 1 ? guzelAd(rl[0]) : rl.length <= 3 && !noktali.length ? rl.map(guzelAd).join(', ') : `${rl.length} renk`;
-        g.fillText(satirlar(g, yazi, ix + iw - rx - 6 * s, 1)[0] || '', rx + (noktali.length ? 6 * s : 0), ty);
+        // renk adları sığdığı kadar; sığmazsa sayı
+        const genis = ix + iw - rx - 6 * s, adlar = rl.map(guzelAd).join(', ');
+        const yazi = g.measureText(adlar).width <= genis ? adlar : `${rl.length} renk`;
+        g.fillText(satirlar(g, yazi, genis, 1)[0] || '', rx + (noktali.length ? 6 * s : 0), ty);
       }
     }
   }
@@ -225,7 +240,7 @@
     g.restore();
     // renkler ve kod: yarı saydam beyaz hap içinde
     const kod = D.kod ? kodAl(p) : '', rl = D.renk ? renkler(p) : [], noktali = rl.filter(renkKod).slice(0, 8);
-    const yazi = [rl.length > 1 ? `${rl.length} renk` : rl.length ? guzelAd(rl[0]) : '', kod ? 'Kod: ' + kod : ''].filter(Boolean).join('  ·  ');
+    const yazi = [rl.length > 1 ? `${rl.length} renk` : rl.length ? guzelAd(rl[0]) : '', kod ? 'Kod: ' + kod : '', bilgi(p).olcu && D.olcu ? bilgi(p).olcu : ''].filter(Boolean).join('  ·  ');
     if (yazi || noktali.length) {
       g.font = F(600, 28); const nr = 15, ng = 10, nw = noktali.length ? noktali.length * 2 * nr + (noktali.length - 1) * ng + 18 : 0, tw = g.measureText(yazi).width, bw = nw + tw + 56, bh = 62, bx = (W - bw) / 2, by = y - 30;
       yuvarlak(g, bx, by, bw, bh, bh / 2); g.fillStyle = 'rgba(255,255,255,.24)'; g.fill();
@@ -266,10 +281,25 @@
     g.fillStyle = RENK.GOLD; g.fillRect(W / 2 - 45, y - 26, 90, 4);
     g.textAlign = 'left';
     // ürün: fotoğraf çarpma ile çizilir, beyaz fonu açık zemine karışır
-    const ay = y + 10, ah = 1330 - ay;
+    const b = D.olcu ? bilgi(p) : {}, kodK = D.kod ? kodAl(p) : '';
+    const ozellik = [['ÖLÇÜ', b.olcu], ['MALZEME', b.malzeme], ['KOD', kodK], ['', b.su]].filter(([, v]) => v).slice(0, 3);
+    const ay = y + 10, ah = (ozellik.length ? 1222 : 1330) - ay;
     // vitrin fotoğraflarının kendi gölgesi var; ayrıca zemin gölgesi çizilmez
     if (im) { g.save(); g.globalCompositeOperation = 'multiply'; sigdir(g, im, m, ay, W - 2 * m, ah - 20); g.restore(); }
     else { g.fillStyle = RENK.MUTED; g.font = F(600, 34); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', W / 2, ay + ah / 2); g.textAlign = 'left'; }
+    // özellik şeridi: ölçü, malzeme, kod (beyaz kutu, ince ayraçlar)
+    if (ozellik.length) {
+      const sx = m, sw = W - 2 * m, sh = 104, sy = 1228, cw = sw / ozellik.length;
+      g.save(); g.shadowColor = 'rgba(18,17,16,.10)'; g.shadowBlur = 24; g.shadowOffsetY = 6; yuvarlak(g, sx, sy, sw, sh, 20); g.fillStyle = '#fff'; g.fill(); g.restore();
+      g.textAlign = 'center';
+      ozellik.forEach(([l, v], i) => {
+        const cx = sx + cw * i + cw / 2;
+        if (i) { g.fillStyle = RENK.LINE; g.fillRect(sx + cw * i, sy + 22, 2, sh - 44); }
+        if (l) { g.font = F(700, 17); g.fillStyle = '#8a6a33'; g.letterSpacing = '3px'; g.fillText(l, cx, sy + 40); g.letterSpacing = '0px'; }
+        g.font = F(700, 27); g.fillStyle = RENK.INK; g.fillText(satirlar(g, v, cw - 28, 1)[0], cx, l ? sy + 78 : sy + sh / 2 + 10);
+      });
+      g.textAlign = 'left';
+    }
     // alt bilgi bandı
     const by = 1360;
     g.fillStyle = RENK.INK; yuvarlak(g, 0, by, W, H - by + 60, 56); g.fill();
@@ -286,7 +316,9 @@
       if (noktali.length) { const r = 17; let x = W - m - r; for (const k of noktali.slice().reverse()) { g.beginPath(); g.arc(x, by + 132, r, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,.8)'; g.stroke(); x -= 2 * r + 12; } }
       else { g.font = F(600, 30); g.fillStyle = '#fff'; g.fillText(satirlar(g, rl.map(guzelAd).join(', '), 380, 1)[0], W - m, by + 144); }
     }
-    if (kod) { g.font = F(500, 24); g.fillStyle = '#a39c91'; g.fillText('Kod: ' + kod, W - m, by + 188); }
+    // renk adları noktaların altında; kod özellik şeridinde değilse burada
+    if (rl.length && noktali.length) { g.font = F(500, 23); g.fillStyle = '#cfc8bc'; g.fillText(satirlar(g, rl.map(guzelAd).join(', '), 460, 1)[0], W - m, by + 186); }
+    else if (kod && !ozellik.some(([l]) => l === 'KOD')) { g.font = F(500, 24); g.fillStyle = '#a39c91'; g.fillText('Kod: ' + kod, W - m, by + 188); }
     g.textAlign = 'left';
     // tek eylem düğmesi (Meta'daki "Mesaj gönder" gibi)
     const bx = m, bw = W - 2 * m, bh = 96, byy = by + 222;
@@ -329,7 +361,7 @@
     for (const l of satirlar(g, p.name, W - 2 * m - 20, 2)) { g.fillText(l, W / 2, y); y += 56; }
     const kod = D.kod ? kodAl(p) : '';
     const rl = D.renk ? renkler(p) : [], noktali = rl.filter(renkKod).slice(0, 10);
-    const alt = [kod ? 'Kod: ' + kod : '', rl.length > 1 ? `${rl.length} renk` : rl.length ? guzelAd(rl[0]) : ''].filter(Boolean).join('   ·   ');
+    const alt = [kod ? 'Kod: ' + kod : '', rl.length ? rl.map(guzelAd).join(', ') : '', bilgiYazi(p)].filter(Boolean).join('   ·   ');
     if (noktali.length) {
       const r = 15, gap = 12, tw = noktali.length * (2 * r) + (noktali.length - 1) * gap; let x = (W - tw) / 2 + r; y += 10;
       for (const k of noktali) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.75)'; g.stroke(); x += 2 * r + gap; }
@@ -478,7 +510,7 @@
     const id = String(p.id), var_ = !D.cikar.has(id), f = fiyatAl(p), img = P.img(p), kod = kodAl(p);
     return `<label class="kt-r ${var_ ? '' : 'kt-cik'}"><input type="checkbox" data-kt-u="${esc(id)}" ${var_ ? 'checked' : ''} ${img ? '' : 'disabled'}>
       <span class="kt-im">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : '<i>Foto yok</i>'}</span>
-      <span class="kt-ad"><b>${esc(p.name)}</b><small>${esc([kod, P.path(p)].filter(Boolean).join(' · '))}</small></span>
+      <span class="kt-ad"><b>${esc(p.name)}</b><small>${esc([kod, P.path(p)].filter(Boolean).join(' · '))}</small>${(() => { const b = bilgi(p), rl = renkler(p), t = [b.olcu, b.malzeme, b.su, rl.length ? rl.map(guzelAd).join(', ') : ''].filter(Boolean).join(' · '); return t ? `<small class="kt-bilgi">${esc(t)}</small>` : ''; })()}</span>
       <span class="kt-sag">${D.fiyat === 'yok' ? '' : `<b>${f ? fmt(f) : '<em>fiyat yok</em>'}</b>`}<small>${num(P.qty(p))} adet</small></span></label>`;
   }
   views.katalog = () => {
@@ -502,7 +534,7 @@
           <label>Sıralama${sec('ktSira', SIRA, D.sira)}</label>
           <label>Alt not<input id="ktNot" value="${esc(D.not)}" placeholder="örn. Fiyatlar 1 Kasım'a kadar geçerlidir"></label>
         </div>
-        <div class="kt-kutular">${resim ? '' : kutu('ktKapak', D.kapak, 'Kapak sayfası') + kutu('ktKatSayfa', D.katSayfa, 'Her kategori yeni sayfada')}${kutu('ktKod', D.kod, 'Ürün kodu yazılsın')}${kutu('ktRenk', D.renk, 'Renkler yazılsın')}</div>
+        <div class="kt-kutular">${resim ? '' : kutu('ktKapak', D.kapak, 'Kapak sayfası') + kutu('ktKatSayfa', D.katSayfa, 'Her kategori yeni sayfada')}${kutu('ktKod', D.kod, 'Ürün kodu yazılsın')}${kutu('ktRenk', D.renk, 'Renkler yazılsın')}${kutu('ktOlcu', D.olcu, 'Ölçü ve malzeme yazılsın')}</div>
       </div>
       <div class="card kt-urunler">
         <h3>Ürünler</h3><p class="sub">Filtreye uyan ve fotoğrafı olan ürünlerin hepsi kataloğa girer; istemediğinizin işaretini kaldırın.</p>
@@ -536,7 +568,7 @@
       if (ciz) { S.keepScroll = true; render(); }
     });
     yaz('ktBaslik', 'baslik'); yaz('ktAlt', 'alt'); yaz('ktNot', 'not');
-    for (const [id, k] of [['ktTema', 'tema'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
+    for (const [id, k] of [['ktTema', 'tema'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktOlcu', 'olcu'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
     const a = $('#ktAra');
     a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render(); }, 200); });
     $('.kt-liste')?.addEventListener('change', e => {

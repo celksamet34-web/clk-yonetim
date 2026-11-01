@@ -920,3 +920,4 @@ body{font-size:15px;letter-spacing:0}
 /* Tahsilat makbuzu */
 .cs-m-gun{max-width:440px;margin-top:12px}
 .cs-m-gun select{width:100%}
+.kt-ad small.kt-bilgi{color:var(--ink-3);font-weight:600}
