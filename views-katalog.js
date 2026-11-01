@@ -11,7 +11,7 @@
   const RENK = { INK: '#121110', INK2: '#1d1b19', GOLD: '#b48f55', GOLD2: '#d6bd8f', CREAM: '#f6f4f0', LINE: '#e8e3db', MUTED: '#7a746b' };
   const ayYil = () => new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
-  const VARS = { baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, kat: '', stokta: true, aktif: true };
+  const VARS = { tema: 'renkli', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, kat: '', stokta: true, aktif: true };
   let kayit = {};
   try { kayit = JSON.parse(localStorage.getItem('clk-katalog') || '{}'); } catch {}
   const D = (S.ui.kt ||= { ...VARS, ...kayit, cikar: new Set(kayit.cikar || []), ara: '', goster: 60, durum: '', calisiyor: false, url: '', blob: null, onizleme: [] });
@@ -65,7 +65,7 @@
     if (!gorselOnbellek.has(src)) gorselOnbellek.set(src, loadImg(src).catch(() => loadImg('https://wsrv.nl/?w=1200&url=' + encodeURIComponent(src))).catch(() => null));
     return gorselOnbellek.get(src);
   }
-  let logoKoyu = null, logoAltin = null;
+  let logoKoyu = null, logoAltin = null, logoBeyaz = null;
   async function logolar() {
     if (logoKoyu) return;
     const im = await loadImg(new URL('logo-clk.png', location.href).href).catch(() => null);
@@ -74,6 +74,9 @@
     const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
     const g = c.getContext('2d'); g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = RENK.GOLD2; g.fillRect(0, 0, c.width, c.height);
     logoAltin = c;
+    const c2 = document.createElement('canvas'); c2.width = im.width; c2.height = im.height;
+    const g2 = c2.getContext('2d'); g2.drawImage(im, 0, 0); g2.globalCompositeOperation = 'source-in'; g2.fillStyle = '#fff'; g2.fillRect(0, 0, c2.width, c2.height);
+    logoBeyaz = c2;
   }
   const yuvarlak = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   const F = (b, z, aile = 'Inter') => `${b} ${Math.round(z)}px ${aile === 'Inter' ? 'Inter, system-ui, sans-serif' : '"Playfair Display", Georgia, serif'}`;
@@ -167,7 +170,82 @@
     altBant(g, W, H, no, toplam);
   }
   /* WhatsApp durumu (celik 01.11.2026): 1080×1920, her ürün ayrı resim. Üstteki ~220 px (ad, süre çubuğu) ve alttaki ~260 px (yanıt kutusu) boş bırakılır. */
-  function durumResmi(g, W, H, p, im) {
+  /* Renkli durum (celik 01.11: "daha canlı renkler daha güzel yap"): her resim sıradaki canlı renk geçişiyle, sarı fiyat çıkartması, beyaz kart, yeşil WhatsApp düğmesi */
+  const PALET = [['#ff3d77', '#ff9a3c'], ['#7b2ff7', '#f107a3'], ['#0061ff', '#00c6ff'], ['#00a884', '#a8e063'], ['#ff512f', '#dd2476'], ['#1d2b64', '#1cb5e0'], ['#f7971e', '#ffd200'], ['#8e2de2', '#4a00e0']];
+  function durumRenkli(g, W, H, p, im, i) {
+    const [c1, c2] = PALET[i % PALET.length];
+    const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, c1); gr.addColorStop(1, c2);
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    // yumuşak ışık lekeleri ve nokta deseni
+    for (const [x, y, r, a] of [[W * 0.9, H * 0.12, 420, 0.16], [W * 0.05, H * 0.55, 360, 0.12], [W * 0.75, H * 0.92, 380, 0.14]]) {
+      const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(255,255,255,${a})`); rg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = rg; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    }
+    g.fillStyle = 'rgba(255,255,255,.18)';
+    for (let yy = 0; yy < 6; yy++) for (let xx = 0; xx < 6; xx++) { g.beginPath(); g.arc(W - 250 + xx * 34, 1480 + yy * 34, 5, 0, 7); g.fill(); }
+    for (let yy = 0; yy < 5; yy++) for (let xx = 0; xx < 5; xx++) { g.beginPath(); g.arc(70 + xx * 34, 330 + yy * 34, 5, 0, 7); g.fill(); }
+    const m = 64, ust = 236;
+    if (logoBeyaz) { const lh = 64, lw = logoBeyaz.width / logoBeyaz.height * lh; g.drawImage(logoBeyaz, m, ust - lh + 8, lw, lh); g.font = F(700, 23); g.fillStyle = '#fff'; g.letterSpacing = '6px'; g.fillText('ÇANTA', m + lw + 16, ust); g.letterSpacing = '0px'; }
+    const kat = P.cat(p);
+    if (kat && kat !== 'Kategorisiz') {
+      g.font = F(700, 22); g.letterSpacing = '3px'; const t = satirlar(g, buyuk(kat), 480, 1)[0], tw = g.measureText(t).width, bh = 54, bx = W - m - tw - 44;
+      yuvarlak(g, bx, ust - 38, tw + 44, bh, bh / 2); g.fillStyle = 'rgba(255,255,255,.22)'; g.fill();
+      g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(t, bx + 22, ust - 38 + bh / 2 + 1); g.textBaseline = 'alphabetic'; g.letterSpacing = '0px';
+    }
+    // hafif eğik beyaz kart
+    const cw = W - 2 * m - 20, ch = 960, cx = (W - cw) / 2, cy = 320;
+    g.save(); g.translate(W / 2, cy + ch / 2); g.rotate(-0.025);
+    g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 60; g.shadowOffsetY = 24; yuvarlak(g, -cw / 2, -ch / 2, cw, ch, 48); g.fillStyle = '#fff'; g.fill();
+    g.shadowColor = 'transparent'; g.clip();
+    if (im) sigdir(g, im, -cw / 2 + 40, -ch / 2 + 40, cw - 80, ch - 80);
+    else { g.fillStyle = '#888'; g.font = F(600, 34); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', 0, 0); g.textAlign = 'left'; }
+    g.restore();
+    // sarı çıkartma: fiyat ya da (fiyatsızda) STOKTA
+    const f = fiyatAl(p), etiket = f ? fmt(f) : P.qty(p) > 0 ? 'STOKTA' : '';
+    if (etiket) {
+      const r = 132, sx = W - m - r + 24, sy = cy + 96;
+      g.save(); g.translate(sx, sy); g.rotate(-0.16);
+      g.shadowColor = 'rgba(0,0,0,.3)'; g.shadowBlur = 30; g.shadowOffsetY = 10;
+      // tırtıklı yıldız kenar
+      g.beginPath(); for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2, rr = k % 2 ? r : r * 1.08; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath();
+      g.fillStyle = '#ffe14d'; g.fill(); g.shadowColor = 'transparent';
+      g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (f) {
+        g.font = F(700, 24); g.fillText(D.fiyat === 'site' ? 'SADECE' : 'FİYAT', 0, -44);
+        let z = 62; g.font = F(700, z); while (g.measureText(etiket).width > r * 1.6 && z > 30) { z -= 2; g.font = F(700, z); }
+        g.fillText(etiket, 0, 8);
+      } else { g.font = F(700, 40); g.fillText(etiket, 0, 0); }
+      g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.restore();
+    }
+    // ad
+    let y = cy + ch + 96; g.textAlign = 'center';
+    g.save(); g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = 16; g.shadowOffsetY = 4;
+    g.font = F(700, 54); g.fillStyle = '#fff';
+    for (const l of satirlar(g, p.name, W - 2 * m - 20, 2)) { g.fillText(l, W / 2, y); y += 62; }
+    g.restore();
+    // renkler ve kod: yarı saydam beyaz hap içinde
+    const kod = D.kod ? kodAl(p) : '', rl = D.renk ? renkler(p) : [], noktali = rl.filter(renkKod).slice(0, 8);
+    const yazi = [rl.length > 1 ? `${rl.length} renk` : rl.length ? guzelAd(rl[0]) : '', kod ? 'Kod: ' + kod : ''].filter(Boolean).join('  ·  ');
+    if (yazi || noktali.length) {
+      g.font = F(600, 28); const nr = 15, ng = 10, nw = noktali.length ? noktali.length * 2 * nr + (noktali.length - 1) * ng + 18 : 0, tw = g.measureText(yazi).width, bw = nw + tw + 56, bh = 62, bx = (W - bw) / 2, by = y - 30;
+      yuvarlak(g, bx, by, bw, bh, bh / 2); g.fillStyle = 'rgba(255,255,255,.24)'; g.fill();
+      let x = bx + 28 + nr;
+      for (const k of noktali) { g.beginPath(); g.arc(x, by + bh / 2, nr, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke(); x += 2 * nr + ng; }
+      g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(yazi, bx + 28 + nw, by + bh / 2 + 1); g.textBaseline = 'alphabetic';
+    }
+    // WhatsApp düğmesi: beyaz hap, yeşil daire
+    const t = `Sipariş için yazın  ${TEL}`; g.font = F(700, 33); g.textAlign = 'left';
+    const tw = g.measureText(t).width, bh = 92, ic = 64, bw = tw + ic + 74, bx = (W - bw) / 2, by = H - 262 - bh;
+    g.save(); g.shadowColor = 'rgba(0,0,0,.28)'; g.shadowBlur = 26; g.shadowOffsetY = 8; yuvarlak(g, bx, by, bw, bh, bh / 2); g.fillStyle = '#fff'; g.fill(); g.restore();
+    g.beginPath(); g.arc(bx + 14 + ic / 2, by + bh / 2, ic / 2, 0, 7); g.fillStyle = '#25d366'; g.fill();
+    // basit telefon simgesi
+    g.save(); g.translate(bx + 14 + ic / 2, by + bh / 2); g.rotate(-0.6); g.fillStyle = '#fff'; yuvarlak(g, -8, -16, 16, 32, 6); g.fill(); g.restore();
+    g.fillStyle = '#111'; g.textBaseline = 'middle'; g.fillText(t, bx + 14 + ic + 22, by + bh / 2 + 1); g.textBaseline = 'alphabetic';
+    g.font = F(700, 25); g.fillStyle = 'rgba(255,255,255,.9)'; g.textAlign = 'center'; g.letterSpacing = '2px'; g.fillText(SITE, W / 2, by + bh + 44); g.letterSpacing = '0px'; g.textAlign = 'left';
+  }
+
+  function durumResmi(g, W, H, p, im, i) {
+    if (D.tema !== 'koyu') return durumRenkli(g, W, H, p, im, i);
     const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2c2824'); gr.addColorStop(0.55, RENK.INK); gr.addColorStop(1, '#0b0a09');
     g.fillStyle = gr; g.fillRect(0, 0, W, H);
     g.strokeStyle = 'rgba(214,189,143,.18)'; g.lineWidth = 2;
@@ -312,7 +390,7 @@
       D.durum = `Resim ${i + 1} / ${l.length} hazırlanıyor…`; const d = $('#ktDurum'); if (d) d.textContent = D.durum;
       if (l[i + 1]) gorsel(P.img(l[i + 1]));
       const im = await gorsel(P.img(l[i])); if (!im) eksik++;
-      g.clearRect(0, 0, W, H); durumResmi(g, W, H, l[i], im);
+      g.clearRect(0, 0, W, H); durumResmi(g, W, H, l[i], im, i);
       const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
       const ad = `CLK-durum-${String(i + 1).padStart(2, '0')}-${String(kodAl(l[i]) || l[i].id).replace(/[^\w-]+/g, '')}.jpg`;
       out.push({ blob, ad, url: URL.createObjectURL(blob) });
@@ -367,7 +445,7 @@
           <label>Başlık<input id="ktBaslik" value="${esc(D.baslik)}" placeholder="Ürün Kataloğu"></label>
           <label>Alt başlık<input id="ktAlt" value="${esc(D.alt)}" placeholder="${esc(guzelAd(ayYil()))} · ${num(ic.length)} ürün"></label>
           <label>Biçim${sec('ktBicim', Object.entries(BICIM).map(([k, v]) => [k, v.ad]), D.bicim)}</label>
-          ${resim ? '' : `<label>Sayfada ürün${sec('ktAdet', b.adet.map(n => [n, n === 1 ? '1 (büyük, reklam gibi)' : String(n)]), D.adet)}</label>`}
+          ${resim ? `<label>Renkler${sec('ktTema', [['renkli', 'Canlı renkli'], ['koyu', 'Siyah ve altın']], D.tema)}</label>` : `<label>Sayfada ürün${sec('ktAdet', b.adet.map(n => [n, n === 1 ? '1 (büyük, reklam gibi)' : String(n)]), D.adet)}</label>`}
           <label>Sıralama${sec('ktSira', SIRA, D.sira)}</label>
           <label>Alt not<input id="ktNot" value="${esc(D.not)}" placeholder="örn. Fiyatlar 1 Kasım'a kadar geçerlidir"></label>
         </div>
@@ -405,7 +483,7 @@
       if (ciz) { S.keepScroll = true; render(); }
     });
     yaz('ktBaslik', 'baslik'); yaz('ktAlt', 'alt'); yaz('ktNot', 'not');
-    for (const [id, k] of [['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
+    for (const [id, k] of [['ktTema', 'tema'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
     const a = $('#ktAra');
     a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render(); }, 200); });
     $('.kt-liste')?.addEventListener('change', e => {
