@@ -1,7 +1,10 @@
 /* CLK Yönetim — Senet gir (celik 01.11.2026: "senet gir işlemini yapabilir misin, hem sıra no veririz"; "çek girişinde açıklamaya senet yazıyoruz").
    Senet Paraşüt'e çek olarak açılır: bankası "Diğer", banka adı SENET, numarası panelin verdiği sıra no (SN0001, SN0002…).
    Müşteriden alınan senet müşterinin carisinden düşer ve sitedeki cariye tahsilat olarak yazılır; tedarikçiye verilen senet ödenecek olur.
-   Birden çok senet (taksit) bir kerede girilir. Paraşüt'te hiçbir kayıt silinmez ya da değiştirilmez (sunucu: gider-cek). */
+   Birden çok senet (taksit) bir kerede girilir. Paraşüt'te hiçbir kayıt silinmez ya da değiştirilmez (sunucu: gider-cek).
+   Tedarikçiye verdik › Portföydeki müşteri evrakı: portföydeki çek ve senetler seçilip numaralı çıkış bordrosu (CB0001…) hazırlanır
+   (celik 01.11.2026: "portföyde ki senetleri tedarikçiye çıkacağımız bir formda hazırla", "tedarikçiye verdik kısmında form açıp seçebiliriz").
+   Paraşüt API'si ciroya izin vermiyor: ciro Paraşüt'te tedarikçiye ödeme olarak girilir, panel girilene kadar "Paraşüt'te bekliyor" gösterir. */
 (() => {
   const { sb, S, $, $$, esc, tl, tl2, num, dt, dtt, toast, head, views, render, araKutu, araSec, ARA, go } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/gider-cek';
@@ -29,8 +32,10 @@
   const siraMetni = n => 'SN' + String(n).padStart(4, '0');
   const senetMi = c => /sen+e?t|seet/i.test(c.bankaAd) || /senet/i.test(c.seri) || (c.banka === 'OTHER' && !c.bankaAd);
 
-  const yeniForm = (o = {}) => ({ yon: o.yon || 'alinan', kisi: null, adet: 1, mod: 'her', tutar: '', ilk: o.ilk || aySonu(gunEkle(bugun(), 28)), aralik: 'ay', tarih: o.tarih || bugun(), aciklama: '', satirlar: [] });
-  const D = (S.ui.sn ||= { k: null, c: null, yuk: false, hata: '', f: yeniForm(), kaydediyor: false, onay: false, sonuc: null, uyari: '', goster: 15 });
+  const yeniForm = (o = {}) => ({ yon: o.yon || 'alinan', tur: o.tur || 'portfoy', kisi: null, adet: 1, mod: 'her', tutar: '', ilk: o.ilk || aySonu(gunEkle(bugun(), 28)), aralik: 'ay', tarih: o.tarih || bugun(), aciklama: '', satirlar: [], secili: [] });
+  const D = (S.ui.sn ||= { k: null, c: null, yuk: false, hata: '', f: yeniForm(), kaydediyor: false, onay: false, sonuc: null, uyari: '', goster: 15,
+    pfTur: 'senet', pfAra: '', pfGoster: 80, bordro: null, bResim: '', bIptalOnay: false });
+  const ciz = () => { S.keepScroll = true; render(); };
 
   async function sor(govde) {
     const { data } = await sb.auth.getSession();
@@ -62,6 +67,273 @@
     const h = iki.find(x => x.status === 'rejected');
     if (h) D.hata = h.reason?.message || 'Veri alınamadı';
     D.yuk = false; S.keepScroll = true; render();
+  }
+
+  /* ---------- tedarikçiye çıkış (ciro) bordrosu ---------- */
+  const AY = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+  const EV = () => CLK.evrak || { senetMi, tur: c => (senetMi(c) ? 'Senet' : 'Çek'), banka: c => (senetMi(c) ? '' : c.bankaAd || (c.banka !== 'OTHER' ? c.banka : '')) };
+  const evrakAdi = c => [EV().tur(c), EV().banka(c), c.seri ? 'No ' + c.seri : ''].filter(Boolean).join(' · ');
+  const trE = d => (d ? String(d).slice(0, 10).split('-').reverse().join('.') : '');
+  const tlE = v => yaz(v) + ' ₺';
+  const gunArasi = (a, b) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5);
+  // tutara göre ağırlıklı ortalama vade
+  const ortVade = (l, tarih) => {
+    const t = l.reduce((s, c) => s + c.tutar, 0);
+    return t && tarih ? gunEkle(tarih, Math.round(l.reduce((s, c) => s + c.tutar * gunArasi(tarih, c.vade), 0) / t)) : '';
+  };
+  const ciroMu = () => D.f.yon === 'verilen' && D.f.tur === 'portfoy';
+  // bordrodaki evrakın Paraşüt'teki durumu: bekliyor (hâlâ portföyde), islendi (bu tedarikçiye ciro), baska (başka tedarikçiye ciro), kapandi (tahsil edildi vb.)
+  function evrakDurum(e, b) {
+    const c = (D.c?.cekler || []).find(x => x.id === e.id);
+    if (!c) return 'bilinmiyor';
+    if (c.yon === 'ciro') return c.kimeId === b.kisiId ? 'islendi' : 'baska';
+    return c.yon === 'alinan' && c.kalan > 0.009 ? 'bekliyor' : 'kapandi';
+  }
+  function bordroDurum(b) {
+    const s = { islendi: 0, bekliyor: 0, baska: 0, kapandi: 0, bilinmiyor: 0 };
+    for (const e of b.evraklar || []) s[evrakDurum(e, b)]++;
+    return s;
+  }
+  // Paraşüt'te ciro edilmeyi bekleyen bordrolara ayrılmış evraklar: id → bordro
+  function ayrilan() {
+    const m = {};
+    for (const b of D.c?.bordrolar || []) for (const e of b.evraklar || []) if (evrakDurum(e, b) === 'bekliyor') m[e.id] = b;
+    return m;
+  }
+  const portfoy = () => (D.c?.cekler || []).filter(c => c.yon === 'alinan' && c.kalan > 0.009 && (c.doviz || 'TRL') === 'TRL')
+    .sort((a, b) => a.vade.localeCompare(b.vade) || a.tutar - b.tutar);
+  function seciliEvrak() {
+    const ayr = ayrilan(), l = portfoy().filter(c => !ayr[c.id]);
+    return D.f.secili.map(id => l.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.vade.localeCompare(b.vade));
+  }
+  function pfFiltre() {
+    const q = D.pfAra.trim().toLocaleUpperCase('tr'), l = portfoy(), say = { senet: 0, cek: 0, hepsi: l.length };
+    for (const c of l) say[EV().senetMi(c) ? 'senet' : 'cek']++;
+    const g = l.filter(c => (D.pfTur === 'hepsi' || (D.pfTur === 'senet') === EV().senetMi(c))
+      && (!q || [c.kimden, c.seri, evrakAdi(c), String(c.tutar), yaz(c.tutar), trE(c.vade)].join(' ').toLocaleUpperCase('tr').includes(q)));
+    return { l: g, say };
+  }
+  function ciroEksik() {
+    const f = D.f, e = [], n = seciliEvrak().length;
+    if (!f.kisi) e.push('Evrakların verildiği tedarikçiyi seçin.');
+    if (!f.tarih) e.push('Veriliş tarihini seçin.');
+    else if (f.tarih > gunEkle(bugun(), 60)) e.push('Tarih çok ileride.');
+    if (!n) e.push('Portföyden en az bir evrak seçin.');
+    if (n > 60) e.push('Bir bordroya en çok 60 evrak yazılır.');
+    return e;
+  }
+  function pfSatir(c, ayr) {
+    const s = D.f.secili.includes(c.id), b = ayr[c.id], n = gunArasi(bugun(), c.vade);
+    const pill = b ? `<span class="pill warn">${esc(b.no)} · ayrıldı</span>` : n < 0 ? `<span class="pill bad">${-n} gün geçti</span>` : n === 0 ? '<span class="pill bad">Bugün</span>' : n <= 7 ? `<span class="pill warn">${n} gün</span>` : `<span class="pill off">${n} gün</span>`;
+    return `<li><label class="sn-pf-r ${s && !b ? 'secili' : ''} ${b ? 'ayrik' : ''} ${n < 0 ? 'gecti' : n <= 7 ? 'yakin' : ''}">
+      <input type="checkbox" data-sn-pf="${esc(c.id)}" ${s && !b ? 'checked' : ''} ${b ? 'disabled' : ''} aria-label="${esc((c.kimden || '') + ' ' + tl2(c.tutar))}">
+      <div class="cs-vade"><b>${c.vade.slice(8, 10)}</b><small>${AY[+c.vade.slice(5, 7) - 1]} ${c.vade.slice(2, 4)}</small></div>
+      <div class="cs-orta"><b>${esc(c.kimden || 'Kişi yok')}</b><small>${esc(evrakAdi(c))} · alış ${dt(c.tarih)}${b ? ` · ${esc(b.no)} ile ${esc(b.kisi)} firmasına verildi, Paraşüt'te ciro bekliyor` : ''}</small></div>
+      <div class="cs-sag"><b>${tl2(c.tutar)}</b>${pill}</div></label></li>`;
+  }
+  function pfListeHtml() {
+    if (!D.c) return `<div class="skel" style="height:200px"></div><p class="hint">${D.hata ? esc(D.hata) : 'Paraşüt\'teki portföy okunuyor, yarım dakika sürebilir…'}</p>`;
+    const { l } = pfFiltre(), ayr = ayrilan();
+    if (!l.length) return `<p class="cs-bos">${portfoy().length ? 'Bu seçimde evrak yok.' : 'Portföyde evrak yok.'}</p>`;
+    return `<ul class="sn-pf">${l.slice(0, D.pfGoster).map(c => pfSatir(c, ayr)).join('')}</ul>
+      ${l.length > D.pfGoster ? `<div class="ek-dug"><button class="btn sm" data-act="snPfDaha">Daha fazla göster (${num(l.length - D.pfGoster)})</button></div>` : ''}`;
+  }
+  function pfSecHtml() {
+    const s = seciliEvrak(), t = s.reduce((x, c) => x + c.tutar, 0);
+    return `<span>${s.length ? `<b>${num(s.length)} evrak seçildi</b> · ${tl2(t)}` : 'Tedarikçiye verilecek evrakları işaretleyin.'}</span>
+      <span class="sn-pf-d">${D.c && pfFiltre().l.length ? '<button class="link" data-act="snPfHepsi">Görünenlerin hepsini seç</button>' : ''}${s.length ? '<button class="link" data-act="snPfTemizle">Seçimi temizle</button>' : ''}</span>`;
+  }
+  const pfYenile = () => {
+    const a = $('#snPfListe'); if (a) a.innerHTML = pfListeHtml();
+    const b = $('#snPfSec'); if (b) b.innerHTML = pfSecHtml();
+    ozetYenile();
+  };
+  // seçilen tedarikçiye daha önce ciro edilmiş, vadesi gelmemiş evraklar ve Paraşüt'e işlenmemiş bordroları
+  function ciroKisiNot() {
+    const k = D.f.kisi; if (!k || !D.c) return '';
+    const ci = (D.c.cekler || []).filter(c => c.yon === 'ciro' && c.kimeId === k.id && c.vade >= bugun());
+    const bek = (D.c.bordrolar || []).filter(b => b.kisiId === k.id && bordroDurum(b).bekliyor);
+    return `<p class="hint sn-acik">${ci.length ? `Bu tedarikçiye ciro edilmiş, vadesi gelmemiş ${num(ci.length)} evrak var (${tl(ci.reduce((t, c) => t + c.tutar, 0))}); son vade ${dt(ci.map(c => c.vade).sort().at(-1))}.` : 'Bu tedarikçide vadesi gelmemiş ciro evrakı yok.'}${bek.length ? ` Paraşüt'te ciroyu bekleyen bordrosu: ${bek.map(b => esc(b.no)).join(', ')}.` : ''}</p>`;
+  }
+  function ciroAdimlar() {
+    const f = D.f, say = D.c ? pfFiltre().say : { senet: 0, cek: 0, hepsi: 0 }, dun = gunEkle(bugun(), -1);
+    return `<div class="gd-adim"><span>2</span><h3>Hangi evraklar?</h3></div>
+      <div class="sn-pf-ust">
+        <div class="gd-seg" role="group" aria-label="Evrak türü">${[['senet', 'Senetler'], ['cek', 'Çekler'], ['hepsi', 'Hepsi']].map(([k, ad]) => `<button data-act="snPfTur" data-o="${k}" aria-pressed="${D.pfTur === k}">${ad} <b>${num(say[k])}</b></button>`).join('')}</div>
+        <input id="snPfAra" type="search" placeholder="Müşteri, no ya da tutar ara" value="${esc(D.pfAra)}" aria-label="Portföyde ara" autocomplete="off">
+      </div>
+      <div class="sn-pf-sec" id="snPfSec">${pfSecHtml()}</div>
+      <div id="snPfListe">${pfListeHtml()}</div>
+      <div class="gd-adim"><span>3</span><h3>Tarih ve not</h3></div>
+      <div class="gd-tarih">
+        <label class="f"><span>Veriliş tarihi</span><input id="snTarih" type="date" value="${esc(f.tarih)}" max="${gunEkle(bugun(), 60)}"></label>
+        <div class="gd-hizli"><button class="chip" data-act="snTarihSec" data-g="${bugun()}" aria-pressed="${f.tarih === bugun()}">Bugün</button><button class="chip" data-act="snTarihSec" data-g="${dun}" aria-pressed="${f.tarih === dun}">Dün</button></div>
+      </div>
+      <label class="f gd-acik"><span>Not (isteğe bağlı)</span><input id="snAciklama" type="text" maxlength="200" autocomplete="off" placeholder="ör. Ekim faturası karşılığı" value="${esc(f.aciklama)}"></label>
+      <p class="hint">Not bordroya yazılır. Paraşüt API'si ciroya izin vermediği için ciro Paraşüt'te tedarikçiye ödeme olarak girilir; girilince bu sayfada "Paraşüt'e işlendi" görünür.</p>`;
+  }
+  function ciroOzetHtml() {
+    const f = D.f, l = seciliEvrak(), top = l.reduce((t, c) => t + c.tutar, 0), e = ciroEksik(), ov = ortVade(l, f.tarih);
+    const satir = (k, v) => `<div class="gd-oz-s"><span>${k}</span><b>${v}</b></div>`;
+    return `<div class="gd-oz-t">${tl2(top)}</div>
+      <div class="gd-oz-k">${num(l.length)} evrak <em>tedarikçiye çıkış</em></div>
+      ${satir('Verilen', f.kisi ? esc(f.kisi.ad) : 'Seçilmedi')}
+      ${satir('Veriliş tarihi', f.tarih ? dt(f.tarih) : '—')}
+      ${l.length && ov ? satir('Ortalama vade', `${dt(ov)} · ${num(gunArasi(f.tarih, ov))} gün`) : ''}
+      ${l.length ? `<div class="sn-oz-l">${l.map(c => `<div><span>${esc(c.seri || EV().tur(c))}</span><span>${esc(c.kimden || '')} · ${dt(c.vade)}</span><b>${tl2(c.tutar)}</b></div>`).join('')}</div>` : ''}
+      ${f.aciklama.trim() ? `<p class="gd-oz-a">“${esc(f.aciklama.trim())}”</p>` : ''}
+      ${D.uyari ? `<p class="gd-oz-h">${esc(D.uyari)}</p>` : ''}
+      <button class="btn dark gd-kaydet" data-act="snKaydet" ${D.kaydediyor || !D.k || !D.c ? 'disabled' : ''}>${D.kaydediyor ? 'Bordro hazırlanıyor…' : D.onay ? `Evet, ${num(l.length)} evrakı ver, bordroyu hazırla` : 'Çıkış bordrosunu hazırla'}</button>
+      <p class="gd-oz-n">${D.onay ? 'Evrakları kontrol edip bir kez daha basın.' : e.length && (f.kisi || l.length) ? esc(e[0]) : 'Bordro numaralanır, evraklar bu tedarikçiye ayrılır. Ciroyu ayrıca Paraşüt\'te tedarikçiye ödeme olarak girin.'}</p>`;
+  }
+
+  // bordro resmi: tedarikçiye verilen evrakların dökümü, ortalama vade, teslim eden / teslim alan imza yerleri
+  function bordroCiz(b) {
+    const l = b.evraklar || [], W = 1080, P = 56, SAT = 52, F = "system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+    const ov = ortVade(l, b.tarih), not = String(b.aciklama || '').trim();
+    const H = 600 + (l.length + 1) * SAT + (not ? 44 : 0) + 330;
+    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+    const g = cv.getContext('2d'); g.scale(2, 2);
+    const yazi = (t, x, y, { b: k = 400, z = 20, r = false, renk = '#1d2433' } = {}) => { g.font = `${k} ${z}px ${F}`; g.fillStyle = renk; g.textAlign = r ? 'right' : 'left'; g.fillText(t, x, y); };
+    const kisalt = (t, z, en, k = 400) => { t = String(t || ''); g.font = `${k} ${z}px ${F}`; while (t.length > 4 && g.measureText(t).width > en) t = t.slice(0, -2).trimEnd() + '…'; return t; };
+    const kutu = (x, y, w, h, rd, renk, cizgi) => { g.beginPath(); g.roundRect(x, y, w, h, rd); if (renk) { g.fillStyle = renk; g.fill(); } if (cizgi) { g.strokeStyle = cizgi; g.lineWidth = 1.5; g.stroke(); } };
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    yazi('CLK ÇANTA', P, 86, { b: 800, z: 38 });
+    yazi('Birlik Mah. 873 Sok. No:2/A Esenler / İstanbul', P, 118, { z: 18, renk: '#5b6475' });
+    yazi('0534 077 88 67', P, 144, { z: 18, renk: '#5b6475' });
+    yazi('ÇEK / SENET ÇIKIŞ BORDROSU', W - P, 84, { b: 800, z: 25, r: true });
+    yazi('Bordro no ' + b.no, W - P, 116, { b: 700, z: 19, r: true });
+    yazi('Tarih ' + trE(b.tarih), W - P, 144, { z: 18, r: true, renk: '#5b6475' });
+    g.fillStyle = '#1d2433'; g.fillRect(P, 168, W - 2 * P, 4);
+    yazi('Teslim alan', P, 214, { z: 17, renk: '#5b6475' });
+    yazi(kisalt(b.kisi, 30, W - 2 * P, 800), P, 250, { b: 800, z: 30 });
+    kutu(P, 278, W - 2 * P, 104, 14, '#1d2433');
+    yazi('Ciro edilerek teslim edilen', P + 30, 322, { z: 20, renk: '#fff' });
+    yazi(`çek ve senetler (${l.length} adet)`, P + 30, 352, { z: 20, renk: '#fff' });
+    yazi(tlE(b.tutar), W - P - 30, 348, { b: 800, z: 44, r: true, renk: '#fff' });
+    const kw = (W - 2 * P - 12) / 2;
+    [['Ortalama vade', ov ? `${trE(ov)} · ${gunArasi(b.tarih, ov)} gün` : '—'], ['Vade aralığı', l.length ? `${trE(l[0].vade)} – ${trE(l[l.length - 1].vade)}` : '—']].forEach(([t, v], i) => {
+      const x = P + i * (kw + 12);
+      kutu(x, 402, kw, 84, 12, null, '#dde2ea');
+      yazi(t, x + 18, 434, { z: 16, renk: '#5b6475' });
+      yazi(v, x + 18, 468, { b: 700, z: 22 });
+    });
+    const kol = { n: P + 6, e: P + 52, k: 440, v: 770, t: W - P - 6 };
+    let y = 536;
+    [['#', kol.n], ['EVRAK', kol.e], ['BORÇLU', kol.k], ['VADE', kol.v]].forEach(([t, x]) => yazi(t, x, y, { b: 700, z: 14, renk: '#5b6475' }));
+    yazi('TUTAR', kol.t, y, { b: 700, z: 14, r: true, renk: '#5b6475' });
+    g.fillStyle = '#1d2433'; g.fillRect(P, y + 12, W - 2 * P, 3);
+    y += 15;
+    for (const [i, e] of l.entries()) {
+      if (i % 2) { g.fillStyle = '#f7f8fa'; g.fillRect(P, y, W - 2 * P, SAT); }
+      const yy = y + 33;
+      yazi(String(i + 1), kol.n, yy, { z: 17, renk: '#5b6475' });
+      yazi(kisalt(evrakAdi(e), 18, kol.k - kol.e - 20), kol.e, yy, { z: 18 });
+      yazi(kisalt(e.kimden || '—', 18, kol.v - kol.k - 20), kol.k, yy, { z: 18 });
+      yazi(trE(e.vade), kol.v, yy, { b: 700, z: 18 });
+      yazi(tlE(e.tutar), kol.t, yy, { b: 700, z: 18, r: true });
+      y += SAT;
+    }
+    g.fillStyle = '#1d2433'; g.fillRect(P, y + 4, W - 2 * P, 2);
+    yazi('TOPLAM', kol.e, y + 40, { b: 800, z: 18 });
+    yazi(`${l.length} evrak`, kol.k, y + 40, { z: 18, renk: '#5b6475' });
+    yazi(tlE(b.tutar), kol.t, y + 40, { b: 800, z: 20, r: true });
+    y += SAT + 10;
+    if (not) { yazi(kisalt('Not: ' + not, 18, W - 2 * P), P, y + 24, { z: 18, renk: '#1d2433' }); y += 44; }
+    yazi('Yukarıdaki çek ve senetler ciro edilerek teslim edilmiştir.', P, y + 30, { z: 18, renk: '#5b6475' });
+    y += 62;
+    [['TESLİM EDEN', 'CLK ÇANTA'], ['TESLİM ALAN', b.kisi]].forEach(([t, ad], i) => {
+      const x = P + i * (kw + 12);
+      kutu(x, y, kw, 190, 12, null, '#dde2ea');
+      yazi(t, x + 18, y + 34, { b: 700, z: 14, renk: '#5b6475' });
+      yazi(kisalt(ad, 20, kw - 36, 700), x + 18, y + 64, { b: 700, z: 20 });
+      yazi('Ad soyad', x + 18, y + 110, { z: 15, renk: '#5b6475' });
+      yazi('İmza', x + 18, y + 164, { z: 15, renk: '#5b6475' });
+      g.fillStyle = '#c9ced8'; g.fillRect(x + 100, y + 112, kw - 120, 1); g.fillRect(x + 100, y + 166, kw - 120, 1);
+    });
+    return new Promise(res => cv.toBlob(res, 'image/png'));
+  }
+  const bordroMetni = b => `CLK Çanta – çek/senet çıkış bordrosu ${b.no}\nSayın ${b.kisi}, ${trE(b.tarih)} tarihinde ciro edilerek teslim edilen evraklar:\n\n`
+    + (b.evraklar || []).map((e, i) => `${i + 1}) ${evrakAdi(e)} – ${e.kimden || '?'} – vade ${trE(e.vade)} – ${tlE(e.tutar)}`).join('\n')
+    + `\n\nToplam: ${(b.evraklar || []).length} evrak, ${tlE(b.tutar)} · ortalama vade ${trE(ortVade(b.evraklar || [], b.tarih))}${b.aciklama ? '\nNot: ' + b.aciklama : ''}\nCLK Çanta · 0534 077 88 67`;
+  let bBlob = null;
+  const bordroDosya = () => `bordro-${D.bordro.no}-${String(D.bordro.kisi).toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}.png`;
+  function bordroAc(b) {
+    if (D.bResim) URL.revokeObjectURL(D.bResim);
+    D.bordro = b; D.bResim = ''; bBlob = null; D.bIptalOnay = false;
+    bordroCiz(b).then(blob => { if (D.bordro !== b) return; bBlob = blob; D.bResim = URL.createObjectURL(blob); ciz(); }).catch(() => toast('Bordro resmi çizilemedi'));
+  }
+  function bordroIndir() { const a = Object.assign(document.createElement('a'), { href: D.bResim, download: bordroDosya() }); document.body.append(a); a.click(); a.remove(); }
+  async function bordroPaylas() {
+    if (!bBlob) return;
+    const dosya = new File([bBlob], bordroDosya(), { type: 'image/png' });
+    try { if (navigator.canShare?.({ files: [dosya] })) { await navigator.share({ files: [dosya], title: D.bordro.no + ' çıkış bordrosu' }); return; } }
+    catch (err) { if (err.name === 'AbortError') return; }
+    bordroIndir(); toast('Bu cihaz doğrudan paylaşmaya izin vermedi; resim indirildi');
+  }
+  function bordroYazdir() {
+    const w = window.open('', '_blank');
+    if (!w) { toast('Yazdırma penceresi açılamadı; resmi indirip yazdırın'); return; }
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(D.bordro.no)} çıkış bordrosu</title><style>@page{margin:10mm}body{margin:0}img{display:block;width:100%}</style><img src="${D.bResim}" onload="setTimeout(function(){print()},200)">`);
+    w.document.close();
+  }
+  function bordroHtml() {
+    const b = D.bordro; if (!b) return '';
+    const s = bordroDurum(b), n = (b.evraklar || []).length;
+    const durum = b.iptal ? '<small class="gd-kirmizi">Bordro iptal edildi; evraklar yeniden seçilebilir.</small>'
+      : s.islendi === n ? '<small>✓ Paraşüt\'e işlendi: evrakların hepsi bu tedarikçiye ciro edilmiş.</small>'
+      : `<small>Paraşüt'te ${num(s.islendi)}/${num(n)} evrak ciro edildi.${s.baska ? ` <b class="gd-kirmizi">${num(s.baska)} evrak başka bir tedarikçiye ciro edilmiş.</b>` : ''}${s.kapandi ? ` ${num(s.kapandi)} evrak artık portföyde değil.` : ''}</small>
+        <small>Ciroyu Paraşüt'te ${esc(b.kisi)} için ödeme olarak girin: ödeme şekli çek/senet, portföyden bu ${n > 1 ? num(n) + ' evrakı' : 'evrakı'} seçin. Girilince burada "Paraşüt'e işlendi" görünür.</small>`;
+    return `<div class="gd-sonuc sn-bordro ${b.iptal || s.baska ? 'kismi' : ''}" role="status">
+      <div class="gd-tik">${b.iptal ? '!' : '✓'}</div>
+      <div><b>${esc(b.no)} çıkış bordrosu: ${esc(b.kisi)}, ${num(n)} evrak, ${tl2(b.tutar)}</b>
+        <div class="sn-sonuc-l">${(b.evraklar || []).map(e => `<span><b>${esc(e.seri || EV().tur(e))}</b>${esc(e.kimden || '')} · ${dt(e.vade)} · ${tl2(e.tutar)}</span>`).join('')}</div>
+        ${durum}
+        <div class="sn-sonuc-d">
+          <button class="btn sm ek-wa" data-act="snBPaylas" ${D.bResim ? '' : 'disabled'}>WhatsApp'ta paylaş</button>
+          <button class="btn sm" data-act="snBIndir" ${D.bResim ? '' : 'disabled'}>Resmi indir</button>
+          <button class="btn sm" data-act="snBYazdir" ${D.bResim ? '' : 'disabled'}>Yazdır</button>
+          <button class="btn sm" data-act="snBMetin">Yazı olarak kopyala</button>
+          ${!b.iptal && !s.islendi && !s.baska ? `<button class="btn sm" data-act="snBIptal">${D.bIptalOnay ? 'Evet, bordroyu iptal et' : 'Bordroyu iptal et'}</button>` : ''}
+        </div>
+        ${D.bResim ? `<div class="ek-on sn-b-on"><img src="${D.bResim}" alt="${esc(b.no)} çıkış bordrosu"></div>` : ''}
+      </div>
+      <button class="gd-x" data-act="snBKapat" aria-label="Kapat">×</button></div>`;
+  }
+  async function ciroKaydet() {
+    const f = D.f, e = ciroEksik();
+    if (e.length) { D.uyari = e[0]; D.onay = false; ciz(); return; }
+    if (!D.onay) { D.onay = true; D.uyari = ''; ozetYenile(); setTimeout(() => { if (D.onay && !D.kaydediyor) { D.onay = false; ozetYenile(); } }, 10000); return; }
+    D.kaydediyor = true; D.onay = false; D.uyari = ''; D.sonuc = null; ciz();
+    const l = seciliEvrak();
+    try {
+      const r = await yazIstek({ islem: 'ciro', istek: uuid(), kisi: f.kisi.id, tarih: f.tarih, evraklar: l.map(c => c.id), aciklama: f.aciklama.trim() });
+      D.f = yeniForm({ yon: 'verilen', tur: 'portfoy', tarih: f.tarih }); dagit(); delete ARA['snKisi_verilen'];
+      if (D.c) D.c.bordrolar = [r, ...(D.c.bordrolar || []).filter(x => x.istek !== r.istek)];
+      if (D.k) D.k.gecmis = [r, ...(D.k.gecmis || []).filter(x => x.istek !== r.istek)];
+      D.kaydediyor = false;
+      bordroAc(r); ciz();
+      toast(`${r.no} çıkış bordrosu hazırlandı.`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      D.uyari = err.message; D.kaydediyor = false; ciz();
+      // evrak başkasına ayrılmış ya da portföyden çıkmışsa liste yenilenir
+      if (/ayrılmış|portföyde değil|bulunamadı/.test(err.message)) { D.c = null; yukle(true); }
+    }
+  }
+  async function bordroIptal() {
+    const b = D.bordro; if (!b) return;
+    if (!D.bIptalOnay) { D.bIptalOnay = true; ciz(); return; }
+    D.bIptalOnay = false;
+    try {
+      const r = await sor({ islem: 'ciro_iptal', istek: b.istek });
+      D.bordro = { ...b, ...r };
+      if (D.c) D.c.bordrolar = (D.c.bordrolar || []).filter(x => x.istek !== b.istek);
+      if (D.k) D.k.gecmis = (D.k.gecmis || []).map(x => (x.istek === b.istek && x.islem === 'ciro' ? { ...x, ...r } : x));
+      if (S.ui.cs?.v) S.ui.cs.v.bordrolar = (S.ui.cs.v.bordrolar || []).filter(x => x.istek !== b.istek);
+      toast(`${b.no} iptal edildi; evraklar yeniden seçilebilir.`);
+    } catch (err) { toast(err.message); }
+    ciz();
   }
 
   /* ---------- taksitler ---------- */
@@ -117,6 +389,7 @@
 
   /* ---------- özet (yazdıkça yalnız bu bölüm yenilenir, telefonda klavye kapanmasın) ---------- */
   function ozetHtml() {
+    if (ciroMu()) return ciroOzetHtml();
     const f = D.f, l = satirlar(), top = l.reduce((t, s) => t + s.t, 0), e = eksik(), sira = siraOnizle(), ayni = ayniVar();
     const satir = (k, v) => `<div class="gd-oz-s"><span>${k}</span><b>${v}</b></div>`;
     return `<div class="gd-oz-t">${tl2(top)}</div>
@@ -172,13 +445,16 @@
     const ae = acikEvrak(), dun = gunEkle(bugun(), -1), l = kisiler();
     const ilkler = [[aySonu(bugun()), 'Bu ay sonu'], [aySonu(ayEkle(bugun(), 1, false)), 'Gelecek ay sonu'], [ayEkle(f.tarih || bugun(), 1, false), '1 ay sonra']];
     return `<div class="card gd-form">
-      ${sonucHtml()}
+      ${bordroHtml()}${sonucHtml()}
       <div class="gd-adim"><span>1</span><h3>Kimden, kime?</h3></div>
       <div class="gd-seg sn-yon" role="group" aria-label="Senet yönü">
         <button data-act="snYon" data-o="alinan" aria-pressed="${f.yon === 'alinan'}">Müşteriden aldık</button>
         <button data-act="snYon" data-o="verilen" aria-pressed="${f.yon === 'verilen'}">Tedarikçiye verdik</button></div>
+      ${f.yon === 'verilen' ? `<div class="gd-seg sn-tur" role="group" aria-label="Tedarikçiye ne verildi">
+        <button data-act="snTur" data-o="portfoy" aria-pressed="${f.tur === 'portfoy'}">Portföydeki müşteri evrakı (ciro)</button>
+        <button data-act="snTur" data-o="kendi" aria-pressed="${f.tur !== 'portfoy'}">Kendi senedimiz</button></div>` : ''}
       <div class="f ara-alan"><span>${f.yon === 'alinan' ? 'Müşteri' : 'Tedarikçi'}</span>${araKutu('snKisi_' + f.yon, l, f.kisi?.ad || '', 'snKisi', { yer: `Paraşüt ${f.yon === 'alinan' ? 'müşterisi' : 'tedarikçisi'} ara (${l.length})` })}</div>
-      ${ae ? `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, vadesi gelmemiş ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>` : ''}
+      ${ciroMu() ? ciroKisiNot() + ciroAdimlar() + '</div>' : ''}${ciroMu() ? '' : `${ae ? `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, vadesi gelmemiş ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>` : ''}
 
       <div class="gd-adim"><span>2</span><h3>Kaç senet, ne kadar?</h3></div>
       <div class="sn-ust">
@@ -201,7 +477,16 @@
       </div>
       <label class="f gd-acik"><span>Not (isteğe bağlı)</span><input id="snAciklama" type="text" maxlength="200" autocomplete="off" placeholder="ör. Ekim cari bakiyesi için" value="${esc(f.aciklama)}"></label>
       <p class="hint">Paraşüt'te açıklamaya "SENET ${f.adet > 1 ? '1/' + f.adet : ''}" ve notunuz yazılır, banka adı SENET olur.</p>
-    </div>`;
+    </div>`}`;
+  }
+
+  function bordroLi(g) {
+    const e = g.evraklar || [], n = e.length, s = D.c ? bordroDurum(g) : null;
+    const pill = g.iptal ? '<span class="pill off">İptal</span>' : !s ? '' : s.islendi === n ? '<span class="pill ok">Paraşüt\'e işlendi</span>'
+      : s.baska ? '<span class="pill bad">Başkasına ciro</span>' : `<span class="pill warn">Paraşüt'te ciro bekliyor${s.islendi ? ' ' + num(n - s.islendi) : ''}</span>`;
+    return `<li class="sn-g-ciro" data-act="snBordroAc" data-istek="${esc(g.istek)}" role="button" tabindex="0">
+      <div class="gd-l-sol"><i class="gd-nokta" style="background:var(--ink)"></i><div><b>${esc(g.kisi)}</b><small>Çıkış bordrosu ${esc(g.no)} · ${num(n)} evrak${n ? ' · vade ' + dt(e[0].vade) + (n > 1 ? '–' + dt(e[n - 1].vade) : '') : ''} · ${dtt(g.zaman)}${g.kim ? ' · ' + esc(String(g.kim).split('@')[0]) : ''}</small></div></div>
+      <div class="gd-l-sag"><b>${tl2(g.tutar)}</b>${pill}</div></li>`;
   }
 
   function sonKart() {
@@ -209,8 +494,8 @@
     const l = D.k.gecmis || [];
     const site = g => !g.site ? '' : g.site.durum === 'tamam' ? '<span class="pill ok">Siteye yazıldı</span>' : g.site.durum === 'bekle' ? '<span class="pill warn">Site bekliyor</span>' : g.site.durum === 'hata' ? '<span class="pill bad">Site hatası</span>' : '';
     return `<div class="card gd-son">
-      <h3>Panelden girilen senetler</h3><p class="sub">Paraşüt'e bu sayfadan girilen son senetler. Tüm çek ve senetler Çek ve senet sayfasında.</p>
-      ${l.length ? `<ul class="gd-liste">${l.slice(0, D.goster).map(g => { const s = g.senetler || []; return `<li>
+      <h3>Panelden girilen senetler ve bordrolar</h3><p class="sub">Bu sayfadan Paraşüt'e girilen senetler ve tedarikçiye çıkış bordroları. Bordroya dokunun, resmi yeniden açılsın. Tüm çek ve senetler Çek ve senet sayfasında.</p>
+      ${l.length ? `<ul class="gd-liste">${l.slice(0, D.goster).map(g => { if (g.islem === 'ciro') return bordroLi(g); const s = g.senetler || []; return `<li>
         <div class="gd-l-sol"><i class="gd-nokta" style="background:${g.yon === 'alinan' ? 'var(--ok)' : 'var(--gold)'}"></i><div><b>${esc(g.kisi)}</b><small>${g.yon === 'alinan' ? 'Alınan' : 'Verilen'} · ${num(s.length)} senet${s.length ? ' · ' + esc(s[0].sira) + (s.length > 1 ? '–' + esc(s.at(-1).sira) : '') : ''}${s.length ? ' · vade ' + dt(s[0].vade) + (s.length > 1 ? '–' + dt(s.at(-1).vade) : '') : ''} · ${dtt(g.zaman)}${g.kim ? ' · ' + esc(String(g.kim).split('@')[0]) : ''}</small></div></div>
         <div class="gd-l-sag"><b>${tl2(g.tutar)}</b>${site(g)}${g.hata ? '<span class="pill bad">Yarım</span>' : ''}</div></li>`; }).join('')}</ul>
         ${l.length > D.goster ? `<div class="ek-dug"><button class="btn sm" data-act="snDaha">Daha fazla</button></div>` : ''}` : '<p class="hint">Panelden henüz senet girilmedi.</p>'}
@@ -221,7 +506,7 @@
     if (!D.k && !D.yuk && !D.hata) yukle();
     if (!D.f.satirlar.length) dagit();
     const acts = `<button class="btn" data-act="snYenile" ${D.yuk ? 'disabled' : ''}>${D.yuk ? 'Okunuyor…' : 'Yenile'}</button>`;
-    return `${head('Finans', 'Senet gir', 'Müşteriden alınan ya da tedarikçiye verilen senedi buradan girin; Paraşüt\'e senet olarak işlenir, sıra no kendiliğinden verilir. Birden çok taksit bir kerede girilir.', acts)}
+    return `${head('Finans', 'Senet gir', 'Müşteriden alınan ya da tedarikçiye verilen senedi buradan girin; Paraşüt\'e senet olarak işlenir, sıra no kendiliğinden verilir. Portföydeki müşteri evraklarını tedarikçiye çıkış bordrosuyla verin.', acts)}
       ${D.hata && D.k ? `<p class="msg err" style="margin-bottom:14px">${esc(D.hata)}</p>` : ''}
       <div class="gd-ust">
         <div class="gd-sol">${formHtml()}</div>
@@ -245,6 +530,17 @@
       if ('snSira' in el.dataset) s.sira = el.value; else if ('snTutar' in el.dataset) s.tutar = el.value; else s.vade = el.value;
       sifirla(); ozetYenile();
     });
+    const pa = $('#snPfAra');
+    pa?.addEventListener('input', () => { clearTimeout(pa.t); pa.t = setTimeout(() => { D.pfAra = pa.value; D.pfGoster = 80; pfYenile(); }, 180); });
+    $('#snPfListe')?.addEventListener('change', e => {
+      const el = e.target; if (!('snPf' in el.dataset)) return;
+      const id = el.dataset.snPf;
+      f.secili = el.checked ? [...new Set([...f.secili, id])] : f.secili.filter(x => x !== id);
+      el.closest('.sn-pf-r')?.classList.toggle('secili', el.checked);
+      sifirla();
+      const b = $('#snPfSec'); if (b) b.innerHTML = pfSecHtml();
+      ozetYenile();
+    });
     kutu?.addEventListener('blur', e => { const el = e.target; if (!('snTutar' in el.dataset)) return; const t = para(el.value), s = f.satirlar[+el.dataset.snTutar]; if (t && s) { s.tutar = yaz(t); el.value = s.tutar; } }, true);
   };
   araSec.snKisi = m => { D.f.kisi = m; D.onay = false; D.uyari = ''; };
@@ -262,6 +558,7 @@
   }
 
   async function kaydet() {
+    if (ciroMu()) return ciroKaydet();
     const f = D.f, e = eksik();
     if (e.length) { D.uyari = e[0]; D.onay = false; S.keepScroll = true; render(); return; }
     if (!D.onay) { D.onay = true; D.uyari = ''; ozetYenile(); setTimeout(() => { if (D.onay && !D.kaydediyor) { D.onay = false; ozetYenile(); } }, 10000); return; }
@@ -289,9 +586,31 @@
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     const f = D.f;
-    const ciz = () => { S.keepScroll = true; render(); };
     if (act === 'snYenile') { D.hata = ''; yukle(true); }
     else if (act === 'snYon') { if (f.yon !== el.dataset.o) { f.yon = el.dataset.o; f.kisi = null; } D.onay = false; D.uyari = ''; ciz(); }
+    else if (act === 'snTur') { f.tur = el.dataset.o; D.onay = false; D.uyari = ''; ciz(); }
+    else if (act === 'snPfTur') { D.pfTur = el.dataset.o; D.pfGoster = 80; ciz(); }
+    else if (act === 'snPfDaha') { D.pfGoster += 100; pfYenile(); }
+    else if (act === 'snPfHepsi') {
+      const ayr = ayrilan(), hepsi = [...new Set([...f.secili, ...pfFiltre().l.filter(c => !ayr[c.id]).map(c => c.id)])];
+      if (hepsi.length > 60) toast('Bir bordroya en çok 60 evrak yazılır; ilk 60 seçildi');
+      f.secili = hepsi.slice(0, 60); D.onay = false;
+      pfYenile();
+    }
+    else if (act === 'snPfTemizle') { f.secili = []; D.onay = false; pfYenile(); }
+    else if (act === 'snBordroAc') {
+      const g = [...(D.c?.bordrolar || []), ...(D.k?.gecmis || [])].find(x => x.islem === 'ciro' && x.istek === el.dataset.istek);
+      if (g) { bordroAc(g); ciz(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    }
+    else if (act === 'snBKapat') { if (D.bResim) URL.revokeObjectURL(D.bResim); D.bordro = null; D.bResim = ''; bBlob = null; ciz(); }
+    else if (act === 'snBPaylas') bordroPaylas();
+    else if (act === 'snBIndir') { if (D.bResim) { bordroIndir(); toast('Resim indirildi'); } }
+    else if (act === 'snBYazdir') { if (D.bResim) bordroYazdir(); }
+    else if (act === 'snBMetin') {
+      const t = bordroMetni(D.bordro);
+      (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => toast('Bordro yazısı kopyalandı; WhatsApp\'a yapıştırabilirsiniz')).catch(() => { window.prompt('Yazıyı kopyalayın:', t); });
+    }
+    else if (act === 'snBIptal') bordroIptal();
     else if (act === 'snAdet') { f.adet = Math.min(EN_COK, Math.max(1, f.adet + Number(el.dataset.d))); if (f.adet === 1) f.mod = 'her'; D.onay = false; dagit(); ciz(); }
     else if (act === 'snMod') { f.mod = el.dataset.o; D.onay = false; dagit(); ciz(); }
     else if (act === 'snAralik') { f.aralik = el.dataset.o; D.onay = false; dagit(); ciz(); }
