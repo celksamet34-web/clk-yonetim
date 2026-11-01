@@ -155,7 +155,10 @@ const BANNER_FORMATS = {
   banner: { out: '1248x1664', fal: { width: 1728, height: 2304 }, shape: 'vertical 3:4', zone: 'Keep the lower third of the image calm and uncluttered (the surface or pedestal under the bag), because text will be placed there.' },
   slider: { out: '1920x850', fal: { width: 3008, height: 1332 }, shape: 'wide panoramic 1920x850 hero banner', zone: 'The bag is on the right side; keep the left half of the image calm, softly lit and uncluttered with only the soft background, because a headline and button will be placed there.' },
   'slider-m': { out: '1080x1440', fal: { width: 1728, height: 2304 }, shape: 'vertical 3:4 mobile hero banner', zone: 'Keep the lower 40% of the image calm and uncluttered (the surface under the bag), because a headline and button will be placed there.' },
-  kategori: { out: '800x1000', fal: { width: 1792, height: 2240 }, shape: 'vertical 4:5 category tile', zone: 'Keep the composition centered and minimal with generous even space around the bag.' }
+  kategori: { out: '800x1000', fal: { width: 1792, height: 2240 }, shape: 'vertical 4:5 category tile', zone: 'Keep the composition centered and minimal with generous even space around the bag.' },
+  // Instagram kapağı (celik 01.11.2026 "photoroomdan dene"): üstte logo, altta ad ve fiyat yazılır
+  ig: { out: '1080x1350', fal: { width: 1728, height: 2160 }, shape: 'vertical 4:5 Instagram post', zone: 'Keep the top fifth and the bottom quarter of the image calm and uncluttered (plain backdrop and surface), because a logo and text will be placed there.' },
+  'ig-hikaye': { out: '1080x1920', fal: { width: 1440, height: 2560 }, shape: 'vertical 9:16 Instagram story', zone: 'Keep the top quarter and the bottom third of the image calm and uncluttered (plain backdrop and surface), because a logo and text will be placed there.' }
 };
 // fal.ai banner istemi: ürün yerinde ve aynen kalır, yalnızca beyaz zemin sahneyle değişir, biçime göre yazı alanı sakin kalır
 // Yalnızca sahne: model ürünü yeniden çizince logoyu değiştiriyor (DADA → DACA, YEFA → VIP) ve açısını bozuyordu (doğrulandı).
@@ -200,7 +203,7 @@ exports.handler = async event => {
     const user = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}` } });
     if (!user.ok) return reply(401, { success: false, message: 'Oturum geçersiz veya süresi dolmuş.' });
     // personel yetkisi (celik 01.11.2026): yalnız yönetici ya da bu sayfalardan birine izni olan personel
-    const yetki = await fetch(`${SUPABASE_URL}/rest/v1/rpc/panel_yetki`, { method: 'POST', headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ istenen: ['yeni', 'urunler', 'stok', 'banner'] }) });
+    const yetki = await fetch(`${SUPABASE_URL}/rest/v1/rpc/panel_yetki`, { method: 'POST', headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ istenen: ['yeni', 'urunler', 'stok', 'banner', 'instagram'] }) });
     if (yetki.status !== 404 && !(yetki.ok && (await yetki.json().catch(() => false)) === true)) return reply(403, { success: false, message: 'Bu işlem için yetkiniz yok.' });
     const body = JSON.parse(event.body || '{}');
     if (body.action === 'falResult') {

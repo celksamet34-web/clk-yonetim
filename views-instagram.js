@@ -4,9 +4,12 @@
    kaydırmalı (kapak + ürünün bütün fotoğrafları + son karede ölçü, malzeme, renk, fiyat) ve koleksiyon (2–4 ürün, "Yeni gelenler").
    Gönderi 4:5 (1080×1350, akışta en çok yer kaplayan boy) ya da hikâye 9:16 (1080×1920; üst ve alt Instagram arayüzü için boş).
    Açıklama ve etiketler (hashtag) üründen yazılır, düzenlenebilir. Paylaşınca açıklama panoya kopyalanır. Sunucuya bir şey yazılmaz.
-   Tasarım 01.11 akşamı celik isteğiyle lüks düzene geçti: kemer fon, ince altın çerçeve, altın mühürde fiyat (aşağıda TEMA). */
+   Tasarım 01.11 akşamı celik isteğiyle lüks düzene geçti: kemer fon, ince altın çerçeve, altın mühürde fiyat (aşağıda TEMA).
+   Lüks sahne (celik 01.11 "photoroomdan dene"): kapak Photoroom'un ürettiği sahnede tam ekran çizilir (ürün pikselleri aynen kalır);
+   yalnız "Sahneyi üret"e basınca üretilir (~0,10 $). Manken karesi (celik 01.11 "instagram içinde 1 sayfa da mankenli mi yapsak"):
+   kaydırmalının 2. karesi ürünün manken fotoğrafı ya da "Manken üret" (fal.ai, ~0,04 $) ile tam ekran. */
 (() => {
-  const { S, $, esc, num, toast, head, views, render, loadProducts, P } = CLK;
+  const { S, $, esc, num, toast, head, views, render, loadProducts, P, sb } = CLK;
   const TEL = '0534 077 88 67', SITE = 'clkcanta.com';
   const RENK = { INK: '#121110', GOLD: '#b48f55', GOLD2: '#d6bd8f', CREAM: '#f6f4f0', LINE: '#e8e3db', MUTED: '#7a746b' };
   const TUR = {
@@ -16,10 +19,23 @@
   };
   const BICIM = { gonderi: ['Gönderi 4:5', 1350], hikaye: ['Hikâye 9:16', 1920] };
   const FIYAT = [['yok', 'Fiyatsız'], ['site', 'Site fiyatı'], ['b1', 'Bayi 1'], ['b2', 'Bayi 2'], ['b3', 'Bayi 3'], ['b4', 'Bayi 4']];
-  const AYAR = { tur: 'tek', bicim: 'gonderi', tema: 'acik', fiyat: 'site', olcu: true, renk: true, kod: true, stokta: true };
+  const AYAR = { tur: 'tek', bicim: 'gonderi', tema: 'acik', fiyat: 'site', olcu: true, renk: true, kod: true, stokta: true, sahne: 'yok' };
+  // Photoroom sahneleri: panelde Türkçe ad, Photoroom'a İngilizce tarif (üstte logo, altta yazı için sakin alan istenir)
+  const SAHNE = [
+    ['yok', 'Kemer (sahnesiz)', ''],
+    ['mermer', 'Mermer kaide', 'a polished warm beige marble pedestal in a softly lit luxury boutique, warm golden accent light from the side, plain softly blurred backdrop, elegant minimal composition with calm empty space above and below the product, premium fashion campaign photography'],
+    ['butik', 'Butik', 'an elegant high-end boutique interior softly out of focus with warm brass details, the product standing on a cream travertine plinth, warm soft light, calm empty space above and below the product, luxury editorial photography'],
+    ['ipek', 'İpek', 'softly draped champagne silk fabric backdrop and a low ivory stone plinth, gentle diffused daylight, airy calm composition with empty space above and below the product, luxury still-life photography'],
+    ['gece', 'Gece', 'a dark charcoal studio with a soft spotlight from above, a black glossy plinth with subtle reflections and a warm gold rim light, calm dark empty space above and below the product, luxury evening campaign photography']
+  ];
+  const SAHNE_SON = ' No text, no letters, no logos, no people.';
+  const KITLE = [['kadin', 'Kadın'], ['erkek', 'Erkek'], ['kiz-cocuk', 'Kız çocuk'], ['erkek-cocuk', 'Erkek çocuk']];
+  const TASIMA = [['omuz', 'Omuzda'], ['capraz', 'Çapraz'], ['el', 'Elde'], ['sirt', 'Sırtta']];
   let kayit = {};
   try { kayit = JSON.parse(localStorage.getItem('clk-instagram') || '{}'); } catch {}
   const D = (S.ui.ig ||= { ...AYAR, ...kayit, sec: [], ara: '', goster: 40, ust: '', alt: '', cap: '', capElle: false, resimler: [], durum: '', calisiyor: false, kirli: false, slide: 0 });
+  // üretilenler yalnız bu oturumda tutulur (sahne: ürün|sahne|boyut → resim; manken: ürün → resim); seçim ürün başına
+  D.sahneler ||= {}; D.mankenler ||= {}; D.mankenSec ||= {}; D.sahneIs ||= ''; D.mankenIs ||= ''; D.kitle ||= ''; D.tasima ||= '';
   const sakla = () => { try { localStorage.setItem('clk-instagram', JSON.stringify(Object.fromEntries(Object.keys(AYAR).map(k => [k, D[k]])))); } catch {} };
 
   /* ürün bilgileri (Katalog ile aynı kurallar) */
@@ -98,7 +114,10 @@
     mocha: { ad: 'Mocha', zemin: ['#4b3629', '#271c15'], isik: [120, 88, 62, 0.55], kemer: ['#f3ebdf', '#e5d9c7'], yazi: '#f5ecdf', soluk: '#cbb9a2', altin: '#dcc08b', cizgi: 'rgba(220,192,139,.55)', koyu: true },
     koyu: { ad: 'Siyah ve altın', zemin: ['#1c1916', '#0a0908'], isik: [92, 78, 58, 0.5], kemer: ['#f1eadf', '#e3d9c9'], yazi: '#f6f0e5', soluk: '#a99f90', altin: '#d8bf90', cizgi: 'rgba(216,191,144,.5)', koyu: true }
   };
-  const T = () => TEMA[D.tema] || TEMA.acik;
+  // sahneli kapakta yazılar koyu geçişin üstüne açık renkte yazılır
+  const SAHNE_TEMA = { ad: 'Sahne', zemin: ['#1c1916', '#0a0908'], isik: [0, 0, 0, 0], kemer: ['#f1eadf', '#e3d9c9'], yazi: '#fbf6ee', soluk: '#e6dac6', altin: '#e8cf9a', cizgi: 'rgba(232,207,154,.65)', koyu: true };
+  let temaOzel = null;
+  const T = () => temaOzel || TEMA[D.tema] || TEMA.acik;
   const SERIF = '"Cormorant Garamond", "Playfair Display", Georgia, serif';
   const FS = (b, z, it) => `${it ? 'italic ' : ''}${b} ${Math.round(z)}px ${SERIF}`;
   // fiyat rakamları Playfair ile: Cormorant'ın eski usul rakamları (1.249) küçük ve zor okunuyor
@@ -316,6 +335,106 @@
     altBilgi(g, W, false);
   }
 
+  /* 5) Photoroom sahneli kapak: sahne tam ekran, üstte ve altta koyu geçiş, ürün sahnenin içinde (Photoroom ürünü yerinde bırakır) */
+  // ürünün kapaktaki yeri (içerik koordinatı, 1080×1350): en çok %60 genişlik, 640 px yükseklik, alt kenarı 918
+  const YER = { w: 0.6, h: 640, alt: 918 };
+  function yerlestir(im, W, H, oy) {
+    const [sx, sy, sw, sh] = icerik(im), k = Math.min(W * YER.w / sw, YER.h / sh, 3), w = sw * k, h = sh * k;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, sx, sy, sw, sh, (W - w) / 2, oy + YER.alt - h, w, h);
+    return c.toDataURL('image/jpeg', 0.92);
+  }
+  function sahneZemin(g, W, H, oy, sahne) {
+    g.fillStyle = '#1c1916'; g.fillRect(0, 0, W, H); kapla(g, sahne, 0, 0, W, H);
+    // üst geçiş logonun ve başlığın arkasında koyu kalır (hikâyede Instagram arayüzü bölgesi de koyu), sonra açılır
+    const ub = oy + (D.ust.trim() ? 430 : 370);
+    let gr = g.createLinearGradient(0, 0, 0, ub); gr.addColorStop(0, 'rgba(12,10,8,.66)'); gr.addColorStop((oy + 120) / ub, 'rgba(12,10,8,.5)'); gr.addColorStop(1, 'rgba(12,10,8,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, ub);
+    const y0 = oy + 900; gr = g.createLinearGradient(0, y0, 0, H); gr.addColorStop(0, 'rgba(12,10,8,0)'); gr.addColorStop(0.25, 'rgba(12,10,8,.62)'); gr.addColorStop(1, 'rgba(12,10,8,.9)'); g.fillStyle = gr; g.fillRect(0, y0, W, H - y0);
+    g.strokeStyle = SAHNE_TEMA.cizgi; g.lineWidth = 1.6; g.strokeRect(30, 30, W - 60, H - 60);
+    g.globalAlpha = 0.55; g.lineWidth = 1; g.strokeRect(40, 40, W - 80, H - 80); g.globalAlpha = 1;
+  }
+  function sahneCiz(g, W, alt, p, ipucu) {
+    const s = T(), kat = P.cat(p), ust = D.ust.trim(), altY = D.alt.trim();
+    // açık renkli sahnede de okunsun: üst yazılara yumuşak gölge
+    g.save(); g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 16;
+    marka(g, W);
+    if (ust) { baslik(g, ust, W, 238, 60); if (altY) aralikli(g, altY, W / 2, 282, 19, 6, s.altin, 'center', 600, W - 220); }
+    else if (kat && kat !== 'Kategorisiz') cizgiliEtiket(g, kat, W / 2, 204);
+    g.restore();
+    muhur(g, W - 158, 372, 84, fiyatAl(p));
+    g.textAlign = 'center'; g.fillStyle = s.yazi; g.font = FS(600, 56);
+    let sat = satirlar(g, guzelAd(p.name), W - 220, 2), y = 1036;
+    if (sat.length > 1) { g.font = FS(600, 46); sat = satirlar(g, guzelAd(p.name), W - 220, 2); y = 1018; }
+    for (const l of sat) { g.fillText(l, W / 2, y); y += 48; }
+    g.textAlign = 'left';
+    const bi = bilgiYazi(p);
+    if (bi) { aralikli(g, bi, W / 2, y + 2, 20, 3, s.soluk, 'center', 600, W - 180); y += 44; }
+    if (D.renk && y < 1140) renkSatiri(g, renkler(p), W / 2, Math.min(y + 4, 1150), W - 180);
+    altBilgi(g, W, ipucu);
+  }
+
+  /* 6) manken karesi: fotoğraf tam ekran, altta koyu geçişte ad, iletişim, logo ve kare numarası */
+  function mankenCiz(g, W, H, oy, p, im, no, top) {
+    g.fillStyle = '#efe9e0'; g.fillRect(0, 0, W, H); kapla(g, im, 0, 0, W, H);
+    const y0 = oy + 1000, gr = g.createLinearGradient(0, y0, 0, H); gr.addColorStop(0, 'rgba(12,10,8,0)'); gr.addColorStop(0.35, 'rgba(12,10,8,.55)'); gr.addColorStop(1, 'rgba(12,10,8,.86)'); g.fillStyle = gr; g.fillRect(0, y0, W, H - y0);
+    g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1.6; g.strokeRect(30, 30, W - 60, H - 60);
+    g.globalAlpha = 0.5; g.lineWidth = 1; g.strokeRect(40, 40, W - 80, H - 80); g.globalAlpha = 1;
+    g.translate(0, oy);
+    let lw = 0;
+    if (logoAltin) { const lh = 40; lw = logoAltin.width / logoAltin.height * lh; g.drawImage(logoAltin, W - 84 - lw, 1190, lw, lh); }
+    g.fillStyle = '#fbf6ee'; g.font = FS(500, 52, true);
+    g.fillText(satirlar(g, guzelAd(p.name), W - 168 - Math.max(lw, 120) - 30, 1)[0], 84, 1226);
+    aralikli(g, `Sipariş için DM  ·  WhatsApp ${TEL}`, 84, 1276, 18, 3, 'rgba(251,246,238,.85)', 'left', 600, W - 168 - 150);
+    aralikli(g, `${String(no).padStart(2, '0')}  /  ${String(top).padStart(2, '0')}`, W - 84, 1276, 18, 6, SAHNE_TEMA.altin, 'right', 600);
+  }
+  // manken karesine giden fotoğraf: seçilen ürün fotoğrafı, üretilen manken ya da yok (varsayılan 2. fotoğraf; Yeni ürün sayfası mankeni 2. sıraya koyar)
+  function mankenAl(p) {
+    const f = P.imgs(p), id = String(p.id), v = D.mankenSec[id] ?? (D.mankenler[id] ? 'uret' : f.length > 1 ? 1 : 'yok');
+    if (v === 'uret') return D.mankenler[id] ? { src: D.mankenler[id], i: -1 } : null;
+    return v !== 'yok' && f[v] ? { src: f[v], i: +v } : null;
+  }
+  const mankenDeger = p => { const v = mankenAl(p); return !v ? 'yok' : v.i < 0 ? 'uret' : String(v.i); };
+  const sahneAnahtar = (p, k = D.sahne) => `${p.id}|${k}|${D.bicim}`;
+  const sahneHazir = p => p && D.tur !== 'koleksiyon' && D.sahne !== 'yok' ? D.sahneler[sahneAnahtar(p)] || '' : '';
+
+  /* yapay zekâ: bu sitenin görsel fonksiyonu; fal.ai kuyruğu 3 sn arayla sorulur (en çok ~3 dk) */
+  const aiFn = (t, body) => fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.message || (r.status === 504 ? 'Sunucu zaman aşımına uğradı.' : 'Görsel üretilemedi.')); return j; });
+  async function ai(body) {
+    const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
+    let j = await aiFn(t, body);
+    if (j.pending) { const job = j.job; for (let i = 0; i < 60 && j.pending; i++) { await new Promise(ok => setTimeout(ok, 3000)); j = await aiFn(t, { action: 'falResult', job }); } if (j.pending) throw new Error('Üretim zaman aşımına uğradı.'); }
+    if (!j.image) throw new Error(j.message || 'Görsel üretilemedi.');
+    return j.image;
+  }
+  async function sahneUret() {
+    const p = secili()[0], tarif = SAHNE.find(x => x[0] === D.sahne)?.[2];
+    if (!p || !tarif || D.sahneIs) return;
+    const anahtar = sahneAnahtar(p), hik = D.bicim === 'hikaye', W = 1080, H = BICIM[D.bicim][1];
+    D.sahneIs = 'Photoroom sahne üretiyor… (10–40 sn)'; ciz();
+    try {
+      const im = await gorsel(P.imgs(p)[0]); if (!im) throw new Error('Ürün fotoğrafı açılamadı.');
+      D.sahneler[anahtar] = await ai({ action: 'banner', engine: 'photoroom', format: hik ? 'ig-hikaye' : 'ig', prompt: tarif + SAHNE_SON, image: yerlestir(im, W, H, hik ? 285 : 0) });
+      toast('Sahne hazır, kapakta kullanılıyor');
+    } catch (e) { toast('Sahne üretilemedi: ' + e.message); }
+    D.sahneIs = ''; D.kirli = true; ciz();
+  }
+  const kitleTahmin = p => { const t = buyuk(P.path(p) + ' ' + p.name); return /ÇOCUK|OKUL/.test(t) ? (/ERKEK/.test(t) ? 'erkek-cocuk' : 'kiz-cocuk') : /ERKEK/.test(t) ? 'erkek' : 'kadin'; };
+  const tasimaTahmin = p => { const t = buyuk(P.path(p) + ' ' + p.name); return /SIRT/.test(t) ? 'sirt' : /EVRAK|LAPTOP|NOTEBOOK|VAL[İI]Z|BAVUL|EL ÇANTA|CÜZDAN|AB[İI]YE|PORTFÖY/.test(t) ? 'el' : /POSTACI|ÇAPRAZ|BEL ÇANTA|GÖĞÜS/.test(t) ? 'capraz' : 'omuz'; };
+  async function mankenUret() {
+    const p = secili()[0]; if (!p || D.mankenIs) return;
+    const id = String(p.id);
+    D.mankenIs = 'Manken üretiliyor… (1–2 dk)'; ciz();
+    try {
+      const im = await gorsel(P.imgs(p)[0]); if (!im) throw new Error('Ürün fotoğrafı açılamadı.');
+      const c = document.createElement('canvas'); c.width = 1200; c.height = 1600; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 1200, 1600); sigdir(x, im, 0, 0, 1200, 1600);
+      const [w, h, d] = ['En', 'Yükseklik', 'Boy'].map(k => +cm(nitelik(p, k)) || 0);
+      D.mankenler[id] = await ai({ action: 'model', image: c.toDataURL('image/jpeg', 0.9), audience: D.kitle || kitleTahmin(p), carry: D.tasima || tasimaTahmin(p), size: { w, h, d } });
+      D.mankenSec[id] = 'uret'; toast('Manken hazır, 2. karede');
+    } catch (e) { toast('Manken üretilemedi: ' + e.message); }
+    D.mankenIs = ''; D.kirli = true; ciz();
+  }
+
   /* resimleri hazırla: tuval → JPEG; ayar değişince kendiliğinden yenilenir */
   let sayac = 0, zaman = 0;
   const planla = () => { D.kirli = true; clearTimeout(zaman); zaman = setTimeout(hazirla, 220); };
@@ -333,13 +452,20 @@
         const imgs = await Promise.all(l.slice(0, tur.en).map(p => gorsel(P.img(p))));
         await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); koleksiyonCiz(g, W, alt, l.slice(0, tur.en), imgs); });
       } else {
-        const p = l[0], fotolar = P.imgs(p), im = await gorsel(fotolar[0]);
-        await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); tekCiz(g, W, alt, p, im, D.tur === 'kaydir' && !hik); });
+        const p = l[0], fotolar = P.imgs(p), im = await gorsel(fotolar[0]), ipucu = D.tur === 'kaydir' && !hik;
+        const sahneSrc = sahneHazir(p), sahne = sahneSrc ? await gorsel(sahneSrc) : null;
+        await ciz(() => {
+          if (!sahne) { zemin(g, W, H, oy); g.translate(0, oy); tekCiz(g, W, alt, p, im, ipucu); return; }
+          sahneZemin(g, W, H, oy, sahne); g.translate(0, oy); temaOzel = SAHNE_TEMA;
+          try { sahneCiz(g, W, alt, p, ipucu); } finally { temaOzel = null; }
+        });
         if (D.tur === 'kaydir') {
-          // kaydırmalı en çok 10 kare: kapak + 8 fotoğraf + bilgi
-          const digerleri = fotolar.slice(1, 9), ims = await Promise.all(digerleri.map(gorsel));
-          const digerIm = ims.filter(Boolean), top = digerIm.length + 2;
-          for (const [i, x] of digerIm.entries()) await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); fotoCiz(g, W, alt, p, x, i + 2, top); });
+          // kaydırmalı en çok 10 kare: kapak + (manken) + fotoğraflar + bilgi; manken karesine giden fotoğraf ara karelerde tekrar etmez
+          const mk = mankenAl(p), mIm = mk ? await gorsel(mk.src) : null;
+          const digerleri = fotolar.slice(1).filter((_, j) => !mIm || j + 1 !== mk.i).slice(0, mIm ? 7 : 8), ims = await Promise.all(digerleri.map(gorsel));
+          const digerIm = ims.filter(Boolean), top = digerIm.length + 2 + (mIm ? 1 : 0);
+          if (mIm) await ciz(() => mankenCiz(g, W, H, oy, p, mIm, 2, top));
+          for (const [i, x] of digerIm.entries()) await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); fotoCiz(g, W, alt, p, x, i + (mIm ? 3 : 2), top); });
           await ciz(() => { zemin(g, W, H, oy); g.translate(0, oy); bilgiCiz(g, W, alt, p, im); });
         }
       }
@@ -348,10 +474,11 @@
       const kod = (D.tur === 'koleksiyon' ? 'koleksiyon' : String(kodAl(l[0]) || l[0].id)).replace(/[^\w-]+/g, '');
       D.resimler = kareler.map((blob, i) => ({ blob, url: URL.createObjectURL(blob), ad: `CLK-instagram-${kod}-${hik ? 'hikaye' : 'gonderi'}-${i + 1}.jpg` }));
       D.slide = 0;
-      const fs = D.fiyat !== 'yok' && l.slice(0, tur.en).some(p => !fiyatAl(p));
-      D.durum = `${D.resimler.length} ${D.resimler.length > 1 ? 'kare' : 'resim'} hazır${fs ? `; fiyatı olmayan üründe fiyat yazılmadı` : ''}.`;
+      const fs = D.fiyat !== 'yok' && l.slice(0, tur.en).some(p => !fiyatAl(p)), sb2 = D.tur !== 'koleksiyon' && D.sahne !== 'yok' && !sahneHazir(l[0]);
+      D.durum = `${D.resimler.length} ${D.resimler.length > 1 ? 'kare' : 'resim'} hazır${fs ? `; fiyatı olmayan üründe fiyat yazılmadı` : ''}${sb2 ? '; sahne için "Sahneyi üret"e basın' : ''}.`;
     } catch (e) { if (benim === sayac) D.durum = 'Hazırlanamadı: ' + (e.message || e); }
-    finally { if (benim === sayac) { D.calisiyor = false; if (!D.capElle) D.cap = aciklama(); onizlemeYenile(); } }
+    // çizim sürerken ayar değiştiyse (kirli) yeniden çizilir
+    finally { if (benim === sayac) { D.calisiyor = false; if (!D.capElle) D.cap = aciklama(); onizlemeYenile(); if (D.kirli) planla(); } }
   }
   function temizle() { for (const r of D.resimler) URL.revokeObjectURL(r.url); D.resimler = []; }
   const durumYaz = t => { D.durum = t; const d = $('#igDurum'); if (d) d.textContent = t; };
@@ -430,6 +557,31 @@
       <span class="kt-sag">${D.fiyat === 'yok' ? '' : `<b>${f ? fmt(f) : '<em>fiyat yok</em>'}</b>`}</span></button>`;
   }
   const listeHtml = () => { const l = liste(); return (l.slice(0, D.goster).map(satirHtml).join('') || '<p class="ek-bos">Aramaya uyan, fotoğraflı ürün yok.</p>') + (l.length > D.goster ? `<button class="btn sm" data-act="igDaha" style="margin:10px 0 2px">Daha fazla göster (${num(l.length - D.goster)})</button>` : ''); };
+  // 3. adım: lüks sahne (tek ürün ve kaydırmalı) ve manken karesi (kaydırmalı)
+  function sahneKart(no) {
+    const p = secili()[0], hazir = sahneHazir(p), kay = D.tur === 'kaydir';
+    const sahneDug = D.sahne === 'yok' ? '' : !p ? '<p class="sub">Önce ürün seçin.</p>' : D.sahneIs ? `<p class="sub ig-is">${esc(D.sahneIs)}</p>`
+      : `<div class="ek-dug"><button class="btn sm ${hazir ? '' : 'gold'}" data-act="igSahneUret">${hazir ? 'Yeniden üret' : 'Sahneyi üret'} (~0,10 $)</button>${hazir ? '<span class="sub">Kapakta kullanılıyor.</span>' : ''}</div>`;
+    let manken = '';
+    if (kay && p) {
+      const f = P.imgs(p), id = String(p.id), v = mankenDeger(p), m = D.mankenler[id];
+      manken = `<h4 class="ig-alt-baslik">Manken karesi (2. kare)</h4>
+        <p class="hint">Ürünün manken fotoğrafını seçin ya da yenisini üretin (~0,04 $). Seçilen fotoğraf tam ekran çizilir.</p>
+        <div class="ig-mf" role="group" aria-label="Manken fotoğrafı">
+          <button type="button" data-act="igManken" data-v="yok" aria-pressed="${v === 'yok'}">Yok</button>
+          ${f.slice(1).map((u, j) => `<button type="button" data-act="igManken" data-v="${j + 1}" aria-pressed="${v === String(j + 1)}" aria-label="${j + 2}. fotoğraf"><img src="${esc(u)}" alt="" loading="lazy"><span>${j + 2}</span></button>`).join('')}
+          ${m ? `<button type="button" data-act="igManken" data-v="uret" aria-pressed="${v === 'uret'}" aria-label="Üretilen manken"><img src="${esc(m)}" alt=""><span>Yeni</span></button>` : ''}
+        </div>
+        <div class="ig-mu">${sec('igKitle', KITLE, D.kitle || kitleTahmin(p))}${sec('igTasima', TASIMA, D.tasima || tasimaTahmin(p))}
+          <button class="btn sm" data-act="igMankenUret" ${D.mankenIs ? 'disabled' : ''}>${D.mankenIs ? esc(D.mankenIs) : `${m ? 'Yeniden' : 'Manken'} üret (~0,04 $)`}</button></div>`;
+    }
+    return `<div class="card">
+      <div class="gd-adim"><span>${no}</span><h3>Lüks sahne${kay ? ' ve manken' : ''}</h3></div>
+      <p class="hint">Kapak Photoroom'un ürettiği lüks sahnede çizilir; ürün fotoğrafı aynen kalır. Her üretim ~0,10 $ ve yalnız düğmeye basınca yapılır.</p>
+      <div class="kt-fiyat" role="group" aria-label="Sahne">${SAHNE.map(([k, ad]) => `<button class="chip" data-act="igSahne" data-v="${k}" aria-pressed="${D.sahne === k}">${ad}${k !== 'yok' && p && D.sahneler[sahneAnahtar(p, k)] ? ' ✓' : ''}</button>`).join('')}</div>
+      ${sahneDug}${manken}
+    </div>`;
+  }
   function onizlemeHtml() {
     const r = D.resimler, hik = D.bicim === 'hikaye';
     if (!r.length) return `<div class="ig-bos">${D.calisiyor ? 'Hazırlanıyor…' : D.tur === 'koleksiyon' ? 'En az 2 ürün seçin.' : 'Bir ürün seçin; gönderi burada görünür.'}</div>`;
@@ -458,7 +610,7 @@
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
     const ust = head('Site ürünleri', 'Instagram', 'Sitedeki ürünlerden Instagram gönderisi ve hikâyesi: tek ürün, kaydırmalı ya da koleksiyon. Açıklama ve etiketler de hazırlanır.');
     if (!S.pLoaded && !S.products.length) return ust + (S.pErr ? CLK.errBox(S.pErr, 'reloadP') : `<div class="card"><p class="sk-say">Ürünler yükleniyor… ${esc(S.pProg || '')}</p><div class="skel" style="height:240px"></div></div>`);
-    const tur = TUR[D.tur], l = secili();
+    const tur = TUR[D.tur], l = secili(), sahneVar = D.tur !== 'koleksiyon', n = sahneVar ? 4 : 3;
     return `${ust}
       <div class="ig-duzen">
         <div class="ig-sol">
@@ -476,8 +628,9 @@
             <div class="ig-ara"><input id="igAra" type="search" value="${esc(D.ara)}" placeholder="Ürün adı, kodu ya da kategori" autocomplete="off">${kutu('igStokta', D.stokta, 'Yalnız stokta')}</div>
             <div class="ig-liste" id="igListe">${listeHtml()}</div>
           </div>
+          ${sahneVar ? sahneKart(3) : ''}
           <div class="card">
-            <div class="gd-adim"><span>3</span><h3>Yazılar ve fiyat</h3></div>
+            <div class="gd-adim"><span>${n}</span><h3>Yazılar ve fiyat</h3></div>
             <div class="kt-fiyat" role="group" aria-label="Fiyat">${FIYAT.map(([k, ad]) => `<button class="chip" data-act="igFiyat" data-v="${k}" aria-pressed="${D.fiyat === k}">${ad}</button>`).join('')}</div>
             <div class="ek-form kt-form">
               <label>${D.tur === 'koleksiyon' ? 'Başlık' : 'Üst yazı (isteğe bağlı)'}<input id="igUst" value="${esc(D.ust)}" maxlength="40" placeholder="${D.tur === 'koleksiyon' ? 'Yeni Gelenler' : 'örn. Yeni Sezon, %20 İndirim, Stokta'}"></label>
@@ -486,7 +639,7 @@
             <div class="kt-kutular">${kutu('igOlcu', D.olcu, 'Ölçü ve malzeme')}${kutu('igRenk', D.renk, 'Renkler')}${kutu('igKod', D.kod, 'Ürün kodu')}</div>
           </div>
           <div class="card">
-            <div class="gd-adim"><span>4</span><h3>Açıklama</h3></div>
+            <div class="gd-adim"><span>${n + 1}</span><h3>Açıklama</h3></div>
             <textarea id="igCap" rows="11" class="ig-cap-alan" placeholder="Ürün seçince açıklama ve etiketler burada yazılır.">${esc(D.capElle ? D.cap : aciklama())}</textarea>
             <div class="ek-dug"><button class="btn sm" data-act="igKopya">Açıklamayı kopyala</button>${D.capElle ? '<button class="btn sm ghost" data-act="igYeniden">Yeniden yaz</button>' : ''}</div>
           </div>
@@ -514,6 +667,8 @@
       planla();
     });
     $('#igCap')?.addEventListener('input', e => { D.cap = e.target.value; if (!D.capElle) { D.capElle = true; } });
+    $('#igKitle')?.addEventListener('change', e => { D.kitle = e.target.value; });
+    $('#igTasima')?.addEventListener('change', e => { D.tasima = e.target.value; });
     kayanBagla();
     // ilk açılışta ya da geri gelince seçili ürün varsa resimler yeniden çizilir
     if (D.sec.length && (D.kirli || !D.resimler.length) && !D.calisiyor && S.products.length) planla();
@@ -536,9 +691,13 @@
       else if (D.sec.length >= en) { toast(`Koleksiyonda en çok ${en} ürün olur`); return; }
       else D.sec.push(id);
       // başka ürün seçilince elle yazılan açıklama eski ürünü anlatmasın
-      D.capElle = false; D.kirli = true; if (!D.sec.length) { temizle(); D.durum = ''; }
+      D.capElle = false; D.kirli = true; D.kitle = D.tasima = ''; if (!D.sec.length) { temizle(); D.durum = ''; }
       ciz();
     }
+    else if (act === 'igSahne') { D.sahne = el.dataset.v; sakla(); D.kirli = true; ciz(); }
+    else if (act === 'igSahneUret') sahneUret();
+    else if (act === 'igManken') { const p = secili()[0]; if (p) { const v = el.dataset.v; D.mankenSec[String(p.id)] = v === 'yok' || v === 'uret' ? v : +v; D.kirli = true; ciz(); } }
+    else if (act === 'igMankenUret') mankenUret();
     else if (act === 'igDaha') { D.goster += 60; const b = $('#igListe'); if (b) b.innerHTML = listeHtml(); }
     else if (act === 'igKopya') kopyala();
     else if (act === 'igYeniden') { D.capElle = false; D.cap = aciklama(); ciz(); }
