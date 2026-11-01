@@ -11,7 +11,7 @@
   const RENK = { INK: '#121110', INK2: '#1d1b19', GOLD: '#b48f55', GOLD2: '#d6bd8f', CREAM: '#f6f4f0', LINE: '#e8e3db', MUTED: '#7a746b' };
   const ayYil = () => new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
-  const VARS = { tema: 'renkli', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, kat: '', stokta: true, aktif: true };
+  const VARS = { tema: 'kurumsal', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, kat: '', stokta: true, aktif: true };
   let kayit = {};
   try { kayit = JSON.parse(localStorage.getItem('clk-katalog') || '{}'); } catch {}
   const D = (S.ui.kt ||= { ...VARS, ...kayit, cikar: new Set(kayit.cikar || []), ara: '', goster: 60, durum: '', calisiyor: false, url: '', blob: null, onizleme: [] });
@@ -244,8 +244,53 @@
     g.font = F(700, 25); g.fillStyle = 'rgba(255,255,255,.9)'; g.textAlign = 'center'; g.letterSpacing = '2px'; g.fillText(SITE, W / 2, by + bh + 44); g.letterSpacing = '0px'; g.textAlign = 'left';
   }
 
+  /* Kurumsal durum (celik 01.11: "renk daha kurumsal, metaya uygun"): Meta reklam düzeni; açık stüdyo zemininde büyük ürün (beyaz fon çarpma ile zemine karışır),
+     üstte ad, altta koyu bilgi bandı: fiyat, renkler, tek altın "Sipariş ver" düğmesi. Az yazı, marka renkleri (kömür, altın, beyaz). */
+  function durumKurumsal(g, W, H, p, im) {
+    const zg = g.createLinearGradient(0, 0, 0, 1360); zg.addColorStop(0, '#ffffff'); zg.addColorStop(1, '#ece7df');
+    g.fillStyle = zg; g.fillRect(0, 0, W, H);
+    const m = 72, ust = 262;
+    if (logoKoyu) { const lh = 58, lw = logoKoyu.width / logoKoyu.height * lh; g.drawImage(logoKoyu, m, ust - lh + 6, lw, lh); g.font = F(700, 21); g.fillStyle = RENK.INK; g.letterSpacing = '6px'; g.fillText('ÇANTA', m + lw + 14, ust); g.letterSpacing = '0px'; }
+    const kat = P.cat(p);
+    if (kat && kat !== 'Kategorisiz') { g.font = F(700, 20); g.fillStyle = '#8a6a33'; g.textAlign = 'right'; g.letterSpacing = '4px'; g.fillText(satirlar(g, buyuk(kat), 520, 1)[0], W - m, ust); g.letterSpacing = '0px'; g.textAlign = 'left'; }
+    // başlık: ürün adı
+    let y = ust + 96; g.font = F(700, 54); g.fillStyle = RENK.INK;
+    for (const l of satirlar(g, p.name, W - 2 * m, 2)) { g.fillText(l, m, y); y += 64; }
+    g.fillStyle = RENK.GOLD; g.fillRect(m, y - 30, 90, 5);
+    // ürün: fotoğraf çarpma ile çizilir, beyaz fonu açık zemine karışır
+    const ay = y + 10, ah = 1330 - ay;
+    // vitrin fotoğraflarının kendi gölgesi var; ayrıca zemin gölgesi çizilmez
+    if (im) { g.save(); g.globalCompositeOperation = 'multiply'; sigdir(g, im, m, ay, W - 2 * m, ah - 20); g.restore(); }
+    else { g.fillStyle = RENK.MUTED; g.font = F(600, 34); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', W / 2, ay + ah / 2); g.textAlign = 'left'; }
+    // alt bilgi bandı
+    const by = 1360;
+    g.fillStyle = RENK.INK; yuvarlak(g, 0, by, W, H - by + 60, 56); g.fill();
+    const f = fiyatAl(p);
+    g.font = F(600, 22); g.fillStyle = RENK.GOLD2; g.letterSpacing = '4px';
+    g.fillText(f ? (D.fiyat === 'site' ? 'FİYAT' : 'BAYİ FİYATI') : 'FİYAT BİLGİSİ', m, by + 74); g.letterSpacing = '0px';
+    if (f) { g.font = F(700, 76); g.fillStyle = '#fff'; g.fillText(fmt(f), m, by + 160); }
+    else { g.font = F(700, 44); g.fillStyle = '#fff'; g.fillText('Mesaj atın, hemen iletelim', m, by + 148); }
+    // sağda renkler ve kod
+    const rl = D.renk ? renkler(p) : [], noktali = rl.filter(renkKod).slice(0, 6), kod = D.kod ? kodAl(p) : '';
+    g.textAlign = 'right';
+    if (rl.length) {
+      g.font = F(600, 22); g.fillStyle = RENK.GOLD2; g.letterSpacing = '4px'; g.fillText(rl.length > 1 ? `${rl.length} RENK` : 'RENK', W - m, by + 74); g.letterSpacing = '0px';
+      if (noktali.length) { const r = 17; let x = W - m - r; for (const k of noktali.slice().reverse()) { g.beginPath(); g.arc(x, by + 132, r, 0, 7); g.fillStyle = renkKod(k); g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,.8)'; g.stroke(); x -= 2 * r + 12; } }
+      else { g.font = F(600, 30); g.fillStyle = '#fff'; g.fillText(satirlar(g, rl.map(guzelAd).join(', '), 380, 1)[0], W - m, by + 144); }
+    }
+    if (kod) { g.font = F(500, 24); g.fillStyle = '#a39c91'; g.fillText('Kod: ' + kod, W - m, by + 188); }
+    g.textAlign = 'left';
+    // tek eylem düğmesi (Meta'daki "Mesaj gönder" gibi)
+    const bx = m, bw = W - 2 * m, bh = 96, byy = by + 222;
+    yuvarlak(g, bx, byy, bw, bh, 18); const gg = g.createLinearGradient(bx, byy, bx + bw, byy); gg.addColorStop(0, RENK.GOLD); gg.addColorStop(1, '#c9a76b'); g.fillStyle = gg; g.fill();
+    g.fillStyle = '#1b150b'; g.font = F(700, 34); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(`Sipariş ver  ·  ${TEL}`, W / 2, byy + bh / 2 + 1);
+    g.textBaseline = 'alphabetic'; g.font = F(600, 23); g.fillStyle = '#a39c91'; g.letterSpacing = '3px'; g.fillText(buyuk(SITE), W / 2, byy + bh + 52); g.letterSpacing = '0px'; g.textAlign = 'left';
+  }
+
   function durumResmi(g, W, H, p, im, i) {
-    if (D.tema !== 'koyu') return durumRenkli(g, W, H, p, im, i);
+    if (D.tema === 'renkli') return durumRenkli(g, W, H, p, im, i);
+    if (D.tema !== 'koyu') return durumKurumsal(g, W, H, p, im);
     const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2c2824'); gr.addColorStop(0.55, RENK.INK); gr.addColorStop(1, '#0b0a09');
     g.fillStyle = gr; g.fillRect(0, 0, W, H);
     g.strokeStyle = 'rgba(214,189,143,.18)'; g.lineWidth = 2;
@@ -445,7 +490,7 @@
           <label>Başlık<input id="ktBaslik" value="${esc(D.baslik)}" placeholder="Ürün Kataloğu"></label>
           <label>Alt başlık<input id="ktAlt" value="${esc(D.alt)}" placeholder="${esc(guzelAd(ayYil()))} · ${num(ic.length)} ürün"></label>
           <label>Biçim${sec('ktBicim', Object.entries(BICIM).map(([k, v]) => [k, v.ad]), D.bicim)}</label>
-          ${resim ? `<label>Renkler${sec('ktTema', [['renkli', 'Canlı renkli'], ['koyu', 'Siyah ve altın']], D.tema)}</label>` : `<label>Sayfada ürün${sec('ktAdet', b.adet.map(n => [n, n === 1 ? '1 (büyük, reklam gibi)' : String(n)]), D.adet)}</label>`}
+          ${resim ? `<label>Tasarım${sec('ktTema', [['kurumsal', 'Kurumsal (Meta reklamı)'], ['renkli', 'Canlı renkli'], ['koyu', 'Siyah ve altın']], D.tema)}</label>` : `<label>Sayfada ürün${sec('ktAdet', b.adet.map(n => [n, n === 1 ? '1 (büyük, reklam gibi)' : String(n)]), D.adet)}</label>`}
           <label>Sıralama${sec('ktSira', SIRA, D.sira)}</label>
           <label>Alt not<input id="ktNot" value="${esc(D.not)}" placeholder="örn. Fiyatlar 1 Kasım'a kadar geçerlidir"></label>
         </div>
