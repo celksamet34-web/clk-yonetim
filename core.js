@@ -149,6 +149,7 @@ window.CLK = (() => {
     instagram: '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6"/></svg>',
     katalog: '<svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/><path d="M15.5 8h2M15.5 11h2"/></svg>',
     senet: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 11h7M9 14.5h7M9 18h4"/></svg>',
+    personel: '<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 11-4.7"/><rect x="15" y="14" width="6" height="6" rx="1"/><path d="M16.5 14v-1.5a1.5 1.5 0 0 1 3 0V14"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
   // Menü grupları (celik 31.10: "menü sıralamasını düzeltelim"). Masaüstü yan menü ve mobil "Daha" sayfası aynı sırayı kullanır.
@@ -158,18 +159,47 @@ window.CLK = (() => {
     ['Site ürünleri', [['yeni', 'Yeni ürün'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['katalog', 'Katalog'], ['instagram', 'Instagram'], ['banner', 'Banner']]],
     ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
     ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet']]],
-    ['Eşitleme', [['stokesitle', 'Stok eşitle'], ['eslestirme', 'Eşleştirme']]]
+    ['Eşitleme', [['stokesitle', 'Stok eşitle'], ['eslestirme', 'Eşleştirme']]],
+    ['Ayarlar', [['personel', 'Personel']]]
   ];
+  /* Personel yetkileri (celik 01.11.2026: "personel giriş yapacak… bütün menüye girişleri olmasın bizim seçtiklerimiz olsun", "çek senet görmesin cari görmesin").
+     Yönetici her şeyi görür; personel yalnız işaretlenen sayfaları. Sunucu da aynı listeyi panel_yetki() ile denetler. */
+  const EK_YETKI = [['esitle', 'Şimdi eşitle düğmesi'], ['ciro', 'Panelde ciro, kâr ve stok değeri']];
+  const ALT_SAYFA = { siparis: 'siparisler', musteri: 'musteriler', duzenle: ['urunler', 'yeni', 'stok'] };
+  const yonetici = () => !S.yetki || S.yetki.rol === 'yonetici';
+  function izin(k) {
+    if (k === 'panel') return true;
+    if (k === 'personel') return yonetici();
+    if (yonetici()) return true;
+    const a = ALT_SAYFA[k], l = S.yetki.sayfalar || [];
+    return Array.isArray(a) ? a.some(x => l.includes(x)) : l.includes(a || k);
+  }
+  const izinliMenu = () => MENU.map(([g, l]) => [g, l.filter(([k]) => izin(k))]).filter(([, l]) => l.length);
+  // personel e-postasız girer: kullanıcı adı <ad>@personel.clkcanta.com hesabına çevrilir (sunucudaki personel fonksiyonuyla aynı kural)
+  const kullaniciAdi = v => String(v || '').trim().toLocaleLowerCase('tr').replace(/[çğıöşü]/g, c => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' }[c])).replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
+  const girisEposta = v => String(v || '').includes('@') ? String(v).trim() : kullaniciAdi(v) + '@personel.clkcanta.com';
+  async function yetkiOku() {
+    S.yetkiHata = '';
+    const uid = S.user?.id; if (!uid) { S.yetki = null; return; }
+    const { data, error } = await sb.from('panel_kullanici').select('kullanici,ad,rol,sayfalar,aktif').eq('user_id', uid).maybeSingle();
+    // tablo henüz kurulmadıysa (SQL çalıştırılmadan önce) eski düzen sürer: tek hesap, her şey açık
+    if (error && /panel_kullanici|does not exist|schema cache|PGRST205|42P01/i.test(error.message + ' ' + error.code)) { S.yetki = null; return; }
+    if (error) { S.yetki = { rol: 'personel', sayfalar: [], aktif: false }; S.yetkiHata = 'Yetkiler okunamadı: ' + error.message; return; }
+    if (!data) { S.yetki = { rol: 'personel', sayfalar: [], aktif: false }; S.yetkiHata = 'Bu hesap panel kullanıcısı olarak tanımlı değil. Yöneticiden hesap açmasını isteyin.'; return; }
+    S.yetki = data;
+    if (!data.aktif) S.yetkiHata = 'Hesabınız kapatılmış. Yöneticiyle görüşün.';
+  }
   const ARTI = ['siparisgir', 'yeni', 'gider', 'senet']; // sık kullanılan "ekle" işlemleri altın renkte
   const ALT_BAR = ['panel', 'urunler', 'siparisgir', 'siparisler']; // mobil alt çubukta olanlar
   const views = {};
   // Paraşüt ↔ site eşitlemesini hemen çalıştırır (saatlik görevi beklemeden); işleyişi views-parasut.js'te
-  const esitleBtn = () => `<button class="esitle" data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${ICONS.esitle}<span>${S.esitleniyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</span></button>`;
+  const esitleBtn = () => !izin('esitle') ? '' : `<button class="esitle" data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${ICONS.esitle}<span>${S.esitleniyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</span></button>`;
   function shell(content) {
     const dugme = ([k, l]) => `<button data-go="${k}" class="${ARTI.includes(k) ? 'add' : ''}" ${S.route === k ? 'aria-current="page"' : ''}>${k === 'yeni' ? ICONS.plus : ICONS[k]}<span>${l}</span></button>`;
+    const MENU = izinliMenu();
     const nav = MENU.map(([g, l]) => (g ? `<div class="nav-g">${g}</div>` : '') + l.map(dugme).join('')).join('');
     const more = ['siparisler', 'musteriler', 'cari'].includes(S.route);
-    const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['daha', 'Daha']].map(([k, l]) => {
+    const mob = [['panel', 'Panel'], ['urunler', 'Ürünler'], ['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['daha', 'Daha']].filter(([k]) => k === 'daha' || izin(k)).map(([k, l]) => {
       const cur = S.route === k || (k === 'daha' && !ALT_BAR.includes(S.route) && MENU.some(([, l]) => l.some(([r]) => r === S.route)));
       const ic = k === 'siparisgir' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
       return `<button data-go="${k}" class="${k === 'siparisgir' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
@@ -177,8 +207,8 @@ window.CLK = (() => {
     return `<div class="shell">
       <aside class="side"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK<small>ÇANTA · YÖNETİM</small></div>
         <nav class="nav">${nav}${esitleBtn()}</nav>
-        <div class="foot"><b>${esc(S.user?.email || '')}</b><button class="link" data-act="logout">Çıkış yap</button></div></aside>
-      <header class="mtop"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK</div><div class="mtop-acts"><button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button><button data-act="logout">Çıkış</button></div></header>
+        <div class="foot"><b>${esc(S.yetki?.ad || S.yetki?.kullanici || S.user?.email || '')}</b>${S.yetki && S.yetki.rol !== 'yonetici' ? '<small>Personel</small>' : ''}<button class="link" data-act="logout">Çıkış yap</button></div></aside>
+      <header class="mtop"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK</div><div class="mtop-acts">${izin('esitle') ? `<button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button>` : ''}<button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
       <div class="sheet-more" id="more" data-act="moreKapat" ${S.more ? '' : 'hidden'}><div class="sheet-in">${MENU.filter(([g]) => g).map(([g, l]) => `<div class="sheet-g">${g}</div>` + l.map(([k, t]) => `<button data-go="${k}">${k === 'yeni' ? ICONS.plus : ICONS[k]}<span>${t}</span></button>`).join('')).join('')}${esitleBtn()}</div></div></div>`;
@@ -252,10 +282,13 @@ window.CLK = (() => {
       return;
     }
     if (!S.user) { app.className = ''; app.innerHTML = views.auth(); views.bindAuth(); return; }
-    const v = views[S.route] || views.panel;
+    if (S.yetkiYukleniyor) { app.className = ''; app.innerHTML = '<div class="auth"><section class="auth-form"><div class="auth-box"><h2>Giriş yapılıyor…</h2></div></section></div>'; return; }
+    if (S.yetkiHata) { app.className = ''; app.innerHTML = `<div class="auth"><section class="auth-form"><div class="auth-box"><h2>Panele erişim yok</h2><div class="msg err">${esc(S.yetkiHata)}</div><button class="btn dark" data-act="logout" style="margin-top:10px">Çıkış yap</button></div></section></div>`; return; }
+    const izinsiz = !izin(S.route);
+    const v = izinsiz ? () => head('Yetki', 'Bu sayfaya erişiminiz yok', 'Yönetici bu sayfayı sizin için açmamış.') + '<div class="card empty"><h3>Yetkiniz yok</h3><p>Açmasını istiyorsanız yöneticiyle görüşün.</p><button class="btn dark" data-go="panel">Panele dön</button></div>' : views[S.route] || views.panel;
     const keepScroll = window.scrollY, focusId = ae?.tagName === 'SELECT' ? '' : ae?.id, sel = ae?.selectionStart, selSon = ae?.selectionEnd ?? sel;
     app.className = ''; app.innerHTML = shell(v());
-    views['bind_' + S.route]?.();
+    if (!izinsiz) views['bind_' + S.route]?.();
     if (focusId) { const f = document.getElementById(focusId); if (f) { f.focus(); try { f.setSelectionRange(sel, selSon); } catch {} } }
     if (S.keepScroll) window.scrollTo({ top: keepScroll }); S.keepScroll = false;
   }
@@ -269,7 +302,7 @@ window.CLK = (() => {
     if (act === 'logout') sb.auth.signOut();
     else if (act === 'reloadP') loadProducts(true);
     else if (act === 'reloadO') loadOrders(true);
-    else if (act === 'reloadU') { loadUsers(true); loadBalance(true); }
+    else if (act === 'reloadU') { loadUsers(true); if (herhangi(VERI.bakiye)) loadBalance(true); }
     else if (act === 'reloadB') loadBalance(true);
     else views.onAct?.(act, a, e);
   });
@@ -277,16 +310,25 @@ window.CLK = (() => {
   async function boot() {
     const { data } = await sb.auth.getSession();
     S.user = data.session?.user || null;
+    if (S.user) { S.yetkiYukleniyor = true; await yetkiOku().catch(() => {}); S.yetkiYukleniyor = false; }
     const h = location.hash.slice(1); if (h && (views[h] || h === 'yeni')) S.route = h;
     sb.auth.onAuthStateChange((_e, session) => {
       const was = !!S.user; S.user = session?.user || null;
-      if (S.user && !was) { S.route = S.route || 'panel'; prefetch(); }
+      if (!S.user) { S.yetki = null; S.yetkiHata = ''; }
+      if (S.user && !was) {
+        S.route = S.route || 'panel'; S.yetkiYukleniyor = true; render();
+        // onAuthStateChange içinde başka supabase çağrısı beklenmez (kilitlenir); bir sonraki turda okunur
+        setTimeout(async () => { await yetkiOku().catch(() => {}); S.yetkiYukleniyor = false; if (!S.yetkiHata) prefetch(); render(); }, 0);
+      }
       render();
     });
     window.addEventListener('hashchange', () => { const r = location.hash.slice(1); if (r && r !== S.route && (views[r] || r === 'yeni')) { S.route = r; render(); } });
-    render(); if (S.user) prefetch();
+    render(); if (S.user && !S.yetkiHata) prefetch();
   }
-  function prefetch() { loadProducts(); loadOrders(); loadUsers(); loadBalance(); }
+  // personel yalnız yetkili olduğu verileri yükler (sunucu da yetkisizine vermez)
+  const herhangi = l => l.some(izin);
+  const VERI = { siparis: ['siparisler', 'siparisgir', 'musteriler', 'cari', 'ciro'], musteri: ['musteriler', 'cari', 'siparisgir', 'siparisler', 'ekstre'], bakiye: ['cari', 'ekstre'] };
+  function prefetch() { loadProducts(); if (herhangi(VERI.siparis)) loadOrders(); if (herhangi(VERI.musteri)) loadUsers(); if (herhangi(VERI.bakiye)) loadBalance(); }
 
-  return { araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
+  return { kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
 })();

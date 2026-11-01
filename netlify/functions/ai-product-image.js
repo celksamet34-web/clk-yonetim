@@ -199,6 +199,9 @@ exports.handler = async event => {
   try {
     const user = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}` } });
     if (!user.ok) return reply(401, { success: false, message: 'Oturum geçersiz veya süresi dolmuş.' });
+    // personel yetkisi (celik 01.11.2026): yalnız yönetici ya da bu sayfalardan birine izni olan personel
+    const yetki = await fetch(`${SUPABASE_URL}/rest/v1/rpc/panel_yetki`, { method: 'POST', headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ istenen: ['yeni', 'urunler', 'stok', 'banner'] }) });
+    if (yetki.status !== 404 && !(yetki.ok && (await yetki.json().catch(() => false)) === true)) return reply(403, { success: false, message: 'Bu işlem için yetkiniz yok.' });
     const body = JSON.parse(event.body || '{}');
     if (body.action === 'falResult') {
       if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });

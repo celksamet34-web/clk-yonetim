@@ -8,8 +8,8 @@
       <div><h1>Çanta işini tek ekrandan yönet.</h1><p>Stok, siparişler, müşteriler ve cari hesaplar Qukasoft ile eşleşik. Yeni ürünü telefonla fotoğraflayıp dakikalar içinde yayına al.</p></div>
       <small style="color:#7d766b;letter-spacing:.2em;font-size:10px">CLK ÇANTA · YÖNETİM</small></section>
     <section class="auth-form"><form class="auth-box" id="login">
-      <h2>Giriş yap</h2><p class="sub">Ürün formunda kullandığın hesapla devam et.</p>
-      <label class="f"><span>E-posta</span><input type="email" id="lg-mail" autocomplete="email" required></label>
+      <h2>Giriş yap</h2><p class="sub">Personel, yöneticinin verdiği kullanıcı adı ve şifreyle girer.</p>
+      <label class="f"><span>Kullanıcı adı veya e-posta</span><input type="text" id="lg-mail" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
       <label class="f"><span>Şifre</span><input type="password" id="lg-pass" autocomplete="current-password" required></label>
       <div id="lg-msg"></div>
       <button class="btn dark" type="submit" style="margin-top:6px">Giriş yap</button>
@@ -17,8 +17,8 @@
   views.bindAuth = () => {
     $('#login').addEventListener('submit', async e => {
       e.preventDefault(); const b = e.target.querySelector('button'); b.disabled = true; b.textContent = 'Giriş yapılıyor…';
-      const { error } = await sb.auth.signInWithPassword({ email: $('#lg-mail').value.trim(), password: $('#lg-pass').value });
-      if (error) { $('#lg-msg').innerHTML = `<div class="msg err">E-posta veya şifre hatalı.</div>`; b.disabled = false; b.textContent = 'Giriş yap'; }
+      const { error } = await sb.auth.signInWithPassword({ email: CLK.girisEposta($('#lg-mail').value), password: $('#lg-pass').value });
+      if (error) { $('#lg-msg').innerHTML = `<div class="msg err">Kullanıcı adı ya da şifre hatalı.</div>`; b.disabled = false; b.textContent = 'Giriş yap'; }
     });
   };
 
@@ -48,7 +48,9 @@
 
   /* ---------- panel ---------- */
   views.panel = () => {
-    const acts = `<button class="btn sm" data-act="reloadAll">Yenile</button><button class="btn dark sm" data-go="yeni">+ Yeni ürün</button>`;
+    const acts = `<button class="btn sm" data-act="reloadAll">Yenile</button>${CLK.izin('yeni') ? '<button class="btn dark sm" data-go="yeni">+ Yeni ürün</button>' : ''}`;
+    // personel yalnız yetkili olduğu rakamları görür (ciro/kâr/stok değeri, sipariş, cari, çek-senet)
+    const gor = { ciro: CLK.izin('ciro'), sip: CLK.izin('siparisler'), cari: CLK.izin('cari'), cek: CLK.izin('cek') };
     if (!S.products.length && !S.orders.length && (S.pLoading || S.oLoading)) return head('Genel bakış', 'Panel', 'Qukasoft verileri alınıyor…', acts) + skel();
     const PR = S.products, on = PR.filter(P.on);
     const cost = PR.reduce((a, p) => a + P.qty(p) * (+p.buyPrice || 0), 0);
@@ -62,28 +64,28 @@
     return head('Genel bakış', 'Panel', `Son güncelleme ${CLK.S.pAt ? CLK.S.pAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—'}`, acts) + `
     <div class="stack">
       <div class="kpis">
-        <div class="kpi hero"><div class="k">Son ${per === 365 ? '12 ay' : per + ' gün'} ciro</div><div class="v">${tlc(s30.rev)}</div><div class="s">${num(s30.cnt)} sipariş · tahmini brüt kâr ${tlc(s30.profit)}</div></div>
-        <div class="kpi tikla" data-act="bekleyenGit" role="link" tabindex="0" title="Bekleyen siparişleri aç"><div class="k">Bekleyen sipariş</div><div class="v">${num(pend.length)}</div><div class="s">yeni ve hazırlanan</div></div>
-        <div class="kpi"><div class="k">Stok değeri</div><div class="v">${tlc(cost)}</div><div class="s">${num(PR.length)} ürün · alış fiyatıyla</div></div>
-        <div class="kpi ${debt < 0 ? 'bad' : ''}"><div class="k">Açık cari</div><div class="v">${tlc(Math.abs(debt))}</div><div class="s">${num(S.users.filter(u => (Number(u.balance) || 0) < 0).length)} müşteri borçlu</div></div>
+        ${gor.ciro ? `<div class="kpi hero"><div class="k">Son ${per === 365 ? '12 ay' : per + ' gün'} ciro</div><div class="v">${tlc(s30.rev)}</div><div class="s">${num(s30.cnt)} sipariş · tahmini brüt kâr ${tlc(s30.profit)}</div></div>` : ''}
+        ${gor.sip ? `<div class="kpi tikla" data-act="bekleyenGit" role="link" tabindex="0" title="Bekleyen siparişleri aç"><div class="k">Bekleyen sipariş</div><div class="v">${num(pend.length)}</div><div class="s">yeni ve hazırlanan</div></div>` : ''}
+        ${gor.ciro ? `<div class="kpi"><div class="k">Stok değeri</div><div class="v">${tlc(cost)}</div><div class="s">${num(PR.length)} ürün · alış fiyatıyla</div></div>` : `<div class="kpi"><div class="k">Ürün</div><div class="v">${num(PR.length)}</div><div class="s">${num(on.length)} yayında · ${num(out.length)} tükenen</div></div>`}
+        ${gor.cari ? `<div class="kpi ${debt < 0 ? 'bad' : ''}"><div class="k">Açık cari</div><div class="v">${tlc(Math.abs(debt))}</div><div class="s">${num(S.users.filter(u => (Number(u.balance) || 0) < 0).length)} müşteri borçlu</div></div>` : ''}
       </div>
-      ${CLK.senetPanel ? CLK.senetPanel.html() : ''}
+      ${CLK.senetPanel && gor.cek ? CLK.senetPanel.html() : ''}
       <div class="card"><div class="card-h"><div><h3>Kategoriler</h3><p class="sub">Üst kategoriler · seçince alt kategorilere ve ürünlere geçilir</p></div><button class="btn sm ghost" data-go="urunler">Tümü</button></div>${views.catTiles(S.products, true)}</div>
-      <div class="grid2">
+      ${gor.ciro ? `<div class="grid2">
         <div class="card"><div class="card-h"><div><h3>Aylık ciro</h3><p class="sub">Son 6 ay · iade ve iptaller hariç</p></div></div>
           <div class="chart">${mon.map(x => `<div class="col"><div class="colbar" style="height:${Math.max(2, x.v / mx * 100)}%" title="${tl(x.v)}"><span>${x.v ? tlc(x.v) : ''}</span></div><small>${x.label}</small></div>`).join('')}</div></div>
         <div class="card"><div class="card-h"><div><h3>En çok satanlar</h3><p class="sub">${s30.top.length ? (per === 365 ? 'Son 12 ay' : 'Son ' + per + ' gün') : 'Tüm zamanlar'} · adet bazında</p></div><button class="btn sm ghost" data-go="siparisler">Siparişler</button></div>
           ${top.length ? `<ul class="rows">${top.map((t, i) => `<li data-edit="${esc(t.code)}"><span class="rank">${i + 1}</span><div class="t"><b>${esc(t.name)}</b><small>${esc(t.code)} · ${tl(t.rev)}</small></div><span class="pill gold">${num(t.q)} adet</span></li>`).join('')}</ul>` : '<p class="sub">Henüz satış yok.</p>'}</div>
-      </div>
+      </div>` : ''}
       <div class="grid2">
-        <div class="card"><div class="card-h"><div><h3>Bekleyen siparişler</h3><p class="sub">Hazırlanması gereken siparişler</p></div><button class="btn sm ghost" data-act="bekleyenGit">Tümü</button></div>
-          ${pend.length ? `<ul class="rows">${pend.slice(0, 6).map(o => `<li data-order="${O.id(o)}"><span class="th ord">${esc(String(O.code(o)).slice(-4))}</span><div class="t"><b>${esc(O.cust(o))}</b><small>${esc(O.code(o))} · ${dt(O.date(o))} · ${O.items(o).length} kalem</small></div><b class="num">${tl(O.total(o))}</b></li>`).join('')}</ul>` : '<p class="sub">Bekleyen sipariş yok.</p>'}</div>
+        ${gor.sip ? `<div class="card"><div class="card-h"><div><h3>Bekleyen siparişler</h3><p class="sub">Hazırlanması gereken siparişler</p></div><button class="btn sm ghost" data-act="bekleyenGit">Tümü</button></div>
+          ${pend.length ? `<ul class="rows">${pend.slice(0, 6).map(o => `<li data-order="${O.id(o)}"><span class="th ord">${esc(String(O.code(o)).slice(-4))}</span><div class="t"><b>${esc(O.cust(o))}</b><small>${esc(O.code(o))} · ${dt(O.date(o))} · ${O.items(o).length} kalem</small></div><b class="num">${tl(O.total(o))}</b></li>`).join('')}</ul>` : '<p class="sub">Bekleyen sipariş yok.</p>'}</div>` : ''}
         <div class="card"><div class="card-h"><div><h3>Stok uyarıları</h3><p class="sub">Aktif ürünlerde tükenen ve kritik seviyedekiler</p></div>${out.length + low.length ? `<button class="btn sm ghost" data-act="toAlerts">Tümü (${out.length + low.length})</button>` : ''}</div>
           ${alerts.length ? `<ul class="rows">${alerts.map(p => `<li data-edit="${esc(p.code)}">${thumb(p)}<div class="t"><b>${esc(p.name)}</b><small>${esc(p.code)} · ${esc(P.cat(p))}</small></div><span class="pill ${P.qty(p) <= 0 ? 'bad' : 'warn'}">${P.qty(p) <= 0 ? 'Tükendi' : P.qty(p) + ' adet'}</span></li>`).join('')}</ul>` : '<p class="sub">Uyarı yok.</p>'}</div>
       </div>
     </div>`;
   };
-  views.bind_panel = () => { CLK.senetPanel?.bind(); };
+  views.bind_panel = () => { if (CLK.izin('cek')) CLK.senetPanel?.bind(); };
 
   /* ---------- ürünler: kategoriye göre ---------- */
   const U = (S.ui.p ||= { q: '', path: [], all: false, f: 'all', shown: 48 });
@@ -193,7 +195,7 @@
   /* ortak eylemler */
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
-    if (act === 'reloadAll') { CLK.loadProducts(true); CLK.loadOrders(true); CLK.loadUsers(true); CLK.loadBalance(true); }
+    if (act === 'reloadAll') { const V = CLK.VERI; CLK.loadProducts(true); if (CLK.herhangi(V.siparis)) CLK.loadOrders(true); if (CLK.herhangi(V.musteri)) CLK.loadUsers(true); if (CLK.herhangi(V.bakiye)) CLK.loadBalance(true); }
     else if (act === 'pMore') { U.shown += 48; S.keepScroll = true; render(); }
     else if (act === 'sMore') { T.shown += 80; S.keepScroll = true; render(); }
     else if (act === 'toAlerts') { T.f = 'alert'; go('stok'); }

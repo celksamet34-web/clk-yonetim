@@ -84,6 +84,8 @@
     if (S.uErr && !S.users.length) return head('İlişkiler', 'Müşteriler', '', acts) + errBox(S.uErr, 'reloadU');
     if (!S.users.length) return head('İlişkiler', 'Müşteriler', 'Alınıyor…', acts) + skel();
     const q = M.q.trim().toLocaleLowerCase('tr');
+    const cariGor = CLK.izin('cari'); // personel cari yetkisi yoksa bakiye görmez (sunucu da bakiyeyi göndermez)
+    if (!cariGor && (M.f === 'debt' || M.sort === 'balance')) { M.f = M.f === 'debt' ? 'all' : M.f; M.sort = M.sort === 'balance' ? 'spend' : M.sort; }
     let L = S.users.map(u => ({ u, s: custStats(u) })).filter(({ u }) => {
       if (M.f === 'dealer' && Number(u.dealerStatus) !== 1) return false;
       if (M.f === 'debt' && !((Number(u.balance) || 0) < 0)) return false;
@@ -95,14 +97,14 @@
     const dealers = S.users.filter(u => Number(u.dealerStatus) === 1).length, debtors = S.users.filter(u => (Number(u.balance) || 0) < 0);
     const ini = u => (userName(u).match(/\p{L}/gu) || ['?']).slice(0, 2).join('').toLocaleUpperCase('tr');
     return head('İlişkiler', 'Müşteriler', `${num(S.users.length)} kayıt`, acts) + `
-      <div class="mini-kpis"><div><span>Müşteri</span><b>${num(S.users.length)}</b></div><div><span>Aktif bayi</span><b>${num(dealers)}</b></div><div><span>Borçlu</span><b>${num(debtors.length)}</b></div><div><span>Toplam alacak</span><b>${tl(Math.abs(debtors.reduce((a, u) => a + Number(u.balance), 0)))}</b></div></div>
+      <div class="mini-kpis"><div><span>Müşteri</span><b>${num(S.users.length)}</b></div><div><span>Aktif bayi</span><b>${num(dealers)}</b></div>${cariGor ? `<div><span>Borçlu</span><b>${num(debtors.length)}</b></div><div><span>Toplam alacak</span><b>${tl(Math.abs(debtors.reduce((a, u) => a + Number(u.balance), 0)))}</b></div>` : ''}</div>
       <div class="card"><div class="tools"><input type="search" id="uq" placeholder="Ad, ünvan, telefon, e-posta, vergi no veya şehir ara" value="${esc(M.q)}">
-        <select id="usort">${[['spend', 'En çok alışveriş'], ['balance', 'Borç (çoktan)'], ['recent', 'En yeni kayıt'], ['name', 'Ada göre']].map(([k, l]) => `<option value="${k}" ${M.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-        <div class="chips">${[['all', 'Tümü'], ['dealer', 'Bayiler'], ['pending', 'Bayilik onayı bekleyen'], ['debt', 'Borçlu']].map(([k, l]) => `<button class="chip" data-uf="${k}" aria-pressed="${M.f === k}">${l}</button>`).join('')}</div>
+        <select id="usort">${[['spend', 'En çok alışveriş'], ['balance', 'Borç (çoktan)'], ['recent', 'En yeni kayıt'], ['name', 'Ada göre']].filter(([k]) => cariGor || k !== 'balance').map(([k, l]) => `<option value="${k}" ${M.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="chips">${[['all', 'Tümü'], ['dealer', 'Bayiler'], ['pending', 'Bayilik onayı bekleyen'], ['debt', 'Borçlu']].filter(([k]) => cariGor || k !== 'debt').map(([k, l]) => `<button class="chip" data-uf="${k}" aria-pressed="${M.f === k}">${l}</button>`).join('')}</div>
         <div class="clist">${L.map(({ u, s }) => { const bal = Number(u.balance) || 0; return `<button class="crow" data-user="${u.id}">
           <span class="av">${esc(ini(u))}</span><div class="c1"><b>${esc(userName(u))}</b><small>${esc(u.title && u.title !== userName(u) ? u.title + ' · ' : '')}${esc(u.phone || u.email || '')}${u.invoice?.city ? ' · ' + esc(u.invoice.city) : ''}</small></div>
           <div class="c2"><span>${num(s.n)} sipariş</span><b>${tl(s.spend)}</b></div>
-          <div class="c3">${Number(u.dealerStatus) === 1 ? '<span class="pill gold">Bayi</span>' : Number(u.dealerStatus) === 2 ? '<span class="pill warn">Onay bekliyor</span>' : ''}<b class="num ${bal < 0 ? 'neg' : bal > 0 ? 'pos' : ''}">${tl2(bal)}</b></div></button>`; }).join('') || '<p class="empty">Müşteri bulunamadı.</p>'}</div></div>`;
+          <div class="c3">${Number(u.dealerStatus) === 1 ? '<span class="pill gold">Bayi</span>' : Number(u.dealerStatus) === 2 ? '<span class="pill warn">Onay bekliyor</span>' : ''}${cariGor ? `<b class="num ${bal < 0 ? 'neg' : bal > 0 ? 'pos' : ''}">${tl2(bal)}</b>` : ''}</div></button>`; }).join('') || '<p class="empty">Müşteri bulunamadı.</p>'}</div></div>`;
   };
   views.bind_musteriler = () => {
     const q = $('#uq'); q?.addEventListener('input', () => { M.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
@@ -122,10 +124,10 @@
         <div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
         <div class="card"><div class="card-h"><div><h3>Siparişleri</h3><p class="sub">${os.length} sipariş</p></div></div>
           ${os.length ? `<div class="olist">${os.map(o => `<button class="orow" data-order="${O.id(o)}"><div class="o1"><b>${esc(O.code(o))}</b><small>${dtt(O.date(o))} · ${O.items(o).length} kalem</small></div><div class="o2">${O.items(o).slice(0, 2).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}</div><div class="o3"><b class="num">${tl(O.total(o))}</b>${st(O.status(o))}</div></button>`).join('')}</div>` : '<p class="sub">Sipariş yok.</p>'}</div>
-        <div class="card"><div class="card-h"><div><h3>Cari hareketler</h3><p class="sub">${bs.length} hareket</p></div></div>${ledger(bs, false)}</div>
+        ${CLK.izin('cari') ? `<div class="card"><div class="card-h"><div><h3>Cari hareketler</h3><p class="sub">${bs.length} hareket</p></div></div>${ledger(bs, false)}</div>` : ''}
       </div>
       <aside class="summary"><div class="sum-card">
-        <div><small style="color:#a99f90;letter-spacing:.16em;font-size:10px;font-weight:700">GÜNCEL BAKİYE</small><div class="big" style="color:${bal < 0 ? '#f0a39a' : 'var(--gold-2)'}">${tl2(bal)}</div><small style="color:#a99f90">${bal < 0 ? 'Müşterinin borcu' : bal > 0 ? 'Müşterinin alacağı' : 'Hesap kapalı'}</small></div>
+        ${CLK.izin('cari') ? `<div><small style="color:#a99f90;letter-spacing:.16em;font-size:10px;font-weight:700">GÜNCEL BAKİYE</small><div class="big" style="color:${bal < 0 ? '#f0a39a' : 'var(--gold-2)'}">${tl2(bal)}</div><small style="color:#a99f90">${bal < 0 ? 'Müşterinin borcu' : bal > 0 ? 'Müşterinin alacağı' : 'Hesap kapalı'}</small></div>` : ''}
         <dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>E-posta</dt><dd style="word-break:break-all">${esc(u.email || '—')}</dd>
           ${u.taxId ? `<dt>Vergi</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId)}</dd>` : ''}<dt>Fiyat grubu</dt><dd>${esc(prices[u.priceType] || 'Varsayılan')}</dd>
           <dt>İskonto</dt><dd>%${num(u.discountRate)}</dd><dt>Açık hesap limiti</dt><dd>${Number(u.nBalanceStatus) === 1 ? (Number(u.nBalanceLimit) ? tl(u.nBalanceLimit) : 'Limitsiz') : 'Kapalı'}</dd>
