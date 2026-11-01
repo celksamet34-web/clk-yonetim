@@ -453,4 +453,102 @@
     }
     else prevAct?.(act, el, e);
   };
+
+  /* ---------- Panel: senetlerin tahsil durumu (celik 01.11.2026: "Ana sayfada senetlerde tahsil edilmiş ve edilecek total…
+     Ödenenler yeşil, ödenecekler turuncu, ödenmeyen kırmızı. Müşteri bazlı da ödenen ve ödenecek olanları ayrı görelim")
+     Müşteri tarafı: müşteriden alınan evrak (portföyde duran ve tedarikçiye ciro edilen).
+       Yeşil  = Paraşüt'te tahsil edilen kısım; ciro edilip vadesi geçen evrak da (karşılıksız dönmediyse) müşteri ödemiş sayılır.
+       Turuncu = vadesi gelmemiş portföy ve ciro evrakı (vadesi bugün olan dahil).
+       Kırmızı = vadesi geçmiş, Paraşüt'te tahsil edilmemiş portföy evrakı.
+     Tedarikçi tarafı: firmanın verdiği evrak (ödendi / ödenecek / vadesi geçti, ödenmedi). Yalnız TL evrak toplanır. */
+  const PN = (S.ui.csp ||= { yon: 'alinan', tur: 'senet', ara: '', acik: '', hepsi: false, denendi: false, at: 0 });
+  const pnAl = () => PN.yon !== 'verilen';
+  const pnKisi = c => (c.yon === 'verilen' ? { id: c.kimeId, ad: c.kime } : { id: c.kimdenId, ad: c.kimden });
+  function pnParca(c) {
+    const t = bugun();
+    if (c.yon === 'ciro') return c.vade < t ? { y: c.tutar, t: 0, k: 0, ciro: 0 } : { y: 0, t: c.tutar, k: 0, ciro: c.tutar };
+    const kalan = Math.max(0, Math.min(c.tutar, Number(c.kalan) || 0)), gec = kalan > 0.009 && (c.vade < t || c.durum === 'overdue');
+    return { y: c.tutar - kalan, t: gec ? 0 : kalan, k: gec ? kalan : 0, ciro: 0 };
+  }
+  function pnOzet() {
+    const al = pnAl(), ay = bugun().slice(0, 7), top = { y: 0, t: 0, k: 0, ciro: 0, ny: 0, nt: 0, nk: 0, buAy: 0, ciroY: 0 }, kisi = {};
+    let dvz = 0;
+    for (const c of D.v?.cekler || []) {
+      if (al ? !(c.yon === 'alinan' || c.yon === 'ciro') : c.yon !== 'verilen') continue;
+      if (PN.tur !== 'hepsi' && (PN.tur === 'senet') !== senetMi(c)) continue;
+      if (c.doviz && c.doviz !== 'TRL') { dvz++; continue; }
+      const p = pnParca(c), ki = pnKisi(c), ad = String(ki.ad || '').trim() || 'Kişi yok', key = ki.id || ad;
+      const k = (kisi[key] ||= { id: key, ad, y: 0, t: 0, k: 0, n: 0, sonraki: '', gecGun: 0, l: [] });
+      for (const a of ['y', 't', 'k']) { top[a] += p[a]; k[a] += p[a]; }
+      if (p.y > 0.009) { top.ny++; if (c.yon === 'ciro') top.ciroY += p.y; }
+      if (p.t > 0.009) { top.nt++; if (c.vade.startsWith(ay)) top.buAy += p.t; if (!k.sonraki || c.vade < k.sonraki) k.sonraki = c.vade; }
+      if (p.k > 0.009) { top.nk++; k.gecGun = Math.max(k.gecGun, -gunFark(c.vade)); }
+      top.ciro += p.ciro; k.n++; k.l.push(c);
+    }
+    const kisiler = Object.values(kisi).sort((a, b) => b.k - a.k || b.t - a.t || b.y - a.y || a.ad.localeCompare(b.ad, 'tr'));
+    return { top, kisiler, dvz };
+  }
+  const pnTutar = (v, cls) => v > 0.009 ? `<b class="${cls}">${tl(v)}</b>` : '<b class="sp-yok">—</b>';
+  function pnEvrakDurum(c) {
+    const p = pnParca(c), n = gunFark(c.vade), al = c.yon !== 'verilen';
+    if (p.k > 0.009) return `<span class="sp-d k">${-n} gün geçti${p.y > 0.009 ? `, ${tl(p.k)} kaldı` : ''}</span>`;
+    if (p.t > 0.009) return `<span class="sp-d t">${c.yon === 'ciro' ? 'Ciroda, ' : ''}${n === 0 ? 'vadesi bugün' : n + ' gün kaldı'}${p.y > 0.009 ? `, ${tl(p.t)} kaldı` : ''}</span>`;
+    return `<span class="sp-d y">${c.yon === 'ciro' ? 'Ciro edildi, vadesi geçti' : al ? 'Tahsil edildi' : 'Ödendi'}</span>`;
+  }
+  function pnEvraklar(k) {
+    const l = k.l.slice().sort((a, b) => { const r = x => { const p = pnParca(x); return p.k > 0.009 ? 0 : p.t > 0.009 ? 1 : 2; }; return r(a) - r(b) || (r(a) === 2 ? b.vade.localeCompare(a.vade) : a.vade.localeCompare(b.vade)); });
+    return `<div class="sp-ev">${l.map(c => {
+      const p = pnParca(c), cls = p.k > 0.009 ? 'k' : p.t > 0.009 ? 't' : 'y', bk = banka(c);
+      return `<div class="sp-e ${cls}"><span class="sp-e-n"><b>${esc(tur(c))}${c.seri ? ' ' + esc(c.seri) : ''}</b>${bk ? `<small>${esc(bk)}</small>` : ''}</span>
+        <span class="sp-e-t">Alış ${dt(c.tarih)}<br>Vade ${dt(c.vade)}</span><b class="sp-e-v">${tl(c.tutar)}</b>${pnEvrakDurum(c)}</div>`;
+    }).join('')}</div>`;
+  }
+  function pnTablo(o) {
+    const al = pnAl(), q = PN.ara.trim().toLocaleLowerCase('tr');
+    const l = q ? o.kisiler.filter(k => k.ad.toLocaleLowerCase('tr').includes(q)) : o.kisiler, EN = 8, g = PN.hepsi || q ? l : l.slice(0, EN);
+    if (!o.kisiler.length) return `<p class="sp-bos">${al ? 'Müşteriden alınmış' : 'Tedarikçiye verilmiş'} ${PN.tur === 'cek' ? 'çek' : PN.tur === 'senet' ? 'senet' : 'evrak'} yok.</p>`;
+    return `<div class="sp-r sp-bas"><span>${al ? 'Müşteri' : 'Tedarikçi'}</span><span class="y">${al ? 'Tahsil edildi' : 'Ödendi'}</span><span class="t">${al ? 'Tahsil edilecek' : 'Ödenecek'}</span><span class="k">Ödenmedi</span></div>
+      ${g.map(k => `<button class="sp-r ${PN.acik === k.id ? 'acik' : ''}" data-act="spAc" data-id="${esc(k.id)}" aria-expanded="${PN.acik === k.id}">
+        <span class="sp-ad"><b>${esc(k.ad)}</b><small>${num(k.n)} evrak${k.gecGun ? ` · <em class="k">${num(k.gecGun)} gün gecikme</em>` : k.sonraki ? ` · sonraki vade ${dt(k.sonraki)}` : ''}</small></span>
+        ${pnTutar(k.y, 'y')}${pnTutar(k.t, 't')}${pnTutar(k.k, 'k')}</button>${PN.acik === k.id ? pnEvraklar(k) : ''}`).join('') || '<p class="sp-bos">Aramaya uyan kişi yok.</p>'}
+      ${!q && l.length > EN ? `<div class="sp-alt"><button class="btn sm ghost" data-act="spHepsi">${PN.hepsi ? 'Daha az göster' : `Tümünü göster (${num(l.length)})`}</button></div>` : ''}`;
+  }
+  function panelSenet() {
+    const ust = (alt) => `<div class="card-h"><div><h3>Senetler</h3><p class="sub">${alt}</p></div><button class="btn sm ghost" data-go="cek">Çek ve senet</button></div>`;
+    if (!D.v) return `<div class="card sp" id="spKart">${ust('Paraşüt\'ten okunuyor…')}${D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn sm" data-act="spYenile" style="margin-top:10px">Tekrar dene</button>` : '<div class="skel" style="height:170px"></div>'}</div>`;
+    const o = pnOzet(), t = o.top, T = t.y + t.t + t.k, al = pnAl(), zm = D.v.zaman ? new Date(D.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const seg = (act, deger, l) => `<div class="gd-seg" role="group">${l.map(([k, ad]) => `<button data-act="${act}" data-o="${k}" aria-pressed="${deger === k}">${ad}</button>`).join('')}</div>`;
+    const kutu = (c, ad, v, alt) => `<div class="sp-k ${c}"><span>${ad}</span><b>${tl(v)}</b><small>${alt}</small></div>`;
+    return `<div class="card sp" id="spKart">${ust(`${al ? 'Müşteriden alınan' : 'Tedarikçiye verdiğimiz'} ${PN.tur === 'cek' ? 'çekler' : PN.tur === 'senet' ? 'senetler' : 'çek ve senetler'} · Paraşüt${zm ? ', ' + zm : ''}${D.yuk ? ' · yenileniyor…' : ''}`)}
+      <div class="sp-secim">${seg('spYon', PN.yon, [['alinan', 'Müşteriden alınan'], ['verilen', 'Tedarikçiye verilen']])}${seg('spTur', PN.tur, [['senet', 'Senet'], ['cek', 'Çek'], ['hepsi', 'Hepsi']])}</div>
+      <div class="sp-kutular">
+        ${kutu('y', al ? 'Tahsil edildi' : 'Ödendi', t.y, `${num(t.ny)} evrak${al && t.ciroY > 0.009 ? ` · ${tl(t.ciroY)} ciro edilip vadesi geçen` : ''}`)}
+        ${kutu('t', al ? 'Tahsil edilecek' : 'Ödenecek', t.t, `${num(t.nt)} evrak${t.buAy > 0.009 ? ` · bu ay ${tl(t.buAy)}` : ''}${t.ciro > 0.009 ? ` · ${tl(t.ciro)} ciroda` : ''}`)}
+        ${kutu('k', 'Ödenmedi', t.k, t.nk ? `${num(t.nk)} evrak, vadesi geçti` : 'Vadesi geçmiş evrak yok')}
+      </div>
+      ${T > 0.009 ? `<div class="sp-bar" aria-hidden="true">${['y', 't', 'k'].map(a => t[a] > 0.009 ? `<i class="${a}" style="width:${(t[a] / T * 100).toFixed(2)}%"></i>` : '').join('')}</div>` : ''}
+      <div class="sp-ara"><h4>${al ? 'Müşteri bazında' : 'Tedarikçi bazında'}</h4><input id="spAra" type="search" placeholder="${al ? 'Müşteri' : 'Tedarikçi'} ara" value="${esc(PN.ara)}" autocomplete="off" aria-label="Kişi ara"></div>
+      <div class="sp-tablo" id="spTablo">${pnTablo(o)}</div>
+      <p class="sp-not">${al ? 'Ciro edilip vadesi geçen evrak, müşteriye geri dönmediyse ödenmiş sayılır. ' : ''}${o.dvz ? `${num(o.dvz)} döviz evrakı toplama katılmadı. ` : ''}Satıra dokununca evraklar açılır.</p>
+    </div>`;
+  }
+  CLK.senetPanel = {
+    html: panelSenet,
+    bind() {
+      // ilk açılışta ve 10 dakikadan eski veride Paraşüt listesi (sunucuda 10 dk saklanır) arka planda alınır
+      if (!D.yuk && (!D.v ? !PN.denendi : Date.now() - PN.at > 10 * 6e4)) { PN.denendi = true; PN.at = Date.now(); setTimeout(() => yukle(false), 0); }
+      const a = $('#spAra');
+      a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { PN.ara = a.value; PN.acik = ''; const b = $('#spTablo'); if (b) b.innerHTML = pnTablo(pnOzet()); }, 180); });
+    }
+  };
+  const prevAct2 = views.onAct;
+  views.onAct = (act, el, e) => {
+    const ciz = () => { S.keepScroll = true; render(); };
+    if (act === 'spYon') { if (PN.yon !== el.dataset.o) { PN.yon = el.dataset.o; PN.acik = ''; PN.hepsi = false; PN.ara = ''; } ciz(); }
+    else if (act === 'spTur') { PN.tur = el.dataset.o; PN.acik = ''; ciz(); }
+    else if (act === 'spAc') { PN.acik = PN.acik === el.dataset.id ? '' : el.dataset.id; const b = $('#spTablo'); if (b) b.innerHTML = pnTablo(pnOzet()); else ciz(); }
+    else if (act === 'spHepsi') { PN.hepsi = !PN.hepsi; const b = $('#spTablo'); if (b) b.innerHTML = pnTablo(pnOzet()); }
+    else if (act === 'spYenile') { D.hata = ''; PN.at = Date.now(); yukle(false); }
+    else prevAct2?.(act, el, e);
+  };
 })();
