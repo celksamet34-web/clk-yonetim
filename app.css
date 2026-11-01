@@ -916,3 +916,6 @@ body{font-size:15px;letter-spacing:0}
   .sn-pf-r .cs-sag{grid-column:3}
   .sn-pf{max-height:none}
 }
+/* Tahsilat makbuzu */
+.cs-m-gun{max-width:440px;margin-top:12px}
+.cs-m-gun select{width:100%}

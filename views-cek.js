@@ -11,7 +11,7 @@
     FINANSBANK: 'QNB', YAPIKREDI: 'Yapı Kredi', DENIZBANK: 'Denizbank', AKBANK: 'Akbank', TEB: 'TEB', ALBARAKA: 'Albaraka Türk', ISBANKASI: 'İş Bankası', KUVEYTTURK: 'Kuveyt Türk',
     ING: 'ING', SEKERBANK: 'Şekerbank', ODEABANK: 'Odeabank', HSBC: 'HSBC', VAKIFKATILIM: 'Vakıf Katılım', ZIRAATKATILIM: 'Ziraat Katılım', EMLAKKATILIM: 'Emlak Katılım',
     FIBABANKA: 'Fibabanka', ANADOLUBANK: 'Anadolubank', ALTERNATIFBANK: 'Alternatif Bank', BURGAN: 'Burgan Bank' };
-  const D = (S.ui.cs ||= { v: null, yuk: false, hata: '', sekme: 'odenecek', ara: '', ay: '', goster: 60, rm: '', rGecmis: false, rResim: '', rDurum: '', rHazir: false });
+  const D = (S.ui.cs ||= { v: null, yuk: false, hata: '', sekme: 'odenecek', ara: '', ay: '', goster: 60, rm: '', rGecmis: false, rResim: '', rDurum: '', rHazir: false, rTur: 'rapor', mTarih: '', rMakbuz: null });
   let rBlob = null;
   const bugun = () => new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
   const gunFark = v => Math.round((Date.parse(v) - Date.parse(bugun())) / 864e5);
@@ -139,6 +139,124 @@
     return c.yon === 'alinan' ? ['Vadesi geçti', '#b42318'] : ['Vadesi geldi', '#5b6475'];
   };
 
+  /* ---------- tahsilat makbuzu (celik 01.11.2026: "heh tahsilat makbuzu", "bunu demeye çalıştım") ----------
+     Müşteriden alınan çek ve senetler için müşteriye verilen makbuz: evraklar, toplam ve yazıyla tutar, teslim eden / teslim alan imza yerleri.
+     Senet gir sayfası da kullanır (CLK.makbuz). */
+  const BIR = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz'], ONL = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan'];
+  const uclu = n => [Math.floor(n / 100) ? (Math.floor(n / 100) > 1 ? BIR[Math.floor(n / 100)] + ' ' : '') + 'yüz' : '', ONL[Math.floor(n % 100 / 10)], BIR[n % 10]].filter(Boolean).join(' ');
+  function yaziyla(v) {
+    const kurus = Math.round(Number(v) * 100), lira = Math.floor(kurus / 100), kr = kurus % 100, adlar = ['milyar', 'milyon', 'bin', ''];
+    const parca = [Math.floor(lira / 1e9) % 1000, Math.floor(lira / 1e6) % 1000, Math.floor(lira / 1e3) % 1000, lira % 1000]
+      .map((x, i) => (!x ? '' : i === 2 && x === 1 ? 'bin' : [uclu(x), adlar[i]].filter(Boolean).join(' '))).filter(Boolean);
+    const t = (parca.join(' ') || 'sıfır') + ' Türk lirası' + (kr ? ' ' + uclu(kr) + ' kuruş' : '');
+    return t.charAt(0).toLocaleUpperCase('tr') + t.slice(1);
+  }
+  const evrakTur = l => { const s = l.filter(senetMi).length; return s === l.length ? 'senet' : s ? 'çek ve senet' : 'çek'; };
+  // m: { kisi, tarih, evraklar: [{ seri, banka, bankaAd, vade, tutar }] }
+  function makbuzCiz(m) {
+    const l = m.evraklar || [], W = 1080, P = 56, SAT = 52, F = "system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+    const top = l.reduce((s, e) => s + e.tutar, 0);
+    const H = 620 + (l.length + 1) * SAT + 400;
+    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+    const g = cv.getContext('2d'); g.scale(2, 2);
+    const yaz = (t, x, y, { b = 400, z = 20, r = false, renk = '#1d2433' } = {}) => { g.font = `${b} ${z}px ${F}`; g.fillStyle = renk; g.textAlign = r ? 'right' : 'left'; g.fillText(t, x, y); };
+    const kisalt = (t, z, en, b = 400) => { t = String(t || ''); g.font = `${b} ${z}px ${F}`; while (t.length > 4 && g.measureText(t).width > en) t = t.slice(0, -2).trimEnd() + '…'; return t; };
+    const sigdir = (t, z, en, b = 400) => { for (; z > 13; z--) { g.font = `${b} ${z}px ${F}`; if (g.measureText(t).width <= en) break; } return z; };
+    const kutu = (x, y, w, h, rd, renk, cizgi) => { g.beginPath(); g.roundRect(x, y, w, h, rd); if (renk) { g.fillStyle = renk; g.fill(); } if (cizgi) { g.strokeStyle = cizgi; g.lineWidth = 1.5; g.stroke(); } };
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    yaz('CLK ÇANTA', P, 86, { b: 800, z: 38 });
+    yaz('Birlik Mah. 873 Sok. No:2/A Esenler / İstanbul', P, 118, { z: 18, renk: '#5b6475' });
+    yaz('0534 077 88 67', P, 144, { z: 18, renk: '#5b6475' });
+    yaz('TAHSİLAT MAKBUZU', W - P, 86, { b: 800, z: 28, r: true });
+    yaz('Tarih ' + trE(m.tarih), W - P, 118, { b: 700, z: 19, r: true });
+    g.fillStyle = '#1d2433'; g.fillRect(P, 168, W - 2 * P, 4);
+    yaz('Sayın', P, 214, { z: 17, renk: '#5b6475' });
+    yaz(kisalt(m.kisi, 30, W - 2 * P, 800), P, 250, { b: 800, z: 30 });
+    kutu(P, 278, W - 2 * P, 104, 14, '#1d2433');
+    yaz('Tahsil edilen', P + 30, 322, { z: 20, renk: '#fff' });
+    yaz(`${evrakTur(l)} (${l.length} adet)`, P + 30, 352, { z: 20, renk: '#fff' });
+    yaz(tlE(top), W - P - 30, 348, { b: 800, z: 44, r: true, renk: '#fff' });
+    kutu(P, 402, W - 2 * P, 84, 12, null, '#dde2ea');
+    yaz('Yalnız', P + 18, 434, { z: 16, renk: '#5b6475' });
+    const yt = yaziyla(top), yz = sigdir(yt, 22, W - 2 * P - 36, 700);
+    yaz(yt, P + 18, 468, { b: 700, z: yz });
+    const kol = { n: P + 6, e: P + 52, v: 640, t: W - P - 6 };
+    let y = 536;
+    [['#', kol.n], ['EVRAK', kol.e], ['VADE', kol.v]].forEach(([t, x]) => yaz(t, x, y, { b: 700, z: 14, renk: '#5b6475' }));
+    yaz('TUTAR', kol.t, y, { b: 700, z: 14, r: true, renk: '#5b6475' });
+    g.fillStyle = '#1d2433'; g.fillRect(P, y + 12, W - 2 * P, 3);
+    y += 15;
+    for (const [i, e] of l.entries()) {
+      if (i % 2) { g.fillStyle = '#f7f8fa'; g.fillRect(P, y, W - 2 * P, SAT); }
+      const yy = y + 33;
+      yaz(String(i + 1), kol.n, yy, { z: 17, renk: '#5b6475' });
+      yaz(kisalt(evrakAdi(e), 18, kol.v - kol.e - 24), kol.e, yy, { z: 18 });
+      yaz(trE(e.vade), kol.v, yy, { b: 700, z: 18 });
+      yaz(tlE(e.tutar), kol.t, yy, { b: 700, z: 18, r: true });
+      y += SAT;
+    }
+    g.fillStyle = '#1d2433'; g.fillRect(P, y + 4, W - 2 * P, 2);
+    yaz('TOPLAM', kol.e, y + 40, { b: 800, z: 18 });
+    yaz(tlE(top), kol.t, y + 40, { b: 800, z: 20, r: true });
+    y += SAT + 14;
+    yaz(`Yukarıdaki ${evrakTur(l)} cari hesabınıza karşılık alınmıştır.`, P, y + 26, { z: 18, renk: '#1d2433' });
+    yaz('Çek ve senetle yapılan ödemeler, evrak vadesinde tahsil edildikten sonra geçerlidir.', P, y + 56, { z: 17, renk: '#5b6475' });
+    y += 86;
+    const kw = (W - 2 * P - 12) / 2;
+    [['TESLİM EDEN', m.kisi], ['TESLİM ALAN', 'CLK ÇANTA']].forEach(([t, ad], i) => {
+      const x = P + i * (kw + 12);
+      kutu(x, y, kw, 190, 12, null, '#dde2ea');
+      yaz(t, x + 18, y + 34, { b: 700, z: 14, renk: '#5b6475' });
+      yaz(kisalt(ad, 20, kw - 36, 700), x + 18, y + 64, { b: 700, z: 20 });
+      yaz('Ad soyad', x + 18, y + 110, { z: 15, renk: '#5b6475' });
+      yaz(i ? 'İmza / kaşe' : 'İmza', x + 18, y + 164, { z: 15, renk: '#5b6475' });
+      g.fillStyle = '#c9ced8'; g.fillRect(x + 110, y + 112, kw - 130, 1); g.fillRect(x + 110, y + 166, kw - 130, 1);
+    });
+    return new Promise(res => cv.toBlob(res, 'image/png'));
+  }
+  const makbuzMetni = m => { const l = m.evraklar || [], top = l.reduce((s, e) => s + e.tutar, 0);
+    return `CLK Çanta – tahsilat makbuzu (${trE(m.tarih)})\nSayın ${m.kisi}, cari hesabınıza karşılık alınan ${evrakTur(l)}:\n\n`
+      + l.map((e, i) => `${i + 1}) ${evrakAdi(e)} – vade ${trE(e.vade)} – ${tlE(e.tutar)}`).join('\n')
+      + `\n\nToplam: ${tlE(top)} (yalnız ${yaziyla(top).toLocaleLowerCase('tr')})\nÇek ve senetle yapılan ödemeler, evrak vadesinde tahsil edildikten sonra geçerlidir.\nCLK Çanta · 0534 077 88 67`; };
+  const dosyaAdi = (on, ad, tarih) => `${on}-${String(ad || '').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}-${tarih}.png`;
+  // ortak: resmi paylaş, indir, yazdır (makbuz, bordro, vade raporu)
+  const belge = {
+    indir(url, dosya) { const a = Object.assign(document.createElement('a'), { href: url, download: dosya }); document.body.append(a); a.click(); a.remove(); },
+    async paylas(blob, url, dosya, baslik) {
+      const f = new File([blob], dosya, { type: 'image/png' });
+      try { if (navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f], title: baslik }); return; } }
+      catch (err) { if (err.name === 'AbortError') return; }
+      belge.indir(url, dosya); toast('Bu cihaz doğrudan paylaşmaya izin vermedi; resim indirildi');
+    },
+    yazdir(url, baslik) {
+      const w = window.open('', '_blank');
+      if (!w) { toast('Yazdırma penceresi açılamadı; resmi indirip yazdırın'); return; }
+      w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(baslik)}</title><style>@page{margin:10mm}body{margin:0}img{display:block;width:100%}</style><img src="${url}" onload="setTimeout(function(){print()},200)">`);
+      w.document.close();
+    },
+    kopyala(t, ne) { (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => toast(ne + ' yazısı kopyalandı; WhatsApp\'a yapıştırabilirsiniz')).catch(() => { window.prompt('Yazıyı kopyalayın:', t); }); }
+  };
+  CLK.makbuz = { ciz: makbuzCiz, metin: makbuzMetni, dosya: m => dosyaAdi('tahsilat-makbuzu', m.kisi, m.tarih), yaziyla };
+  CLK.belge = belge;
+  // müşterinin evrak aldığı günler (makbuz için): en yeni önce
+  const alisGunleri = ad => {
+    const g = {};
+    for (const c of D.v?.cekler || []) if ((c.yon === 'ciro' || c.yon === 'alinan') && c.kimden === ad && c.tarih) { const x = g[c.tarih] ||= { tarih: c.tarih, n: 0, t: 0 }; x.n++; x.t += c.tutar; }
+    return Object.values(g).sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, 15);
+  };
+  async function makbuzHazirla() {
+    if (!D.rm || !musteriler().some(m => m.ad === D.rm)) { D.rDurum = 'Listeden bir müşteri seçin.'; S.keepScroll = true; render(); return; }
+    const gl = alisGunleri(D.rm), tarih = gl.some(x => x.tarih === D.mTarih) ? D.mTarih : gl[0]?.tarih;
+    raporSifirla();
+    if (!tarih) { D.rDurum = 'Bu müşteriden alınmış çek ya da senet yok.'; S.keepScroll = true; render(); return; }
+    const l = (D.v.cekler || []).filter(c => (c.yon === 'ciro' || c.yon === 'alinan') && c.kimden === D.rm && c.tarih === tarih).sort((a, b) => a.vade.localeCompare(b.vade));
+    D.rMakbuz = { kisi: D.rm, tarih, evraklar: l.map(c => ({ seri: c.seri, banka: c.banka, bankaAd: c.bankaAd, vade: c.vade, tutar: c.tutar })) };
+    rBlob = await makbuzCiz(D.rMakbuz);
+    D.rResim = URL.createObjectURL(rBlob); D.rTur = 'makbuz';
+    D.rDurum = `${dt(tarih)} tarihinde alınan ${l.length} evrak için tahsilat makbuzu hazırlandı.`;
+    S.keepScroll = true; render();
+  }
+
   function raporCiz(ad, l) {
     const W = 1080, P = 56, SAT = 50, F = "system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
     const gelecek = l.filter(c => c.vade >= bugun()), top = gelecek.reduce((s, c) => s + c.tutar, 0);
@@ -198,7 +316,7 @@
       `\n\nVadesi gelmemiş toplam: ${tlE(gelecek.reduce((s, c) => s + c.tutar, 0))} (${gelecek.length} adet).\nVade tarihlerinde ödemenizi rica ederiz. Teşekkür ederiz.\nCLK Çanta · 0534 077 88 67`;
   };
   const waNo = t => { const d = String(t).replace(/\D/g, ''); return d.startsWith('90') ? d : d.startsWith('0') ? '9' + d : d.length === 10 ? '90' + d : d; };
-  const raporDosya = () => `cek-senet-${D.rm.toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}-${bugun()}.png`;
+  const raporDosya = () => (D.rTur === 'makbuz' && D.rMakbuz ? CLK.makbuz.dosya(D.rMakbuz) : dosyaAdi('cek-senet', D.rm, bugun()));
   const raporSifirla = () => { if (D.rResim) URL.revokeObjectURL(D.rResim); D.rResim = ''; rBlob = null; D.rDurum = ''; };
   async function raporHazirla() {
     if (!D.rm || !musteriler().some(m => m.ad === D.rm)) { D.rDurum = 'Listeden bir müşteri seçin.'; S.keepScroll = true; render(); return; }
@@ -206,7 +324,7 @@
     raporSifirla();
     if (!l.length) { D.rDurum = 'Bu müşterinin vadesi gelmemiş evrakı yok. Geçmiş evrakları da göstermek için kutuyu işaretleyin.'; S.keepScroll = true; render(); return; }
     rBlob = await raporCiz(D.rm, l);
-    D.rResim = URL.createObjectURL(rBlob);
+    D.rResim = URL.createObjectURL(rBlob); D.rTur = 'rapor';
     D.rDurum = `${l.length} evrak rapora yazıldı.`;
     S.keepScroll = true; render();
   }
@@ -214,31 +332,29 @@
     const ml = musteriler(), m = ml.find(x => x.ad === D.rm);
     const tel = m ? (D.v.cekler.find(c => c.kimden === D.rm && c.kimdenTel)?.kimdenTel || '') : '';
     return `<div class="card cs-rapor" id="csRapor">
-      <h3>Müşteriye vade raporu</h3><p class="sub">Müşterinin verdiği çek ve senetler alış ve vade tarihleriyle resim olarak hazırlanır, WhatsApp'tan gönderilir. Evrakın kime ciro edildiği yazılmaz.</p>
+      <h3>Müşteriye vade raporu ve tahsilat makbuzu</h3><p class="sub">Vade raporu: müşterinin verdiği çek ve senetler alış ve vade tarihleriyle (kime ciro edildiği yazılmaz). Tahsilat makbuzu: seçilen gün müşteriden alınan evraklar, tutar yazıyla, imza yerleriyle. İkisi de resim olarak WhatsApp'tan gönderilir ya da yazdırılır.</p>
       <div class="cs-r-form">
         <div class="f ara-alan"><span>Müşteri</span>${araKutu('csRm', ml, D.rm, 'csRm', { yer: `Müşteri adı yazın (${ml.length} müşteri)` })}</div>
         <label class="toggle"><input type="checkbox" id="csRGecmis" ${D.rGecmis ? 'checked' : ''}> Vadesi geçmiş evraklar da olsun</label>
       </div>
+      ${m ? (() => { const gl = alisGunleri(D.rm); return gl.length ? `<label class="f cs-m-gun"><span>Makbuz için evrak alınan gün</span><select id="csMTarih">${gl.map(x => `<option value="${x.tarih}" ${x.tarih === D.mTarih ? 'selected' : ''}>${dt(x.tarih)} · ${num(x.n)} evrak · ${tl(x.t)}</option>`).join('')}</select></label>` : ''; })() : ''}
       <div class="ek-dug">
-        <button class="btn dark" data-act="csRHazirla">Raporu hazırla</button>
+        <button class="btn dark" data-act="csRHazirla">Vade raporu</button>
+        <button class="btn dark" data-act="csMHazirla" ${m && alisGunleri(D.rm).length ? '' : 'disabled'}>Tahsilat makbuzu</button>
         <button class="btn ek-wa" data-act="csRPaylas" ${D.rResim ? '' : 'disabled'}>WhatsApp'ta paylaş</button>
         <button class="btn" data-act="csRIndir" ${D.rResim ? '' : 'disabled'}>Resmi indir</button>
+        <button class="btn" data-act="csRYazdir" ${D.rResim ? '' : 'disabled'}>Yazdır</button>
         <button class="btn" data-act="csRMetin" ${D.rResim ? '' : 'disabled'}>Yazı olarak kopyala</button>
         ${D.rResim && tel ? `<a class="btn" href="https://wa.me/${esc(waNo(tel))}" target="_blank" rel="noopener">WhatsApp'ta sohbeti aç</a>` : ''}
       </div>
       ${D.rDurum ? `<p class="ek-durum" role="status">${esc(D.rDurum)}</p>` : ''}
-      ${D.rResim ? `<div class="ek-on"><img src="${D.rResim}" alt="Çek ve senet dökümü: ${esc(D.rm)}"></div>` : ''}
+      ${D.rResim ? `<div class="ek-on"><img src="${D.rResim}" alt="${D.rTur === 'makbuz' ? 'Tahsilat makbuzu' : 'Çek ve senet dökümü'}: ${esc(D.rm)}"></div>` : ''}
     </div>`;
   }
-  async function raporPaylas() {
-    if (!rBlob) return;
-    const dosya = new File([rBlob], raporDosya(), { type: 'image/png' });
-    try { if (navigator.canShare?.({ files: [dosya] })) { await navigator.share({ files: [dosya], title: 'Çek ve senet dökümü' }); return; } }
-    catch (err) { if (err.name === 'AbortError') return; }
-    raporIndir(); toast('Bu cihaz doğrudan paylaşmaya izin vermedi; resim indirildi');
-  }
-  function raporIndir() { const a = Object.assign(document.createElement('a'), { href: D.rResim, download: raporDosya() }); document.body.append(a); a.click(); a.remove(); }
-  araSec.csRm = m => { if (m.ad !== D.rm) raporSifirla(); D.rm = m.ad; };
+  const raporBaslik = () => (D.rTur === 'makbuz' ? 'Tahsilat makbuzu' : 'Çek ve senet dökümü');
+  function raporPaylas() { if (rBlob) belge.paylas(rBlob, D.rResim, raporDosya(), raporBaslik()); }
+  function raporIndir() { belge.indir(D.rResim, raporDosya()); }
+  araSec.csRm = m => { if (m.ad !== D.rm) { raporSifirla(); D.mTarih = ''; } D.rm = m.ad; };
 
   views.cek = () => {
     if (!D.v && !D.yuk && !D.hata) yukle();
@@ -297,7 +413,8 @@
   };
 
   views.bind_cek = () => {
-    $('#csRGecmis')?.addEventListener('change', e => { D.rGecmis = e.target.checked; if (D.rResim) raporHazirla(); });
+    $('#csRGecmis')?.addEventListener('change', e => { D.rGecmis = e.target.checked; if (D.rResim && D.rTur !== 'makbuz') raporHazirla(); });
+    $('#csMTarih')?.addEventListener('change', e => { D.mTarih = e.target.value; if (D.rResim && D.rTur === 'makbuz') makbuzHazirla(); });
     const a = $('#csAra');
     a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render(); }, 200); });
   };
@@ -328,9 +445,11 @@
     else if (act === 'csRHazirla') raporHazirla();
     else if (act === 'csRPaylas') raporPaylas();
     else if (act === 'csRIndir') { if (D.rResim) { raporIndir(); toast('Resim indirildi'); } }
+    else if (act === 'csMHazirla') makbuzHazirla();
+    else if (act === 'csRYazdir') { if (D.rResim) belge.yazdir(D.rResim, raporBaslik() + ' – ' + D.rm); }
     else if (act === 'csRMetin') {
-      const l = musteriEvrak(D.rm, D.rGecmis), t = raporMetni(D.rm, l);
-      (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => toast('Rapor yazısı kopyalandı; WhatsApp\'a yapıştırabilirsiniz')).catch(() => { window.prompt('Yazıyı kopyalayın:', t); });
+      if (D.rTur === 'makbuz' && D.rMakbuz) belge.kopyala(makbuzMetni(D.rMakbuz), 'Makbuz');
+      else belge.kopyala(raporMetni(D.rm, musteriEvrak(D.rm, D.rGecmis)), 'Rapor');
     }
     else prevAct?.(act, el, e);
   };

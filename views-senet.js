@@ -336,6 +336,34 @@
     ciz();
   }
 
+  /* ---------- tahsilat makbuzu: müşteriden alınan senetler için (çizim views-cek.js CLK.makbuz) ---------- */
+  let mBlob = null;
+  const makbuzVerisi = g => ({ kisi: g.kisi, tarih: g.tarih, evraklar: (g.senetler || []).map(x => ({ seri: x.sira, banka: 'OTHER', bankaAd: 'SENET', vade: x.vade, tutar: x.tutar })) });
+  function makbuzAc(g) {
+    if (!CLK.makbuz) { toast('Makbuz açılamadı; sayfayı yenileyin'); return; }
+    if (D.mResim) URL.revokeObjectURL(D.mResim);
+    const m = makbuzVerisi(g);
+    D.makbuz = m; D.mResim = ''; mBlob = null;
+    CLK.makbuz.ciz(m).then(b => { if (D.makbuz !== m) return; mBlob = b; D.mResim = URL.createObjectURL(b); ciz(); }).catch(() => toast('Makbuz çizilemedi'));
+  }
+  function makbuzHtml() {
+    const m = D.makbuz; if (!m) return '';
+    const top = m.evraklar.reduce((t, e) => t + e.tutar, 0);
+    return `<div class="gd-sonuc sn-bordro sn-makbuz" role="status">
+      <div class="gd-tik">✓</div>
+      <div><b>Tahsilat makbuzu: ${esc(m.kisi)}, ${num(m.evraklar.length)} senet, ${tl2(top)}</b>
+        <small>Müşteriye WhatsApp'tan gönderin ya da yazdırıp imzalatın.</small>
+        <div class="sn-sonuc-d">
+          <button class="btn sm ek-wa" data-act="snMPaylas" ${D.mResim ? '' : 'disabled'}>WhatsApp'ta paylaş</button>
+          <button class="btn sm" data-act="snMIndir" ${D.mResim ? '' : 'disabled'}>Resmi indir</button>
+          <button class="btn sm" data-act="snMYazdir" ${D.mResim ? '' : 'disabled'}>Yazdır</button>
+          <button class="btn sm" data-act="snMMetin">Yazı olarak kopyala</button>
+        </div>
+        ${D.mResim ? `<div class="ek-on sn-b-on"><img src="${D.mResim}" alt="Tahsilat makbuzu: ${esc(m.kisi)}"></div>` : ''}
+      </div>
+      <button class="gd-x" data-act="snMKapat" aria-label="Kapat">×</button></div>`;
+  }
+
   /* ---------- taksitler ---------- */
   function dagit() {
     const f = D.f, n = Math.min(EN_COK, Math.max(1, Number(f.adet) || 1)), t = para(f.tutar), eski = f.satirlar;
@@ -434,7 +462,7 @@
         ${siteNot}
         ${[...(r.uyari || []), ...r.senetler.flatMap(x => (x.uyari || []).map(u => x.sira + ': ' + u))].map(u => `<small class="gd-kirmizi">${esc(u)}</small>`).join('')}
         ${r.hata ? `<small class="gd-kirmizi"><b>${esc(r.hata)}</b>${r.belirsiz ? '' : r.senetler.length ? ' Kaydedilemeyen senetler formda duruyor; kontrol edip tekrar kaydedin.' : ''}</small>` : ''}
-        <div class="sn-sonuc-d">${r.yon === 'alinan' && r.senetler.length ? `<button class="btn sm" data-act="snRapor" data-ad="${esc(r.kisi)}">Müşteriye vade raporu</button>` : ''}<button class="btn sm" data-go="cek">Çek ve senet sayfası</button></div>
+        <div class="sn-sonuc-d">${r.yon === 'alinan' && r.senetler.length ? `<button class="btn sm dark" data-act="snMakbuz">Tahsilat makbuzu</button><button class="btn sm" data-act="snRapor" data-ad="${esc(r.kisi)}">Müşteriye vade raporu</button>` : ''}<button class="btn sm" data-go="cek">Çek ve senet sayfası</button></div>
       </div>
       <button class="gd-x" data-act="snSonucKapat" aria-label="Kapat">×</button></div>`;
   }
@@ -445,7 +473,7 @@
     const ae = acikEvrak(), dun = gunEkle(bugun(), -1), l = kisiler();
     const ilkler = [[aySonu(bugun()), 'Bu ay sonu'], [aySonu(ayEkle(bugun(), 1, false)), 'Gelecek ay sonu'], [ayEkle(f.tarih || bugun(), 1, false), '1 ay sonra']];
     return `<div class="card gd-form">
-      ${bordroHtml()}${sonucHtml()}
+      ${makbuzHtml()}${bordroHtml()}${sonucHtml()}
       <div class="gd-adim"><span>1</span><h3>Kimden, kime?</h3></div>
       <div class="gd-seg sn-yon" role="group" aria-label="Senet yönü">
         <button data-act="snYon" data-o="alinan" aria-pressed="${f.yon === 'alinan'}">Müşteriden aldık</button>
@@ -497,7 +525,7 @@
       <h3>Panelden girilen senetler ve bordrolar</h3><p class="sub">Bu sayfadan Paraşüt'e girilen senetler ve tedarikçiye çıkış bordroları. Bordroya dokunun, resmi yeniden açılsın. Tüm çek ve senetler Çek ve senet sayfasında.</p>
       ${l.length ? `<ul class="gd-liste">${l.slice(0, D.goster).map(g => { if (g.islem === 'ciro') return bordroLi(g); const s = g.senetler || []; return `<li>
         <div class="gd-l-sol"><i class="gd-nokta" style="background:${g.yon === 'alinan' ? 'var(--ok)' : 'var(--gold)'}"></i><div><b>${esc(g.kisi)}</b><small>${g.yon === 'alinan' ? 'Alınan' : 'Verilen'} · ${num(s.length)} senet${s.length ? ' · ' + esc(s[0].sira) + (s.length > 1 ? '–' + esc(s.at(-1).sira) : '') : ''}${s.length ? ' · vade ' + dt(s[0].vade) + (s.length > 1 ? '–' + dt(s.at(-1).vade) : '') : ''} · ${dtt(g.zaman)}${g.kim ? ' · ' + esc(String(g.kim).split('@')[0]) : ''}</small></div></div>
-        <div class="gd-l-sag"><b>${tl2(g.tutar)}</b>${site(g)}${g.hata ? '<span class="pill bad">Yarım</span>' : ''}</div></li>`; }).join('')}</ul>
+        <div class="gd-l-sag"><b>${tl2(g.tutar)}</b>${site(g)}${g.hata ? '<span class="pill bad">Yarım</span>' : ''}${g.yon === 'alinan' && s.length && g.istek ? `<button class="btn sm" data-act="snMakbuzAc" data-istek="${esc(g.istek)}">Makbuz</button>` : ''}</div></li>`; }).join('')}</ul>
         ${l.length > D.goster ? `<div class="ek-dug"><button class="btn sm" data-act="snDaha">Daha fazla</button></div>` : ''}` : '<p class="hint">Panelden henüz senet girilmedi.</p>'}
     </div>`;
   }
@@ -611,6 +639,16 @@
       (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => toast('Bordro yazısı kopyalandı; WhatsApp\'a yapıştırabilirsiniz')).catch(() => { window.prompt('Yazıyı kopyalayın:', t); });
     }
     else if (act === 'snBIptal') bordroIptal();
+    else if (act === 'snMakbuz') { if (D.sonuc?.senetler?.length) { makbuzAc({ kisi: D.sonuc.kisi, tarih: D.sonuc.tarih, senetler: D.sonuc.senetler }); ciz(); } }
+    else if (act === 'snMakbuzAc') {
+      const g = (D.k?.gecmis || []).find(x => x.islem === 'senet' && x.istek === el.dataset.istek);
+      if (g) { makbuzAc(g); ciz(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    }
+    else if (act === 'snMKapat') { if (D.mResim) URL.revokeObjectURL(D.mResim); D.makbuz = null; D.mResim = ''; mBlob = null; ciz(); }
+    else if (act === 'snMPaylas') { if (mBlob) CLK.belge.paylas(mBlob, D.mResim, CLK.makbuz.dosya(D.makbuz), 'Tahsilat makbuzu'); }
+    else if (act === 'snMIndir') { if (D.mResim) { CLK.belge.indir(D.mResim, CLK.makbuz.dosya(D.makbuz)); toast('Resim indirildi'); } }
+    else if (act === 'snMYazdir') { if (D.mResim) CLK.belge.yazdir(D.mResim, 'Tahsilat makbuzu – ' + D.makbuz.kisi); }
+    else if (act === 'snMMetin') { if (D.makbuz) CLK.belge.kopyala(CLK.makbuz.metin(D.makbuz), 'Makbuz'); }
     else if (act === 'snAdet') { f.adet = Math.min(EN_COK, Math.max(1, f.adet + Number(el.dataset.d))); if (f.adet === 1) f.mod = 'her'; D.onay = false; dagit(); ciz(); }
     else if (act === 'snMod') { f.mod = el.dataset.o; D.onay = false; dagit(); ciz(); }
     else if (act === 'snAralik') { f.aralik = el.dataset.o; D.onay = false; dagit(); ciz(); }
