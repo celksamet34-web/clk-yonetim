@@ -23,15 +23,15 @@
   // Photoroom sahneleri: panelde Türkçe ad, Photoroom'a İngilizce tarif (üstte logo, altta yazı için sakin alan istenir)
   const SAHNE = [
     ['yok', 'Kemer (sahnesiz)', ''],
-    ['mermer', 'Mermer kaide', 'a polished warm beige marble pedestal in a softly lit luxury boutique, warm golden accent light from the side, plain softly blurred backdrop, elegant minimal composition with calm empty space above and below the product, premium fashion campaign photography'],
+    ['mermer', 'Mermer kaide', 'the product standing on a polished warm beige marble pedestal in a softly lit luxury boutique, warm golden accent light from the side, plain softly blurred backdrop, elegant minimal composition, premium fashion campaign photography'],
     ['butik', 'Butik', 'an elegant high-end boutique interior softly out of focus with warm brass details, the product standing on a cream travertine plinth, warm soft light, calm empty space above and below the product, luxury editorial photography'],
-    ['ipek', 'İpek', 'softly draped champagne silk fabric backdrop and a low ivory stone plinth, gentle diffused daylight, airy calm composition with empty space above and below the product, luxury still-life photography'],
-    ['gece', 'Gece', 'a dark charcoal studio with a soft spotlight from above, a black glossy plinth with subtle reflections and a warm gold rim light, calm dark empty space above and below the product, luxury evening campaign photography'],
+    ['ipek', 'İpek', 'the product standing on a low ivory stone plinth in front of softly draped champagne silk fabric, gentle diffused daylight, airy calm composition, luxury still-life photography'],
+    ['gece', 'Gece', 'the product standing on a black glossy plinth with subtle reflections in a dark charcoal studio, soft spotlight from above and a warm gold rim light, luxury evening campaign photography'],
     // celik 01.11 gece: "daha güzel ve farklı tema" — Instagram'da çanta satıcılarının sık kullandığı sahneler
-    ['pampas', 'Taş ve pampas', 'warm beige travertine stone blocks with soft dried pampas grass in a ceramic vase to one side, sculpted neutral plaster wall, soft natural window light, calm empty space above and below the product, modern minimal luxury lifestyle photography'],
-    ['gunes', 'Gün ışığı', 'a warm cream plaster wall with soft golden-hour sunlight and gentle palm leaf shadows falling across it, the product standing on a light stone ledge, calm empty space above and below the product, Mediterranean summer luxury campaign photography'],
-    ['kadife', 'Kadife', 'deep emerald green velvet drapery backdrop with soft folds, a round brushed brass pedestal, warm moody spotlight, calm empty space above and below the product, opulent luxury editorial photography'],
-    ['pastel', 'Pastel kemer', 'a soft blush pink studio with a large arched niche in the wall and smooth geometric pedestals in pastel tones, soft even diffused light, calm empty space above and below the product, playful premium fashion photography']
+    ['pampas', 'Taş ve pampas', 'the product standing on a low warm beige travertine stone block, dried pampas grass in a ceramic vase beside it, sculpted neutral plaster wall, soft natural window light, modern minimal luxury lifestyle photography'],
+    ['gunes', 'Gün ışığı', 'the product standing on a light stone ledge in front of a warm cream plaster wall with soft golden-hour sunlight and gentle palm leaf shadows, Mediterranean summer luxury campaign photography'],
+    ['kadife', 'Kadife', 'the product standing on a round brushed brass pedestal in front of deep emerald green velvet drapery with soft folds, warm moody spotlight, opulent luxury editorial photography'],
+    ['pastel', 'Pastel kemer', 'the product standing on a smooth pastel cylinder pedestal in front of a large arched niche in a soft blush pink wall, soft even diffused light, playful premium fashion photography']
   ];
   const SAHNE_SON = ' No text, no letters, no logos, no people.';
   const KITLE = [['kadin', 'Kadın'], ['erkek', 'Erkek'], ['kiz-cocuk', 'Kız çocuk'], ['erkek-cocuk', 'Erkek çocuk']];
@@ -119,10 +119,7 @@
     mocha: { ad: 'Mocha', zemin: ['#4b3629', '#271c15'], isik: [120, 88, 62, 0.55], kemer: ['#f3ebdf', '#e5d9c7'], yazi: '#f5ecdf', soluk: '#cbb9a2', altin: '#dcc08b', cizgi: 'rgba(220,192,139,.55)', koyu: true },
     koyu: { ad: 'Siyah ve altın', zemin: ['#1c1916', '#0a0908'], isik: [92, 78, 58, 0.5], kemer: ['#f1eadf', '#e3d9c9'], yazi: '#f6f0e5', soluk: '#a99f90', altin: '#d8bf90', cizgi: 'rgba(216,191,144,.5)', koyu: true }
   };
-  // sahneli kapakta yazılar koyu geçişin üstüne açık renkte yazılır
-  const SAHNE_TEMA = { ad: 'Sahne', zemin: ['#1c1916', '#0a0908'], isik: [0, 0, 0, 0], kemer: ['#f1eadf', '#e3d9c9'], yazi: '#fbf6ee', soluk: '#e6dac6', altin: '#e8cf9a', cizgi: 'rgba(232,207,154,.65)', koyu: true };
-  let temaOzel = null;
-  const T = () => temaOzel || TEMA[D.tema] || TEMA.acik;
+  const T = () => TEMA[D.tema] || TEMA.acik;
   const SERIF = '"Cormorant Garamond", "Playfair Display", Georgia, serif';
   const FS = (b, z, it) => `${it ? 'italic ' : ''}${b} ${Math.round(z)}px ${SERIF}`;
   // fiyat rakamları Playfair ile: Cormorant'ın eski usul rakamları (1.249) küçük ve zor okunuyor
@@ -340,42 +337,77 @@
     altBilgi(g, W, false);
   }
 
-  /* 5) Photoroom sahneli kapak: sahne tam ekran, üstte ve altta koyu geçiş, ürün sahnenin içinde (Photoroom ürünü yerinde bırakır) */
-  // ürünün kapaktaki yeri (içerik koordinatı, 1080×1350): en çok %60 genişlik, 640 px yükseklik, alt kenarı 918
-  const YER = { w: 0.6, h: 640, alt: 918 };
+  /* 5) Photoroom sahneli kapak (celik 01.11 gece: koyu geçişli, çerçeveli ilk düzen "çok çirkin" bulundu): sahne fotoğrafı olduğu gibi,
+     üstte küçük logo (sahne açıksa koyu, koyuysa altın), altta krem kart: ad, ölçü, iletişim ve fiyat. Ürün Photoroom'da yerinde kalır. */
+  // ürünün kapaktaki yeri (içerik koordinatı, 1080×1350): en çok %68 genişlik, 680 px yükseklik, alt kenarı 1010 (kartın üstünde zemin görünür)
+  const YER = { w: 0.68, h: 680, alt: 1010 };
+  // ürün kutusu: vitrin gölgesi (açık renksiz gri) sayılmaz, yoksa çanta kaidenin üstünde havada kalıyordu; bulunamazsa beyaz olmayan kutu
+  function urunKutu(im) {
+    try {
+      const n = 200, k = Math.min(1, n / Math.max(im.width, im.height)), cw = Math.max(1, Math.round(im.width * k)), ch = Math.max(1, Math.round(im.height * k));
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d'); x.drawImage(im, 0, 0, cw, ch);
+      const d = x.getImageData(0, 0, cw, ch).data; let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) {
+        const i = (yy * cw + xx) * 4, lo = Math.min(d[i], d[i + 1], d[i + 2]), hi = Math.max(d[i], d[i + 1], d[i + 2]);
+        if (lo < 238 && !(lo >= 196 && hi - lo <= 10)) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+      }
+      if (x1 > x0 && y1 > y0 && (x1 - x0) * (y1 - y0) > cw * ch * 0.05) {
+        const px = (x1 - x0) * 0.02, py = (y1 - y0) * 0.02, a0 = Math.max(0, (x0 - px) / k), b0 = Math.max(0, (y0 - py) / k);
+        return [a0, b0, Math.min(im.width, (x1 + 1 + px) / k) - a0, Math.min(im.height, (y1 + 1 + py) / k) - b0];
+      }
+    } catch {}
+    return icerik(im);
+  }
   function yerlestir(im, W, H, oy) {
-    const [sx, sy, sw, sh] = icerik(im), k = Math.min(W * YER.w / sw, YER.h / sh, 3), w = sw * k, h = sh * k;
+    const [sx, sy, sw, sh] = urunKutu(im), k = Math.min(W * YER.w / sw, YER.h / sh, 3), w = sw * k, h = sh * k;
     const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, sx, sy, sw, sh, (W - w) / 2, oy + YER.alt - h, w, h);
     return c.toDataURL('image/jpeg', 0.92);
   }
-  function sahneZemin(g, W, H, oy, sahne) {
-    g.fillStyle = '#1c1916'; g.fillRect(0, 0, W, H); kapla(g, sahne, 0, 0, W, H);
-    // üst geçiş logonun ve başlığın arkasında koyu kalır (hikâyede Instagram arayüzü bölgesi de koyu), sonra açılır
-    const ub = oy + (D.ust.trim() ? 430 : 370);
-    let gr = g.createLinearGradient(0, 0, 0, ub); gr.addColorStop(0, 'rgba(12,10,8,.66)'); gr.addColorStop((oy + 120) / ub, 'rgba(12,10,8,.5)'); gr.addColorStop(1, 'rgba(12,10,8,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, ub);
-    const y0 = oy + 900; gr = g.createLinearGradient(0, y0, 0, H); gr.addColorStop(0, 'rgba(12,10,8,0)'); gr.addColorStop(0.25, 'rgba(12,10,8,.62)'); gr.addColorStop(1, 'rgba(12,10,8,.9)'); g.fillStyle = gr; g.fillRect(0, y0, W, H - y0);
-    g.strokeStyle = SAHNE_TEMA.cizgi; g.lineWidth = 1.6; g.strokeRect(30, 30, W - 60, H - 60);
-    g.globalAlpha = 0.55; g.lineWidth = 1; g.strokeRect(40, 40, W - 80, H - 80); g.globalAlpha = 1;
+  // sahnenin logo bölgesi açık mı (ortalama parlaklık)
+  function ustAcik(sahne, W, H, oy) {
+    try {
+      const c = document.createElement('canvas'); c.width = 108; c.height = Math.round(H / 10); const x = c.getContext('2d'); kapla(x, sahne, 0, 0, c.width, c.height);
+      const d = x.getImageData(32, Math.round((oy + 40) / 10), 44, 14).data; let t = 0;
+      for (let i = 0; i < d.length; i += 4) t += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+      return t / (d.length / 4) > 140;
+    } catch { return true; }
   }
-  function sahneCiz(g, W, alt, p, ipucu) {
-    const s = T(), kat = P.cat(p), ust = D.ust.trim(), altY = D.alt.trim();
-    // açık renkli sahnede de okunsun: üst yazılara yumuşak gölge
-    g.save(); g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 16;
-    marka(g, W);
-    if (ust) { baslik(g, ust, W, 238, 60); if (altY) aralikli(g, altY, W / 2, 282, 19, 6, s.altin, 'center', 600, W - 220); }
-    else if (kat && kat !== 'Kategorisiz') cizgiliEtiket(g, kat, W / 2, 204);
+  function sahneCiz(g, W, alt, p, ipucu, acik) {
+    // logo: açık sahnede koyu, koyuda altın; yumuşak gölgeyle
+    const lg = acik ? logoKoyu : logoAltin;
+    g.save(); g.shadowColor = acik ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.45)'; g.shadowBlur = 18;
+    if (lg) { const lh = 46, lw = lg.width / lg.height * lh; g.drawImage(lg, (W - lw) / 2, 58, lw, lh); }
+    aralikli(g, 'ÇANTA', W / 2, 134, 15, 11, acik ? '#3a2f22' : '#e8cf9a', 'center', 600);
+    const ust = D.ust.trim(), altY = D.alt.trim();
+    if (ust) {
+      g.font = FS(500, 56, true); g.textAlign = 'center'; g.fillStyle = acik ? '#1f1a15' : '#fbf6ee';
+      let z = 56; while (z > 30 && g.measureText(ust).width > W - 200) { z -= 2; g.font = FS(500, z, true); }
+      g.fillText(ust, W / 2, 206); g.textAlign = 'left';
+      if (altY) aralikli(g, altY, W / 2, 244, 17, 6, acik ? '#6b5530' : '#e8cf9a', 'center', 600, W - 220);
+    }
     g.restore();
-    muhur(g, W - 158, 372, 84, fiyatAl(p));
-    g.textAlign = 'center'; g.fillStyle = s.yazi; g.font = FS(600, 56);
-    let sat = satirlar(g, guzelAd(p.name), W - 220, 2), y = 1036;
-    if (sat.length > 1) { g.font = FS(600, 46); sat = satirlar(g, guzelAd(p.name), W - 220, 2); y = 1018; }
-    for (const l of sat) { g.fillText(l, W / 2, y); y += 48; }
-    g.textAlign = 'left';
+    // alt kart
+    const kx = 54, ky = 1118, kw = W - 108, kh = 178, f = fiyatAl(p), ayir = kx + kw - 300;
+    g.save(); g.shadowColor = 'rgba(40,28,12,.22)'; g.shadowBlur = 34; g.shadowOffsetY = 10; yuvarlak(g, kx, ky, kw, kh, 28); g.fillStyle = 'rgba(251,248,243,.95)'; g.fill(); g.restore();
+    g.strokeStyle = 'rgba(154,119,65,.35)'; g.lineWidth = 1.2; yuvarlak(g, kx + 9, ky + 9, kw - 18, kh - 18, 22); g.stroke();
+    const sx = kx + 44, sw = ayir - sx - 30;
+    g.fillStyle = '#1f1a15'; g.font = FS(600, 46); let z = 46; const ad = guzelAd(p.name);
+    while (z > 30 && g.measureText(ad).width > sw) { z -= 2; g.font = FS(600, z); }
+    g.fillText(satirlar(g, ad, sw, 1)[0], sx, ky + 66);
     const bi = bilgiYazi(p);
-    if (bi) { aralikli(g, bi, W / 2, y + 2, 20, 3, s.soluk, 'center', 600, W - 180); y += 44; }
-    if (D.renk && y < 1140) renkSatiri(g, renkler(p), W / 2, Math.min(y + 4, 1150), W - 180);
-    altBilgi(g, W, ipucu);
+    if (bi) aralikli(g, bi, sx, ky + 104, 16, 3, '#7d7265', 'left', 600, sw);
+    aralikli(g, `DM  ·  WhatsApp ${TEL}  ·  ${SITE}`, sx, ky + 146, 15, 3, '#9a7741', 'left', 600, sw);
+    g.fillStyle = 'rgba(154,119,65,.45)'; g.fillRect(ayir, ky + 30, 1.2, kh - 60);
+    const cx = (ayir + kx + kw) / 2;
+    if (f) {
+      aralikli(g, bayi() ? 'BAYİ FİYATI' : 'FİYAT', cx, ky + 64, 15, 6, '#9a7741', 'center', 700);
+      g.fillStyle = '#1f1a15'; g.textAlign = 'center'; sigYaziF(g, fmt(f), cx, ky + 126, 250, 52, 700, false, FP); g.textAlign = 'left';
+    } else {
+      aralikli(g, 'SİPARİŞ İÇİN', cx, ky + 78, 15, 6, '#9a7741', 'center', 700);
+      g.fillStyle = '#1f1a15'; g.font = FS(600, 38, true); g.textAlign = 'center'; g.fillText('DM atın', cx, ky + 124); g.textAlign = 'left';
+    }
+    if (ipucu) { g.save(); g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 10; aralikli(g, 'KAYDIR  →', W - 64, ky + kh + 38, 15, 4, '#fbf6ee', 'right', 600); g.restore(); }
   }
 
   /* 6) manken karesi: fotoğraf tam ekran, altta koyu geçişte ad, iletişim, logo ve kare numarası */
@@ -390,7 +422,7 @@
     g.fillStyle = '#fbf6ee'; g.font = FS(500, 52, true);
     g.fillText(satirlar(g, guzelAd(p.name), W - 168 - Math.max(lw, 120) - 30, 1)[0], 84, 1226);
     aralikli(g, `Sipariş için DM  ·  WhatsApp ${TEL}`, 84, 1276, 18, 3, 'rgba(251,246,238,.85)', 'left', 600, W - 168 - 150);
-    aralikli(g, `${String(no).padStart(2, '0')}  /  ${String(top).padStart(2, '0')}`, W - 84, 1276, 18, 6, SAHNE_TEMA.altin, 'right', 600);
+    aralikli(g, `${String(no).padStart(2, '0')}  /  ${String(top).padStart(2, '0')}`, W - 84, 1276, 18, 6, '#e8cf9a', 'right', 600);
   }
   // manken karesine giden fotoğraf: seçilen ürün fotoğrafı, üretilen manken ya da yok (varsayılan 2. fotoğraf; Yeni ürün sayfası mankeni 2. sıraya koyar)
   function mankenAl(p) {
@@ -461,8 +493,8 @@
         const sahneSrc = sahneHazir(p), sahne = sahneSrc ? await gorsel(sahneSrc) : null;
         await ciz(() => {
           if (!sahne) { zemin(g, W, H, oy); g.translate(0, oy); tekCiz(g, W, alt, p, im, ipucu); return; }
-          sahneZemin(g, W, H, oy, sahne); g.translate(0, oy); temaOzel = SAHNE_TEMA;
-          try { sahneCiz(g, W, alt, p, ipucu); } finally { temaOzel = null; }
+          g.fillStyle = '#1c1916'; g.fillRect(0, 0, W, H); kapla(g, sahne, 0, 0, W, H);
+          const acik = ustAcik(sahne, W, H, oy); g.translate(0, oy); sahneCiz(g, W, alt, p, ipucu, acik);
         });
         if (D.tur === 'kaydir') {
           // kaydırmalı en çok 10 kare: kapak + (manken) + fotoğraflar + bilgi; manken karesine giden fotoğraf ara karelerde tekrar etmez
