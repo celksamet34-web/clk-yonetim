@@ -967,3 +967,40 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
   .sp-r>b,.sp-r>span:not(.sp-ad){text-align:left;font-size:13.5px}
   .sp-e{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}.sp-e-t{grid-column:1}.sp-e-v{grid-column:2;grid-row:1;justify-self:end}.sp-d{grid-column:2;grid-row:2}
 }
+
+/* Instagram (views-instagram.js) */
+.ig-duzen{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:18px;align-items:start}
+.ig-sol{display:grid;gap:18px;min-width:0}
+.ig-sag{position:sticky;top:24px;min-width:0}
+.ig-turler{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 14px}
+.ig-tur{display:grid;gap:4px;text-align:left;padding:14px;border:1.5px solid var(--line-2);border-radius:16px;background:#fff;cursor:pointer;font:inherit;color:inherit}
+.ig-tur b{font-size:14.5px}.ig-tur small{font-size:12px;color:var(--muted);line-height:1.35}
+.ig-tur[aria-pressed=true]{border-color:var(--ink);background:var(--ink);color:#fff}.ig-tur[aria-pressed=true] small{color:#b5ac9e}
+.ig-satir{display:flex;flex-wrap:wrap;gap:10px}
+.ig-secim{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.ig-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 6px 6px 12px;border-radius:99px;background:var(--gold-soft);color:var(--gold-ink);font-size:13px;font-weight:700}
+.ig-chip button{width:26px;height:26px;border:0;border-radius:50%;background:#fff;color:var(--ink);font-size:16px;line-height:1;cursor:pointer}
+.ig-ara{display:flex;gap:14px;align-items:center;margin:12px 0 8px}.ig-ara input{flex:1}.ig-ara .toggle{white-space:nowrap}
+.ig-liste{max-height:520px;overflow-y:auto;border-top:1px solid var(--line);overscroll-behavior:contain}
+.ig-r{display:grid;grid-template-columns:26px 48px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:8px 6px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.ig-r:hover{background:var(--bg)}.ig-r.secili{background:var(--gold-soft)}
+.ig-no{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;font:700 12px var(--f-b)}
+.ig-r.secili .ig-no{background:var(--ink);border-color:var(--ink);color:var(--gold-2)}
+.ig-cap-alan{margin-top:12px;font-size:14px}
+.ig-cikti h3{margin:0}.ig-cikti .sub{min-height:18px}
+.ig-cikti .ek-dug{margin-top:14px}.ig-cikti .hint{margin-top:10px}
+.ig-tel{max-width:380px;margin:12px auto 0;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff;box-shadow:var(--sh)}
+.ig-ust{display:flex;align-items:center;gap:10px;padding:10px 12px}.ig-ust b{font-size:13.5px}.ig-ust small{margin-left:auto;color:var(--muted);font-size:12px}
+.ig-av{width:32px;height:32px;border-radius:50%;background:var(--ink);display:grid;place-items:center;outline:2px solid var(--gold);outline-offset:2px}.ig-av img{width:22px;filter:invert(1) sepia(.5) saturate(2) hue-rotate(5deg)}
+.ig-kayan{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;background:#f3f1ee}
+.ig-kayan::-webkit-scrollbar{display:none}
+.ig-kayan img{flex:0 0 100%;width:100%;aspect-ratio:4/5;object-fit:cover;scroll-snap-align:center;display:block}
+.ig-tel.hik .ig-kayan img{aspect-ratio:9/16}
+.ig-nokta{display:flex;justify-content:center;gap:4px;padding:8px 0 2px}.ig-nokta i{width:6px;height:6px;border-radius:50%;background:#cfcac2}.ig-nokta i.on{background:#3b82f6}
+.ig-cap{font-size:13px;padding:6px 12px 12px;margin:0;line-height:1.4}.ig-cap span{color:var(--muted)}
+.ig-kucuk{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 4px}
+.ig-kucuk button{position:relative;flex:0 0 64px;padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;cursor:pointer}
+.ig-kucuk img{width:100%;display:block}.ig-kucuk span{position:absolute;left:4px;top:4px;font:700 10px var(--f-b);background:rgba(18,17,16,.75);color:#fff;border-radius:6px;padding:1px 5px}
+.ig-bos{margin-top:12px;padding:40px 16px;text-align:center;color:var(--muted);border:1.5px dashed var(--line-2);border-radius:16px}
+@media(max-width:1000px){.ig-duzen{grid-template-columns:1fr}.ig-sag{position:static}}
+@media(max-width:600px){.ig-turler{grid-template-columns:1fr}.ig-tur{grid-template-columns:auto 1fr;align-items:baseline;gap:10px}.ig-ara{flex-direction:column;align-items:stretch}.ig-liste{max-height:420px}}

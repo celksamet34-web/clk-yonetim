@@ -58,6 +58,14 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Ürün bilgileri (celik 01.11: "ürünün ölçüleri bilgileri renkleri vs yazsın"): `bilgi(p)` Qukasoft niteliklerinden ölçü (En × Yükseklik × Boy cm), Malzeme, Su Geçirmez okur ("Ölçü ve malzeme yazılsın" kutusu). PDF kartında koddan sonra bir satır; renkler sığarsa adlarıyla, sığmazsa "N renk". Kurumsal durumda ürünün altında beyaz özellik şeridi (ÖLÇÜ, MALZEME, KOD; en çok 3), alt bantta renk noktalarının altında renk adları. Panel listesinde de ölçü, malzeme ve renkler yazar.
 - Sayfalar tuvale çizilir, jsPDF 2.5.1 (jsdelivr, ilk basışta yüklenir) ile PDF; indir ya da `navigator.share` ile WhatsApp. Fotoğraf CORS ile açılmazsa wsrv.nl aracısı denenir, o da olmazsa "Fotoğraf yüklenemedi" kutusu.
 
+## Instagram (views-instagram.js, sayfa #instagram; 01.11.2026)
+
+- celik isteği: "panele Instagram post ile alakalı bir form hazırla… çantacıların içeriklerini bak hangisi bize uygun olursa onu tasarla". www.instagram.com bu ortamdan açılmıyor (engelli); tasarım çanta satıcılarının yaygın gönderi düzenine göre yapıldı: tek ürün fiyat rozetli, kaydırmalı (kapak + diğer fotoğraflar + "Ürün bilgileri" kartı), koleksiyon (2–4 ürün, "Yeni Gelenler").
+- Site ürünleri menüsünde Katalog ile Banner arasında. Biçim: Gönderi 1080×1350 (4:5) ya da Hikâye 1080×1920; tema Açık (krem, fotoğraf `multiply`) ya da Siyah ve altın. Fiyat: Fiyatsız / Site / Bayi 1–4 (Katalog ile aynı kurallar; bayi fiyatında rozet içinde "BAYİ"). Üst/alt yazı isteğe bağlı (koleksiyonda başlık). Alt bant: "SİPARİŞ VE BİLGİ · DM · WhatsApp 0534 077 88 67", clkcanta.com; hikâyede yüzen kart.
+- Ürün bilgisi (ölçü, malzeme, su geçirmez, renkler, kod) Katalog'daki `bilgi`/`renkler` ile aynı; PRS-/CLK- kodları yazılmaz, kısa ünsüzsüz kelimeler (BYB, PP) büyük harf kalır.
+- Açıklama (caption) kendiliğinden yazılır: ad, 📏 ölçü, 🧵 malzeme, 🎨 renkler, 🏷️ fiyat, DM/WhatsApp, clkcanta.com ve en çok 15 etiket (kategori anahtar kelimeleri; "suni deri" #deriçanta vermez; bayide #toptançanta). Elle değiştirilirse ürün seçimi değişene kadar korunur; "Yeniden yaz" da sıfırlar.
+- "Instagram'da paylaş" açıklamayı panoya kopyalar, sonra `navigator.share` ile resimleri verir (olmazsa indirir). Ayarlar `localStorage` `clk-instagram`.
+
 ## Görsel stüdyosu (views-banner.js, sayfa #banner)
 
 - Biçimler (`FORMATS` / sunucuda `BANNER_FORMATS`): Anasayfa banner 1248×1664, Slider masaüstü 1920×850 (ürün sağda, sol yazıya), Slider mobil 1080×1440, Kategori kutusu 800×1000 (krem stüdyo, yuvarlak fon). Onaylananlar `localStorage` `clk-banner-approvals` listesinde.
