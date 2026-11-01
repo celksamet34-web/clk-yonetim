@@ -183,7 +183,7 @@
       ${l.length ? `<div class="sn-oz-l">${l.map(c => `<div><span>${esc(c.seri || EV().tur(c))}</span><span>${esc(c.kimden || '')} · ${dt(c.vade)}</span><b>${tl2(c.tutar)}</b></div>`).join('')}</div>` : ''}
       ${f.aciklama.trim() ? `<p class="gd-oz-a">“${esc(f.aciklama.trim())}”</p>` : ''}
       ${D.uyari ? `<p class="gd-oz-h">${esc(D.uyari)}</p>` : ''}
-      <button class="btn dark gd-kaydet" data-act="snKaydet" ${D.kaydediyor || !D.k || !D.c ? 'disabled' : ''}>${D.kaydediyor ? 'Bordro hazırlanıyor…' : D.onay ? `Evet, ${num(l.length)} evrakı ver, bordroyu hazırla` : 'Çıkış bordrosunu hazırla'}</button>
+      <button class="btn dark gd-kaydet" data-act="snKaydet" ${D.kaydediyor || !D.k || !D.c ? 'disabled' : ''}>${D.kaydediyor ? 'Bordro hazırlanıyor…' : D.onay ? `Evet, ${num(l.length)} evrakı ver, bordroyu hazırla` : 'Çıkış bordrosunu hazırla (Paraşüt\'e yazılmaz)'}</button>
       <p class="gd-oz-n">${D.onay ? 'Evrakları kontrol edip bir kez daha basın.' : e.length && (f.kisi || l.length) ? esc(e[0]) : 'Bordro numaralanır, evraklar bu tedarikçiye ayrılır. Ciroyu ayrıca Paraşüt\'te tedarikçiye ödeme olarak girin.'}</p>`;
   }
 
@@ -480,7 +480,10 @@
         <button data-act="snYon" data-o="verilen" aria-pressed="${f.yon === 'verilen'}">Tedarikçiye verdik</button></div>
       ${f.yon === 'verilen' ? `<div class="gd-seg sn-tur" role="group" aria-label="Tedarikçiye ne verildi">
         <button data-act="snTur" data-o="portfoy" aria-pressed="${f.tur === 'portfoy'}">Portföydeki müşteri evrakı (ciro)</button>
-        <button data-act="snTur" data-o="kendi" aria-pressed="${f.tur !== 'portfoy'}">Kendi senedimiz</button></div>` : ''}
+        <button data-act="snTur" data-o="kendi" aria-pressed="${f.tur !== 'portfoy'}">Kendi senedimiz</button></div>
+      <p class="sn-tur-n ${f.tur === 'portfoy' ? 'uyar' : 'tamam'}">${f.tur === 'portfoy'
+        ? '<b>Paraşüt\'e yazılmaz.</b> Müşteriden aldığımız çek/senetleri tedarikçiye verirken yalnız çıkış bordrosu hazırlar; ciroyu Paraşüt\'te tedarikçiye ödeme olarak ayrıca girin. Yeni, kendi senedimizi verdiysek <b>Kendi senedimiz</b>\'i seçin.'
+        : '<b>Paraşüt\'e yazılır.</b> Firmamızın yeni senedi tedarikçiye verilir; sıra no alır, Paraşüt\'te verilen senet olarak açılır.'}</p>` : ''}
       <div class="f ara-alan"><span>${f.yon === 'alinan' ? 'Müşteri' : 'Tedarikçi'}</span>${araKutu('snKisi_' + f.yon, l, f.kisi?.ad || '', 'snKisi', { yer: `Paraşüt ${f.yon === 'alinan' ? 'müşterisi' : 'tedarikçisi'} ara (${l.length})` })}</div>
       ${ciroMu() ? ciroKisiNot() + ciroAdimlar() + '</div>' : ''}${ciroMu() ? '' : `${ae ? `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, vadesi gelmemiş ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>` : ''}
 

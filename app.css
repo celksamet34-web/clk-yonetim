@@ -893,6 +893,7 @@ body{font-size:15px;letter-spacing:0}
 .kt-durum button span{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:#1fa855;color:#fff;font:700 11px var(--f-b);letter-spacing:.04em;padding:5px 12px;border-radius:999px}
 /* Tedarikçiye çıkış bordrosu (Senet gir › Tedarikçiye verdik › Portföydeki müşteri evrakı) */
 .sn-tur button{padding:10px 16px}
+.sn-tur-n{margin:-4px 0 14px;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.45}.sn-tur-n.uyar{background:var(--warn-soft);color:var(--warn);border:1px solid #ecd6a8}.sn-tur-n.tamam{background:var(--ok-soft);color:var(--ok)}
 .sn-pf-ust{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .sn-pf-ust .gd-seg b{font-weight:600;color:var(--muted);margin-left:3px;font-variant-numeric:tabular-nums}
 .sn-pf-ust input[type=search]{flex:1 1 200px;min-width:0;min-height:var(--tap);border:1px solid var(--line-2);border-radius:13px;padding:10px 14px;font:inherit;font-size:16px;background:#fff}
