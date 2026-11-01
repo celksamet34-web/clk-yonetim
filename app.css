@@ -888,3 +888,6 @@ body{font-size:15px;letter-spacing:0}
   .sn-satir .sn-no{grid-row:1/3;height:auto;align-self:stretch}
   .sn-satir input[type=date]{font-size:15px;padding:10px 8px}
 }
+.kt-durum{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.kt-durum button{position:relative;padding:0;border:0;background:none;cursor:pointer;display:block}
+.kt-durum button span{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:#1fa855;color:#fff;font:700 11px var(--f-b);letter-spacing:.04em;padding:5px 12px;border-radius:999px}
