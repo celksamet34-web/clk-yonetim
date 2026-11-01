@@ -26,7 +26,12 @@
     ['mermer', 'Mermer kaide', 'a polished warm beige marble pedestal in a softly lit luxury boutique, warm golden accent light from the side, plain softly blurred backdrop, elegant minimal composition with calm empty space above and below the product, premium fashion campaign photography'],
     ['butik', 'Butik', 'an elegant high-end boutique interior softly out of focus with warm brass details, the product standing on a cream travertine plinth, warm soft light, calm empty space above and below the product, luxury editorial photography'],
     ['ipek', 'İpek', 'softly draped champagne silk fabric backdrop and a low ivory stone plinth, gentle diffused daylight, airy calm composition with empty space above and below the product, luxury still-life photography'],
-    ['gece', 'Gece', 'a dark charcoal studio with a soft spotlight from above, a black glossy plinth with subtle reflections and a warm gold rim light, calm dark empty space above and below the product, luxury evening campaign photography']
+    ['gece', 'Gece', 'a dark charcoal studio with a soft spotlight from above, a black glossy plinth with subtle reflections and a warm gold rim light, calm dark empty space above and below the product, luxury evening campaign photography'],
+    // celik 01.11 gece: "daha güzel ve farklı tema" — Instagram'da çanta satıcılarının sık kullandığı sahneler
+    ['pampas', 'Taş ve pampas', 'warm beige travertine stone blocks with soft dried pampas grass in a ceramic vase to one side, sculpted neutral plaster wall, soft natural window light, calm empty space above and below the product, modern minimal luxury lifestyle photography'],
+    ['gunes', 'Gün ışığı', 'a warm cream plaster wall with soft golden-hour sunlight and gentle palm leaf shadows falling across it, the product standing on a light stone ledge, calm empty space above and below the product, Mediterranean summer luxury campaign photography'],
+    ['kadife', 'Kadife', 'deep emerald green velvet drapery backdrop with soft folds, a round brushed brass pedestal, warm moody spotlight, calm empty space above and below the product, opulent luxury editorial photography'],
+    ['pastel', 'Pastel kemer', 'a soft blush pink studio with a large arched niche in the wall and smooth geometric pedestals in pastel tones, soft even diffused light, calm empty space above and below the product, playful premium fashion photography']
   ];
   const SAHNE_SON = ' No text, no letters, no logos, no people.';
   const KITLE = [['kadin', 'Kadın'], ['erkek', 'Erkek'], ['kiz-cocuk', 'Kız çocuk'], ['erkek-cocuk', 'Erkek çocuk']];
