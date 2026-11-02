@@ -113,7 +113,7 @@
   };
 
   views.musteri = () => {
-    const u = userById(S.arg); const back = `<button class="btn sm" data-go="musteriler">← Müşteriler</button>`;
+    const u = userById(S.arg); const back = `${u ? CLK.tahsilat?.dugme(u.id) || '' : ''}<button class="btn sm" data-go="musteriler">← Müşteriler</button>`;
     if (!u) return head('Müşteri', 'Bulunamadı', '', back) + (S.uLoading ? skel() : '<div class="card empty"><h3>Müşteri bulunamadı</h3></div>');
     const s = custStats(u), os = ordersOf(u.id), bs = balOf(u.id), bal = Number(u.balance) || 0;
     const prices = { 0: 'Varsayılan', 2: 'Bayi fiyatı 1', 3: 'Bayi fiyatı 2', 4: 'Bayi fiyatı 3', 5: 'Bayi fiyatı 4' };
@@ -148,9 +148,11 @@
   }
   const C = (S.ui.c ||= { q: '', t: 'all' });
   views.cari = () => {
-    const acts = `<button class="btn sm" data-act="reloadU" ${S.bLoading || S.uLoading ? 'disabled' : ''}>${S.bLoading ? 'Yükleniyor' : 'Yenile'}</button>`;
-    if (S.bErr && !S.balance.length) return head('Finans', 'Cari hesap', '', acts) + errBox(S.bErr, 'reloadB');
-    if (!S.bLoaded && !S.balance.length) return head('Finans', 'Cari hesap', 'Alınıyor…', acts) + skel();
+    // Ödeme gir (views-tahsilat.js): müşteriden alınan ödeme Paraşüt'e tahsilat olarak girilir, site carisine de yazılır
+    const acts = `${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="reloadU" ${S.bLoading || S.uLoading ? 'disabled' : ''}>${S.bLoading ? 'Yükleniyor' : 'Yenile'}</button>`;
+    const odeme = CLK.tahsilat?.kart() || '';
+    if (S.bErr && !S.balance.length) return head('Finans', 'Cari hesap', '', acts) + odeme + errBox(S.bErr, 'reloadB');
+    if (!S.bLoaded && !S.balance.length) return head('Finans', 'Cari hesap', 'Alınıyor…', acts) + odeme + skel();
     const q = C.q.trim().toLocaleLowerCase('tr');
     const L = S.balance.filter(b => {
       const t = (BAL_TYPE[b.type] || ['', 'adj'])[1]; if (C.t !== 'all' && t !== C.t) return false;
@@ -158,7 +160,7 @@
     });
     const inSum = S.balance.filter(b => sign(b) > 0).reduce((a, b) => a + Math.abs(+b.price || 0), 0), outSum = S.balance.filter(b => sign(b) < 0).reduce((a, b) => a + Math.abs(+b.price || 0), 0);
     const debtors = S.users.filter(u => (Number(u.balance) || 0) < 0).sort((a, b) => a.balance - b.balance), creditors = S.users.filter(u => (Number(u.balance) || 0) > 0);
-    return head('Finans', 'Cari hesap', `${num(S.balance.length)} hareket · ${num(S.users.length)} hesap`, acts) + `
+    return head('Finans', 'Cari hesap', `${num(S.balance.length)} hareket · ${num(S.users.length)} hesap`, acts) + odeme + `
       <div class="kpis">
         <div class="kpi hero"><div class="k">Toplam alacak</div><div class="v">${tl(Math.abs(debtors.reduce((a, u) => a + Number(u.balance), 0)))}</div><div class="s">${num(debtors.length)} müşterinin borcu</div></div>
         <div class="kpi"><div class="k">Müşteri alacağı</div><div class="v">${tlc(creditors.reduce((a, u) => a + Number(u.balance), 0))}</div><div class="s">${num(creditors.length)} hesapta artı bakiye</div></div>

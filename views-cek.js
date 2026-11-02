@@ -439,6 +439,7 @@
         ${hafta.length ? `<div class="cs-uy warn"><b>7 gün içinde ödenecek: ${num(hafta.length)} evrak, ${tl(toplam(hafta))}</b><span>${hafta.map(c => `${esc(c.kime)} ${tl(c.kalan)} (${dt(c.vade)})`).join(' · ')}</span></div>` : ''}
         ${ciroHafta.length ? `<div class="cs-uy gold"><b>7 gün içinde vadesi gelen müşteri evrakı: ${num(ciroHafta.length)}, ${tl(toplam(ciroHafta))}</b><span>${ciroHafta.slice(0, 8).map(c => `${esc(c.kimden)} ${tl(c.tutar)} (${senetMi(c) && gunFark(c.vade) <= 0 ? 'son gün ' + kisaGun(sonGun(c)) : 'vade ' + dt(c.vade)})`).join(' · ')}${ciroHafta.length > 8 ? ' …' : ''}</span><small>Ciro ettiğiniz evraklar; müşteriye hatırlatmak isteyebilirsiniz.</small></div>` : ''}
       </div>` : ''}
+      ${panelSenet()}
       ${takvim(l)}
       <div class="grid2 cs-gruplar">
         ${grupKart('Kime ödeyeceğiz', 'Verdiğimiz, ödenmemiş çek ve senetler kişi başına.', od, 'kime', 'cs-g-od')}
@@ -457,6 +458,7 @@
   };
 
   views.bind_cek = () => {
+    pnBagla();
     $('#csRGecmis')?.addEventListener('change', e => { D.rGecmis = e.target.checked; if (D.rResim && D.rTur !== 'makbuz') raporHazirla(); });
     $('#csMTarih')?.addEventListener('change', e => { D.mTarih = e.target.value; if (D.rResim && D.rTur === 'makbuz') makbuzHazirla(); });
     const a = $('#csAra');
@@ -559,25 +561,13 @@
         ${pnTutar(k.y, 'y')}${pnTutar(k.t, 't')}${pnTutar(k.k, 'k')}</button>${PN.acik === k.id ? pnEvraklar(k) : ''}`).join('') || '<p class="sp-bos">Aramaya uyan kişi yok.</p>'}
       ${!q && l.length > EN ? `<div class="sp-alt"><button class="btn sm ghost" data-act="spHepsi">${PN.hepsi ? 'Daha az göster' : `Tümünü göster (${num(l.length)})`}</button></div>` : ''}`;
   }
-  // Panel: bugün son günü olan ya da ödeme süresindeki müşteri senetleri (portföyde, tahsil edilmemiş)
-  function pnUyari() {
-    const l = (D.v?.cekler || []).filter(c => c.yon === 'alinan' && c.kalan > 0.009 && senetMi(c) && gunFark(c.vade) <= 0 && gunFark(sonGun(c)) >= 0)
-      .sort((a, b) => sonGun(a).localeCompare(sonGun(b)));
-    if (!l.length) return '';
-    const son = l.filter(c => sonGun(c) === bugun()), ad = c => `${esc(c.kimden || 'Kişi yok')} ${tl(c.kalan)} · ${sonGun(c) === bugun() ? 'bugün son gün' : 'son gün ' + kisaGun(sonGun(c))}`;
-    const diger = l.filter(c => sonGun(c) !== bugun()), top = x => tl(x.reduce((t, c) => t + c.kalan, 0));
-    const bas = [son.length ? `Bugün son gün: ${num(son.length)} müşteri senedi, ${top(son)}` : '', diger.length ? `Ödeme süresinde: ${num(diger.length)} müşteri senedi, ${top(diger)}` : ''].filter(Boolean).join(' · ');
-    return `<div class="cs-uy ${son.length ? 'bad' : 'warn'} sp-uy" role="status"><b>${bas}</b>
-      <span>${l.slice(0, 5).map(ad).join(' · ')}${l.length > 5 ? ` · ve ${num(l.length - 5)} senet daha` : ''}</span><small>Ödenmezse son gün 15:00'a kadar protesto için notere verilir. Tahsil edildiyse Paraşüt'te işleyin.</small></div>`;
-  }
   function panelSenet() {
-    const ust = (alt) => `<div class="card-h"><div><h3>Senetler</h3><p class="sub">${alt}</p></div><button class="btn sm ghost" data-go="cek">Çek ve senet</button></div>`;
+    const ust = (alt) => `<div class="card-h"><div><h3>Senetler</h3><p class="sub">${alt}</p></div></div>`;
     if (!D.v) return `<div class="card sp" id="spKart">${ust('Paraşüt\'ten okunuyor…')}${D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn sm" data-act="spYenile" style="margin-top:10px">Tekrar dene</button>` : '<div class="skel" style="height:170px"></div>'}</div>`;
     const o = pnOzet(), t = o.top, T = t.y + t.t + t.k, al = pnAl(), zm = D.v.zaman ? new Date(D.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
     const seg = (act, deger, l) => `<div class="gd-seg" role="group">${l.map(([k, ad]) => `<button data-act="${act}" data-o="${k}" aria-pressed="${deger === k}">${ad}</button>`).join('')}</div>`;
     const kutu = (c, ad, v, alt) => `<div class="sp-k ${c}"><span>${ad}</span><b>${tl(v)}</b><small>${alt}</small></div>`;
     return `<div class="card sp" id="spKart">${ust(`${al ? 'Müşteriden alınan' : 'Tedarikçiye verdiğimiz'} ${PN.tur === 'cek' ? 'çekler' : PN.tur === 'senet' ? 'senetler' : 'çek ve senetler'} · Paraşüt${zm ? ', ' + zm : ''}${D.yuk ? ' · yenileniyor…' : ''}`)}
-      ${pnUyari()}
       <div class="sp-secim">${seg('spYon', PN.yon, [['alinan', 'Müşteriden alınan'], ['verilen', 'Tedarikçiye verilen']])}${seg('spTur', PN.tur, [['senet', 'Senet'], ['cek', 'Çek'], ['hepsi', 'Hepsi']])}</div>
       <div class="sp-kutular">
         ${kutu('y', al ? 'Tahsil edildi' : 'Ödendi', t.y, `${num(t.ny)} evrak${al && t.ciroY > 0.009 ? ` · ${tl(t.ciroY)} ciro edilip vadesi geçen` : ''}`)}
@@ -590,14 +580,41 @@
       <p class="sp-not">${al ? 'Senette son gün vade (tatilse sonraki iş günü) ve izleyen iki iş günüdür, 15:00\'a kadar; kırmızıya son gün geçince düşer. Ciro edilip süresi geçen evrak, müşteriye geri dönmediyse ödenmiş sayılır. ' : ''}${o.dvz ? `${num(o.dvz)} döviz evrakı toplama katılmadı. ` : ''}Satıra dokununca evraklar açılır.</p>
     </div>`;
   }
+  /* Ana panel: önümüzdeki 7 günün senetleri (celik 02.11.2026: "bu 7 gün içinde olan senetleri bana ana panelde göster. senetleri ordan kaldır.
+     ana ekrandan sadece ödemesi gelen ve ödenecek senetleri vadeleri ile yaz"). Büyük senet kartı (yeşil/turuncu/kırmızı, kişi bazında) Çek ve senet sayfasına taşındı.
+     Tahsil edilecek: portföydeki müşteri senedi, vadesi 7 gün içinde ya da vadesi geçmiş ama son günü gelmemiş (ödeme süresinde). Ciro edilenler girmez (tedarikçiye ödenir).
+     Ödenecek: firmanın verdiği, ödenmemiş senet, vadesi 7 gün içinde ya da geçmiş (gecikmiş de ödenecek sayılır). Yalnız TL. */
+  function panelKisa() {
+    const ust = alt => `<div class="card-h"><div><h3>Senetler · 7 gün</h3><p class="sub">${alt}</p></div><button class="btn sm ghost" data-go="cek">Çek ve senet</button></div>`;
+    if (!D.v) return `<div class="card sk7">${ust('Paraşüt\'ten okunuyor…')}${D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn sm" data-act="spYenile" style="margin-top:10px">Tekrar dene</button>` : '<div class="skel" style="height:120px"></div>'}</div>`;
+    const l = (D.v.cekler || []).filter(c => senetMi(c) && (!c.doviz || c.doviz === 'TRL') && c.kalan > 0.009);
+    const al = l.filter(c => c.yon === 'alinan' && gunFark(c.vade) <= 7 && gunFark(sonGun(c)) >= 0).sort((a, b) => a.vade.localeCompare(b.vade));
+    const ver = l.filter(c => c.yon === 'verilen' && gunFark(c.vade) <= 7).sort((a, b) => a.vade.localeCompare(b.vade));
+    const top = x => x.reduce((t, c) => t + c.kalan, 0);
+    const durum = c => {
+      const n = gunFark(c.vade);
+      if (c.yon === 'alinan' && n <= 0) { const s = gunFark(sonGun(c)); return s === 0 ? ['bad', 'Bugün son gün'] : ['warn', 'Son gün ' + kisaGun(sonGun(c))]; }
+      return n < 0 ? ['bad', `${-n} gün gecikti`] : n === 0 ? ['bad', 'Bugün'] : n === 1 ? ['warn', 'Yarın'] : ['gold', `${n} gün kaldı`];
+    };
+    const satir = c => { const [cls, yaz] = durum(c); return `<li><div class="cs-vade"><b>${c.vade.slice(8, 10)}</b><small>${AYLAR[+c.vade.slice(5, 7) - 1]} ${GUNK[haftaGunu(c.vade)]}</small></div>
+      <div class="sk7-k"><b>${esc((c.yon === 'verilen' ? c.kime : c.kimden) || 'Kişi yok')}</b><small>Senet${c.seri ? ' ' + esc(c.seri) : ''}${c.vade.slice(0, 4) !== bugun().slice(0, 4) ? ' · ' + c.vade.slice(0, 4) : ''}</small></div>
+      <div class="sk7-s"><b>${tl(c.kalan)}</b><span class="pill ${cls}">${yaz}</span></div></li>`; };
+    const kol = (cls, baslik, x, bos) => `<div class="sk7-kol ${cls}"><div class="sk7-b"><span>${baslik}</span><b>${tl(top(x))}</b><small>${num(x.length)} senet</small></div>
+      ${x.length ? `<ul class="sk7-l">${x.map(satir).join('')}</ul>` : `<p class="sk7-bos">${bos}</p>`}</div>`;
+    const zm = D.v.zaman ? new Date(D.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+    return `<div class="card sk7">${ust(`Vadesi önümüzdeki 7 günde olan senetler · Paraşüt${zm ? ', ' + zm : ''}${D.yuk ? ' · yenileniyor…' : ''}`)}
+      <div class="sk7-g">${kol('al', 'Tahsil edilecek', al, '7 gün içinde vadesi gelen müşteri senedi yok.')}${kol('ver', 'Ödenecek', ver, '7 gün içinde ödenecek senet yok.')}</div>
+      <p class="sp-not">Müşteri senedinde son gün vade (tatilse sonraki iş günü) ve izleyen iki iş günüdür, 15:00'a kadar.</p></div>`;
+  }
+  const pnYukle = () => { if (!D.yuk && (!D.v ? !PN.denendi : Date.now() - PN.at > 10 * 6e4)) { PN.denendi = true; PN.at = Date.now(); setTimeout(() => yukle(false), 0); } };
+  const pnBagla = () => {
+    const a = $('#spAra');
+    a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { PN.ara = a.value; PN.acik = ''; const b = $('#spTablo'); if (b) b.innerHTML = pnTablo(pnOzet()); }, 180); });
+  };
   CLK.senetPanel = {
-    html: panelSenet,
-    bind() {
-      // ilk açılışta ve 10 dakikadan eski veride Paraşüt listesi (sunucuda 10 dk saklanır) arka planda alınır
-      if (!D.yuk && (!D.v ? !PN.denendi : Date.now() - PN.at > 10 * 6e4)) { PN.denendi = true; PN.at = Date.now(); setTimeout(() => yukle(false), 0); }
-      const a = $('#spAra');
-      a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { PN.ara = a.value; PN.acik = ''; const b = $('#spTablo'); if (b) b.innerHTML = pnTablo(pnOzet()); }, 180); });
-    }
+    html: panelSenet, kisa: panelKisa,
+    // ilk açılışta ve 10 dakikadan eski veride Paraşüt listesi (sunucuda 10 dk saklanır) arka planda alınır
+    bind() { pnYukle(); pnBagla(); }
   };
   const prevAct2 = views.onAct;
   views.onAct = (act, el, e) => {

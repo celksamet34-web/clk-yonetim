@@ -69,7 +69,7 @@
         ${gor.ciro ? `<div class="kpi"><div class="k">Stok değeri</div><div class="v">${tlc(cost)}</div><div class="s">${num(PR.length)} ürün · alış fiyatıyla</div></div>` : `<div class="kpi"><div class="k">Ürün</div><div class="v">${num(PR.length)}</div><div class="s">${num(on.length)} yayında · ${num(out.length)} tükenen</div></div>`}
         ${gor.cari ? `<div class="kpi ${debt < 0 ? 'bad' : ''}"><div class="k">Açık cari</div><div class="v">${tlc(Math.abs(debt))}</div><div class="s">${num(S.users.filter(u => (Number(u.balance) || 0) < 0).length)} müşteri borçlu</div></div>` : ''}
       </div>
-      ${CLK.senetPanel && gor.cek ? CLK.senetPanel.html() : ''}
+      ${CLK.senetPanel && gor.cek ? CLK.senetPanel.kisa() : ''}
       <div class="card"><div class="card-h"><div><h3>Kategoriler</h3><p class="sub">Üst kategoriler · seçince alt kategorilere ve ürünlere geçilir</p></div><button class="btn sm ghost" data-go="urunler">Tümü</button></div>${views.catTiles(S.products, true)}</div>
       ${gor.ciro ? `<div class="grid2">
         <div class="card"><div class="card-h"><div><h3>Aylık ciro</h3><p class="sub">Son 6 ay · iade ve iptaller hariç</p></div></div>
