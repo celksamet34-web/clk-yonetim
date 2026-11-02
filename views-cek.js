@@ -582,29 +582,51 @@
   }
   /* Ana panel: önümüzdeki 7 günün senetleri (celik 02.11.2026: "bu 7 gün içinde olan senetleri bana ana panelde göster. senetleri ordan kaldır.
      ana ekrandan sadece ödemesi gelen ve ödenecek senetleri vadeleri ile yaz"). Büyük senet kartı (yeşil/turuncu/kırmızı, kişi bazında) Çek ve senet sayfasına taşındı.
-     Tahsil edilecek: portföydeki müşteri senedi, vadesi 7 gün içinde ya da vadesi geçmiş ama son günü gelmemiş (ödeme süresinde). Ciro edilenler girmez (tedarikçiye ödenir).
-     Ödenecek: firmanın verdiği, ödenmemiş senet, vadesi 7 gün içinde ya da geçmiş (gecikmiş de ödenecek sayılır). Yalnız TL. */
+     celik 02.11: "senetlerde tedarikçiye vermiş olsam dahi orda göster. senet kimin senet nerde tarih ve vade. ödenecekler formu gibi düşün":
+     Ödemesi gelen: müşteri senedi portföyde ya da tedarikçiye ciro edilmiş (çıkış bordrosuna yazılıp Paraşüt'te işlenmemiş olan da), vadesi 7 gün içinde
+     ya da vadesi geçmiş ama son günü gelmemiş. Sütunlar: vade, senet kimin, nerede, alış tarihi, tutar, durum.
+     Ödenecek: firmanın verdiği, ödenmemiş senet, vadesi 7 gün içinde ya da geçmiş (gecikmiş de ödenecek sayılır). Yalnız TL.
+     celik 02.11: "senetler 7 gün de çekler senetler gelmedi": çekler de girer (çekte son gün vadedir); o gün yaklaşan evrakların çoğu ciro edilmişti. */
   function panelKisa() {
-    const ust = alt => `<div class="card-h"><div><h3>Senetler · 7 gün</h3><p class="sub">${alt}</p></div><button class="btn sm ghost" data-go="cek">Çek ve senet</button></div>`;
+    const ust = alt => `<div class="card-h"><div><h3>Çek ve senetler · 7 gün</h3><p class="sub">${alt}</p></div><button class="btn sm ghost" data-go="cek">Çek ve senet</button></div>`;
     if (!D.v) return `<div class="card sk7">${ust('Paraşüt\'ten okunuyor…')}${D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn sm" data-act="spYenile" style="margin-top:10px">Tekrar dene</button>` : '<div class="skel" style="height:120px"></div>'}</div>`;
-    const l = (D.v.cekler || []).filter(c => senetMi(c) && (!c.doviz || c.doviz === 'TRL') && c.kalan > 0.009);
-    const al = l.filter(c => c.yon === 'alinan' && gunFark(c.vade) <= 7 && gunFark(sonGun(c)) >= 0).sort((a, b) => a.vade.localeCompare(b.vade));
-    const ver = l.filter(c => c.yon === 'verilen' && gunFark(c.vade) <= 7).sort((a, b) => a.vade.localeCompare(b.vade));
-    const top = x => x.reduce((t, c) => t + c.kalan, 0);
+    const tut = c => (c.yon === 'ciro' ? c.tutar : c.kalan);
+    const ayr = ayrilanlar();
+    const l = (D.v.cekler || []).filter(c => (!c.doviz || c.doviz === 'TRL') && c.vade && (c.yon === 'ciro' ? c.tutar > 0.009 : c.kalan > 0.009));
+    const sira = (a, b) => a.vade.localeCompare(b.vade) || (a.kimden || a.kime || '').localeCompare(b.kimden || b.kime || '', 'tr');
+    const gel = l.filter(c => (c.yon === 'alinan' || c.yon === 'ciro') && gunFark(c.vade) <= 7 && gunFark(sonGun(c)) >= 0).sort(sira);
+    const ver = l.filter(c => c.yon === 'verilen' && gunFark(c.vade) <= 7).sort(sira);
+    const top = x => x.reduce((t, c) => t + tut(c), 0);
+    const tarihK = d => (d ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}` : '–');
     const durum = c => {
       const n = gunFark(c.vade);
-      if (c.yon === 'alinan' && n <= 0) { const s = gunFark(sonGun(c)); return s === 0 ? ['bad', 'Bugün son gün'] : ['warn', 'Son gün ' + kisaGun(sonGun(c))]; }
+      if (c.yon !== 'verilen' && n <= 0) { const s = gunFark(sonGun(c)); return s === 0 ? ['bad', 'Bugün son gün'] : ['warn', 'Son gün ' + kisaGun(sonGun(c))]; }
       return n < 0 ? ['bad', `${-n} gün gecikti`] : n === 0 ? ['bad', 'Bugün'] : n === 1 ? ['warn', 'Yarın'] : ['gold', `${n} gün kaldı`];
     };
-    const satir = c => { const [cls, yaz] = durum(c); return `<li><div class="cs-vade"><b>${c.vade.slice(8, 10)}</b><small>${AYLAR[+c.vade.slice(5, 7) - 1]} ${GUNK[haftaGunu(c.vade)]}</small></div>
-      <div class="sk7-k"><b>${esc((c.yon === 'verilen' ? c.kime : c.kimden) || 'Kişi yok')}</b><small>Senet${c.seri ? ' ' + esc(c.seri) : ''}${c.vade.slice(0, 4) !== bugun().slice(0, 4) ? ' · ' + c.vade.slice(0, 4) : ''}</small></div>
-      <div class="sk7-s"><b>${tl(c.kalan)}</b><span class="pill ${cls}">${yaz}</span></div></li>`; };
-    const kol = (cls, baslik, x, bos) => `<div class="sk7-kol ${cls}"><div class="sk7-b"><span>${baslik}</span><b>${tl(top(x))}</b><small>${num(x.length)} senet</small></div>
-      ${x.length ? `<ul class="sk7-l">${x.map(satir).join('')}</ul>` : `<p class="sk7-bos">${bos}</p>`}</div>`;
+    const nerede = c => {
+      if (c.yon === 'ciro') return `<b>${esc(c.kime || 'Tedarikçi')}</b><small>Ciro edildi</small>`;
+      const b = ayr[c.id];
+      if (b) return `<b>${esc(b.kisi)}</b><small>Bordro ${esc(b.no)} · Paraşüt'te ciro bekliyor</small>`;
+      return '<b class="sk7-pf">Portföyde</b><small>Elimizde</small>';
+    };
+    const vadeH = c => `<div class="cs-vade"><b>${c.vade.slice(8, 10)}</b><small>${AYLAR[+c.vade.slice(5, 7) - 1]} ${GUNK[haftaGunu(c.vade)]}</small></div>`;
+    const no = c => `${tur(c)}${banka(c) ? ' ' + esc(banka(c)) : ''}${c.seri ? ' no ' + esc(c.seri) : ''}${c.vade.slice(0, 4) !== bugun().slice(0, 4) ? ' · vade ' + c.vade.slice(0, 4) : ''}`;
+    const satir = (c, gelen) => { const [cls, yaz] = durum(c); return `<li class="sk7-tr${c.yon === 'ciro' || ayr[c.id] ? ' ted' : ''}">
+      <div class="v">${vadeH(c)}</div>
+      <div class="k"><b>${esc((gelen ? c.kimden : c.kime) || 'Kişi yok')}</b><small>${no(c)}</small></div>
+      ${gelen ? `<div class="n"><span class="m">Nerede: </span>${nerede(c)}</div>` : ''}
+      <div class="t"><span class="m">${gelen ? 'Alış' : 'Veriliş'} </span>${tarihK(c.tarih)}</div>
+      <div class="tu">${tl(tut(c))}</div>
+      <div class="d"><span class="pill ${cls}">${yaz}</span></div></li>`; };
+    const tablo = (cls, baslik, alt, x, bos, gelen) => `<section class="sk7-kol ${cls}">
+      <div class="sk7-b"><span>${baslik}</span><b>${tl(top(x))}</b><small>${alt}</small></div>
+      ${x.length ? `<ul class="sk7-tb ${gelen ? 'gelen' : 'oden'}"><li class="sk7-th" aria-hidden="true"><span>Vade</span><span>${gelen ? 'Kimin' : 'Kime verildi'}</span>${gelen ? '<span>Nerede</span>' : ''}<span>${gelen ? 'Alış tarihi' : 'Veriliş tarihi'}</span><span class="r">Tutar</span><span class="r">Durum</span></li>${x.map(c => satir(c, gelen)).join('')}</ul>` : `<p class="sk7-bos">${bos}</p>`}</section>`;
+    const pf = gel.filter(c => c.yon === 'alinan' && !ayr[c.id]), td = gel.filter(c => c.yon === 'ciro' || ayr[c.id]);
+    const gelAlt = gel.length ? `${num(gel.length)} evrak${td.length ? ` · portföyde ${tl(top(pf))}, tedarikçide ${tl(top(td))}` : ''}` : '';
     const zm = D.v.zaman ? new Date(D.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
-    return `<div class="card sk7">${ust(`Vadesi önümüzdeki 7 günde olan senetler · Paraşüt${zm ? ', ' + zm : ''}${D.yuk ? ' · yenileniyor…' : ''}`)}
-      <div class="sk7-g">${kol('al', 'Tahsil edilecek', al, '7 gün içinde vadesi gelen müşteri senedi yok.')}${kol('ver', 'Ödenecek', ver, '7 gün içinde ödenecek senet yok.')}</div>
-      <p class="sp-not">Müşteri senedinde son gün vade (tatilse sonraki iş günü) ve izleyen iki iş günüdür, 15:00'a kadar.</p></div>`;
+    return `<div class="card sk7">${ust(`Vadesi önümüzdeki 7 günde olan çek ve senetler · Paraşüt${zm ? ', ' + zm : ''}${D.yuk ? ' · yenileniyor…' : ''}`)}
+      <div class="sk7-g">${tablo('al', 'Ödemesi gelen', gelAlt, gel, '7 gün içinde vadesi gelen müşteri çeki ya da senedi yok.', true)}${tablo('ver', 'Ödenecek', ver.length ? num(ver.length) + ' evrak' : '', ver, '7 gün içinde ödenecek çek ya da senet yok.', false)}</div>
+      <p class="sp-not">Ödemesi gelen: müşterilerin çek ve senetleri, portföyde ya da tedarikçiye verilmiş olsa da. Çekte son gün vadedir; senette son gün vade (tatilse sonraki iş günü) ve izleyen iki iş günüdür, 15:00'a kadar.</p></div>`;
   }
   const pnYukle = () => { if (!D.yuk && (!D.v ? !PN.denendi : Date.now() - PN.at > 10 * 6e4)) { PN.denendi = true; PN.at = Date.now(); setTimeout(() => yukle(false), 0); } };
   const pnBagla = () => {
