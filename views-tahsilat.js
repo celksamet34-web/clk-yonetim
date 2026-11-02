@@ -89,7 +89,7 @@
     const f = T.f, t = para(f.tutar), h = hesap(f.hesap), e = eksik(), ayni = ayniVar(), u = siteUye(f.kisi);
     const satir = (k, v) => `<div class="gd-oz-s"><span>${k}</span><b>${v}</b></div>`;
     const bal = u ? Number(u.balance) || 0 : null;
-    return `<div class="gd-oz-k">Müşteriden ödeme</div>
+    return `<div class="gd-oz-k">Müşteriden tahsilat</div>
       <div class="gd-oz-t">${t ? tl2(t) : '0,00 ₺'}</div>
       ${satir('Müşteri', f.kisi ? esc(f.kisi.ad) : 'Seçilmedi')}
       ${satir('Tarih', f.tarih ? dt(f.tarih) : '—')}
@@ -98,7 +98,7 @@
       ${f.aciklama.trim() ? `<p class="gd-oz-a">“${esc(f.aciklama.trim())}”</p>` : ''}
       ${ayni ? `<p class="gd-oz-u">Bu müşteriden bu tarihte aynı tutarda ödeme panelden zaten girildi (${esc(ayni.hesap)}). İkinci kez girmediğinizden emin olun.</p>` : ''}
       ${T.uyari ? `<p class="gd-oz-h">${esc(T.uyari)}</p>` : ''}
-      <button class="btn gold gd-kaydet" data-act="thKaydet" ${T.kaydediyor || !T.k ? 'disabled' : ''}>${T.kaydediyor ? 'Paraşüt\'e kaydediliyor…' : T.onay ? (ayni ? 'Evet, yine de kaydet' : 'Evet, kaydet') : 'Ödemeyi kaydet'}</button>
+      <button class="btn gold gd-kaydet" data-act="thKaydet" ${T.kaydediyor || !T.k ? 'disabled' : ''}>${T.kaydediyor ? 'Paraşüt\'e kaydediliyor…' : T.onay ? (ayni ? 'Evet, yine de kaydet' : 'Evet, kaydet') : 'Tahsilatı kaydet'}</button>
       <p class="gd-oz-n">${T.onay ? 'Bilgileri kontrol edip bir kez daha basın.' : e.length && (f.tutar || f.kisi) ? esc(e[0]) : 'Paraşüt\'e tahsilat olarak girilir, site carisine de yazılır. Hiçbir kayıt silinmez.'}</p>`;
   }
   const ozetYenile = () => { const o = $('#thOzet'); if (o) o.innerHTML = ozetHtml(); };
@@ -166,7 +166,7 @@
     if (!T.acik) return '';
     if (!T.k && !T.yuk && !T.hata) setTimeout(() => yukle(false), 0);
     return `<section class="odm" id="thKart">
-      <div class="odm-h"><div><h2>Ödeme gir</h2><p class="sub">Müşteriden alınan nakit, havale, kart${senetVar() ? ' ya da senet' : ''}. Kasa ve bankalar Paraşüt'ten gelir.</p></div>
+      <div class="odm-h"><div><h2>Ödeme gir</h2><p class="sub">Müşteriden tahsilat: nakit, havale, kart${senetVar() ? ' ya da senet' : ''}. Paraşüt'te müşterinin carisine tahsilat olarak girer, kasa ve bankalar Paraşüt'ten gelir.</p></div>
         <button class="btn sm ghost" data-act="thKapat">Kapat</button></div>
       <div class="gd-ust">${formHtml()}<div class="gd-sag">${senetMi() && T.k ? `<div class="card gd-ozet" id="snOzet">${CLK.senetGom.ozet()}</div>` : `<div class="card gd-ozet" id="thOzet">${ozetHtml()}</div>`}${gecmisHtml()}</div></div>
     </section>`;
