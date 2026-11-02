@@ -10,7 +10,9 @@
   const TUR = [['kart', 'Kredi kartı'], ['kredi', 'Kredi'], ['kira', 'Kira'], ['fatura', 'Fatura'], ['vergi', 'Vergi / SGK'], ['diger', 'Diğer']];
   const TURAD = Object.fromEntries(TUR);
   const YER = { kart: 'Örn. Garanti Bonus kart', kredi: 'Örn. Akbank ticari kredi', kira: 'Örn. Dükkân kirası', fatura: 'Örn. Elektrik faturası', vergi: 'Örn. SGK primi', diger: 'Örn. Araç sigortası' };
-  const HAT = [[7, '7 gün önce'], [3, '3 gün önce'], [1, '1 gün önce'], [0, 'Son gün']];
+  // son gün her ödemede sabah ve akşam 20:00'de gelir (celik 02.11), seçilen yalnız önceki günler
+  const HAT = [[7, '7 gün önce'], [3, '3 gün önce'], [1, '1 gün önce']];
+  const SONGUN = 'son gün sabah ve 20:00';
   const AY = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
   const AYTAM = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
   const GUN = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
@@ -93,10 +95,10 @@
     const kt = kalanTaksit(k, D || {});
     return `Her ayın ${k.gun}. günü${k.bitis ? ` · son taksit ${ayAdi(k.bitis)}${kt ? ` (${kt} taksit kaldı)` : ''}` : ''}`;
   };
-  const hatYazi = k => (k.hatirlat || []).length ? 'Bildirim: ' + HAT.filter(([n]) => k.hatirlat.includes(n)).map(([, l]) => l.toLocaleLowerCase('tr')).join(', ') : 'Bildirim yok (gecikince bir kez)';
+  const hatYazi = k => 'Bildirim: ' + [...HAT.filter(([n]) => (k.hatirlat || []).includes(n)).map(([, l]) => l.toLocaleLowerCase('tr')), SONGUN].join(', ');
 
   /* ---------- form ---------- */
-  const bosForm = () => ({ id: '', ad: '', tur: 'kart', tekrar: 'aylik', gun: '', tarih: '', tutar: '', taksit: '', hatirlat: [3, 1, 0], not: '' });
+  const bosForm = () => ({ id: '', ad: '', tur: 'kart', tekrar: 'aylik', gun: '', tarih: '', tutar: '', taksit: '', hatirlat: [3, 1], not: '' });
   function formHtml() {
     const f = OD.f, yeni = !f.id;
     return `<div class="card od-form" id="odForm"><div class="card-h"><div><h3>${yeni ? 'Yeni ödeme' : esc(f.ad || 'Ödeme') + ' · düzenle'}</h3><p class="sub">Son ödeme gününden önce telefona bildirim gelir.</p></div></div>
@@ -109,7 +111,7 @@
         <label class="f"><span>Tutar <em>${f.tur === 'kart' ? 'ekstre her ay değişiyorsa boş bırakın' : 'isteğe bağlı'}</em></span><input id="odTutar" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(f.tutar)}"></label>
         ${f.tekrar === 'aylik' && (f.tur === 'kredi' || f.taksit) ? `<label class="f"><span>Kalan taksit <em>boşsa bitmez</em></span><input id="odTaksit" type="number" min="1" max="480" inputmode="numeric" placeholder="Örn. 12" value="${esc(f.taksit)}"></label>` : ''}
       </div>
-      <div class="f"><span>Ne zaman hatırlatılsın?</span><div class="chips">${HAT.map(([n, l]) => `<button class="chip" data-act="odHat" data-v="${n}" aria-pressed="${f.hatirlat.includes(n)}">${l}</button>`).join('')}</div></div>
+      <div class="f"><span>Önceden hatırlatma <em>son gün sabah ve akşam 20:00'de her zaman gelir</em></span><div class="chips">${HAT.map(([n, l]) => `<button class="chip" data-act="odHat" data-v="${n}" aria-pressed="${f.hatirlat.includes(n)}">${l}</button>`).join('')}</div></div>
       <label class="f"><span>Not <em>isteğe bağlı</em></span><input id="odNot" type="text" maxlength="200" autocomplete="off" placeholder="Örn. hesaptan otomatik çekiliyor" value="${esc(f.not)}"></label>
       ${OD.fHata ? `<p class="msg err">${esc(OD.fHata)}</p>` : ''}
       <div class="od-btn"><button class="btn gold" data-act="odKaydet" ${OD.is ? 'disabled' : ''}>${OD.is ? 'Kaydediliyor' : 'Kaydet'}</button><button class="btn" data-act="odKapat" ${OD.is ? 'disabled' : ''}>Vazgeç</button>
@@ -165,7 +167,7 @@
           ${odn.length ? `<h4 class="od-h4">Son ödenenler</h4><ul class="od-liste">${odn.slice(0, 12).map(x => `<li><div><b>${esc(x.ad)}</b><small>${x.donem === 'tek' ? 'Tek sefer' : esc(ayAdi(x.donem))} · ödendi ${dt(x.o.tarih)}${x.o.tutar ? ' · ' + tl(x.o.tutar) : ''}</small></div>${x.k ? `<button class="btn sm ghost" data-act="odGeri" data-id="${x.id}" data-donem="${x.donem}" title="Ödenmedi olarak geri al">Geri al</button>` : ''}</li>`).join('')}</ul>` : ''}
         </div>
         <div class="card od-bildirim"><div class="card-h"><div><h3>Telefona bildirim</h3><p class="sub">ntfy uygulaması · sipariş bildirimleriyle aynı kanal</p></div></div>
-          <p>Hatırlatmalar sipariş bildirimlerinin geldiği <b>ntfy</b> kanalına gelir, telefonda ayrıca bir şey kurmanız gerekmez: seçtiğiniz günlerde saat 09:00'da, ödeme gecikirse ertesi gün bir kez daha.</p>
+          <p>Hatırlatmalar sipariş bildirimlerinin geldiği <b>ntfy</b> kanalına gelir, telefonda ayrıca bir şey kurmanız gerekmez: seçtiğiniz günlerde saat 09:00'da, son gün sabah 09:00'da ve akşam 20:00'de, ödeme gecikirse ertesi gün bir kez daha. Son gün "Ödendi" derseniz akşamki gelmez.</p>
           <button class="btn gold sm" data-act="odDeneme" ${OD.is ? 'disabled' : ''}>Deneme bildirimi gönder</button>
         </div>
       </div>`;
