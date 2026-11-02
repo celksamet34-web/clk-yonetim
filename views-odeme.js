@@ -2,7 +2,7 @@
    telefon ile bildirim alacağımız bir form hazırla. personele gizli kalsın").
    Kredi kartı, kredi, kira, fatura, vergi gibi ödemeler: her ayın belli günü ya da tek sefer; tutar isteğe bağlı (kart ekstresi her ay değişirse dönem tutarı girilir).
    Sunucu: Supabase edge fonksiyonu odeme-takvim (yalnız yönetici; kayıt sp_ayar odeme_takvim, Paraşüt'e yazılmaz). Telefona bildirim ntfy uygulamasına,
-   ödemelere özel ayrı bir kanaldan gider: cron saat başı 09:00–21:00, seçilen günlerde (7/3/1 gün önce, son gün) ve gecikince bir kez. Sayfa personelde görünmez. */
+   sipariş bildirimleriyle aynı kanala gider (celik 02.11: "aynı kanala çek"; kanal adı sp_ayar odeme_ntfy_konu, panelde gösterilmez): cron saat başı 09:00–21:00, seçilen günlerde (7/3/1 gün önce, son gün) ve gecikince bir kez. Sayfa personelde görünmez. */
 (() => {
   const { sb, S, $, esc, tl: tl0, tl2, num, dt, toast, head, views, render, go } = CLK;
   const tl = n => (Number(n) || 0) % 1 ? tl2(n) : tl0(n); // kuruşlu tutar kuruşuyla yazılır
@@ -164,12 +164,9 @@
           ${(v.kalemler || []).length ? `<ul class="od-liste">${[...v.kalemler].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(k => `<li><div><b>${esc(k.ad)}</b><small>${esc(TURAD[k.tur] || '')} · ${esc(tekrarYazi(k, D))}${k.tutar ? ' · ' + tl(k.tutar) : ''}</small><small>${esc(hatYazi(k))}</small></div><button class="btn sm" data-act="odDuzenle" data-id="${k.id}">Düzenle</button></li>`).join('')}</ul>` : '<p class="sub">Kayıt yok.</p>'}
           ${odn.length ? `<h4 class="od-h4">Son ödenenler</h4><ul class="od-liste">${odn.slice(0, 12).map(x => `<li><div><b>${esc(x.ad)}</b><small>${x.donem === 'tek' ? 'Tek sefer' : esc(ayAdi(x.donem))} · ödendi ${dt(x.o.tarih)}${x.o.tutar ? ' · ' + tl(x.o.tutar) : ''}</small></div>${x.k ? `<button class="btn sm ghost" data-act="odGeri" data-id="${x.id}" data-donem="${x.donem}" title="Ödenmedi olarak geri al">Geri al</button>` : ''}</li>`).join('')}</ul>` : ''}
         </div>
-        <div class="card od-bildirim"><div class="card-h"><div><h3>Telefona bildirim</h3><p class="sub">ntfy uygulaması · ödemelere özel kanal</p></div></div>
-          <p>Hatırlatmalar sipariş bildirimlerinin geldiği <b>ntfy</b> uygulamasına, ayrı bir kanaldan gelir: seçtiğiniz günlerde saat 09:00'da, ödeme gecikirse ertesi gün bir kez daha.</p>
-          <p><b>Bir kez kurun:</b> telefonda ntfy uygulamasında <b>+</b>'ya basıp aşağıdaki kanal adını yazın (ya da telefondan "ntfy'de aç"a basın), sonra "Deneme bildirimi"yle kontrol edin.</p>
-          <div class="od-konu"><code>${esc(v.konu || '')}</code><button class="btn sm" data-act="copy" data-v="${esc(v.konu || '')}">Kopyala</button><a class="btn sm" href="https://ntfy.sh/${encodeURIComponent(v.konu || '')}" target="_blank" rel="noopener">ntfy'de aç</a></div>
+        <div class="card od-bildirim"><div class="card-h"><div><h3>Telefona bildirim</h3><p class="sub">ntfy uygulaması · sipariş bildirimleriyle aynı kanal</p></div></div>
+          <p>Hatırlatmalar sipariş bildirimlerinin geldiği <b>ntfy</b> kanalına gelir, telefonda ayrıca bir şey kurmanız gerekmez: seçtiğiniz günlerde saat 09:00'da, ödeme gecikirse ertesi gün bir kez daha.</p>
           <button class="btn gold sm" data-act="odDeneme" ${OD.is ? 'disabled' : ''}>Deneme bildirimi gönder</button>
-          <p class="sub" style="margin-top:10px">Kanal adını kimseyle paylaşmayın: bilen herkes bildirimleri görebilir.</p>
         </div>
       </div>`;
   };
