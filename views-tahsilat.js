@@ -179,7 +179,7 @@
   }
   // Cari hesap sayfası çizilince: senet seçiliyse senet alanlarının olayları bağlanır
   const bagla = () => { if (T.acik && senetMi() && T.k) CLK.senetGom.bagla(); };
-  CLK.tahsilat = { kart, ac, bagla, dugme: (siteId) => CLK.izin('cari') ? `<button class="btn gold sm" data-act="thAc"${siteId ? ` data-u="${esc(siteId)}"` : ''}>Ödeme gir</button>` : '' };
+  CLK.tahsilat = { kart, ac, bagla, sor, dugme: (siteId) => CLK.izin('cari') ? `<button class="btn gold sm" data-act="thAc"${siteId ? ` data-u="${esc(siteId)}"` : ''}>Ödeme gir</button>` : '' };
 
   araSec.thKisi = m => { T.f.kisi = m; T.onay = false; T.uyari = ''; };
 

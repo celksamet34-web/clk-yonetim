@@ -146,38 +146,100 @@
       return `<tr class="${withUser && u ? 'row' : ''}" ${withUser && u ? `data-user="${u.id}"` : ''}><td>${dtt(b.createdAt)}</td>${withUser ? `<td>${esc(u ? userName(u) : b.userCode || '#' + b.userId)}</td>` : ''}<td>${esc(lab)}</td><td>${esc(b.paymentFirmName || '—')}${Number(b.installments) > 1 ? ' · ' + b.installments + ' taksit' : ''}</td><td class="r"><b class="${sg > 0 ? 'pos' : 'neg'}">${sg > 0 ? '+' : '−'}${tl2(Math.abs(Number(b.price) || 0))}</b></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
-  const C = (S.ui.c ||= { q: '', t: 'all' });
+  /* ---------- cari: müşteri carileri (celik 02.11.2026: "cari hesaplarda hareketler gözükmesin müşteri carileri gözüksün.
+     en son ödeme yaptığı zamana yazalım. son hareket zamanı olarak") ----------
+     Her müşteri bir satır: site bakiyesi, Paraşüt'teki son ödemesi (tahsilat, çek ya da senet) ve son hareketi (satış, iade, ödeme).
+     Tarihler gider-cek cari_ozet işleminden gelir (20 dk saklanır, eskiyse arka planda yenilenir). Hareket listesi müşteri sayfasında. */
+  const C = (S.ui.c ||= { q: '', f: 'hepsi', s: 'borc' });
+  const CZ = (S.ui.cz ||= { v: null, yuk: false, hata: '', zaman: 0, tekrar: 0 });
+  async function cariOzetYukle(yenile) {
+    if (CZ.yuk || !CLK.tahsilat?.sor) return;
+    CZ.yuk = true; CZ.hata = ''; if (S.route === 'cari') { S.keepScroll = true; render(); }
+    try {
+      const j = await CLK.tahsilat.sor({ islem: 'cari_ozet', yenile: !!yenile });
+      if (j.musteriler?.length || !CZ.v) CZ.v = j;
+      CZ.zaman = Date.now();
+      // sunucu eski listeyi verip yenisini arka planda hesaplıyorsa biraz sonra yeniden sorulur
+      if (j.eski && CZ.tekrar < 4) { CZ.tekrar++; setTimeout(() => { if (S.route === 'cari') cariOzetYukle(false); }, 40000); } else CZ.tekrar = 0;
+    } catch (e) { CZ.hata = e.message; }
+    CZ.yuk = false; if (S.route === 'cari') { S.keepScroll = true; render(); }
+  }
+  const gunNo = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  const bugunNo = () => { const d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const gecen = s => Math.round((bugunNo() - gunNo(s)) / 864e5);
+  const once = n => n <= 0 ? 'bugün' : n === 1 ? 'dün' : `${n} gün önce`;
+  const GEC = 30; // borçlu müşteri bu kadar gündür ödeme yapmadıysa kırmızı yazılır
+  const cariSatirlar = () => {
+    const p = {}; for (const m of CZ.v?.musteriler || []) if (m.site) p[m.site] = m;
+    return S.users.map(u => {
+      const bal = Number(u.balance) || 0, z = p[u.id] || null, son = z?.odeme ? gecen(z.odeme[0]) : null;
+      return { u, bal, z, son, gec: bal < -0.5 && !!z && (son === null || son > GEC) };
+    });
+  };
   views.cari = () => {
     // Ödeme gir (views-tahsilat.js): müşteriden alınan ödeme Paraşüt'e tahsilat olarak girilir, site carisine de yazılır
-    const acts = `${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="reloadU" ${S.bLoading || S.uLoading ? 'disabled' : ''}>${S.bLoading ? 'Yükleniyor' : 'Yenile'}</button>`;
+    if (!CZ.yuk && !CZ.hata && (!CZ.v || Date.now() - CZ.zaman > 20 * 60e3)) setTimeout(() => cariOzetYukle(false), 0);
+    const acts = `${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="czYenile" ${S.uLoading || CZ.yuk ? 'disabled' : ''}>${S.uLoading || CZ.yuk ? 'Yükleniyor' : 'Yenile'}</button>`;
     const odeme = CLK.tahsilat?.kart() || '';
-    if (S.bErr && !S.balance.length) return head('Finans', 'Cari hesap', '', acts) + odeme + errBox(S.bErr, 'reloadB');
-    if (!S.bLoaded && !S.balance.length) return head('Finans', 'Cari hesap', 'Alınıyor…', acts) + odeme + skel();
+    if (S.uErr && !S.users.length) return head('Finans', 'Cari hesap', '', acts) + odeme + errBox(S.uErr, 'reloadU');
+    if (!S.uLoaded && !S.users.length) return head('Finans', 'Cari hesap', 'Alınıyor…', acts) + odeme + skel();
+    const R = cariSatirlar();
+    const debtors = R.filter(r => r.bal < -0.5), creditors = R.filter(r => r.bal > 0.5), gec = R.filter(r => r.gec);
+    const yedi = R.filter(r => r.son !== null && r.son <= 7).length;
     const q = C.q.trim().toLocaleLowerCase('tr');
-    const L = S.balance.filter(b => {
-      const t = (BAL_TYPE[b.type] || ['', 'adj'])[1]; if (C.t !== 'all' && t !== C.t) return false;
-      if (!q) return true; const u = userById(b.userId); return [u ? userName(u) : '', b.userCode, b.paymentFirmName].join(' ').toLocaleLowerCase('tr').includes(q);
+    let L = R.filter(r => {
+      if (C.f === 'borclu' && !(r.bal < -0.5)) return false;
+      if (C.f === 'alacakli' && !(r.bal > 0.5)) return false;
+      if (C.f === 'gec' && !r.gec) return false;
+      return !q || [userName(r.u), r.u.phone, r.u.email, r.u.code, r.z?.ad].join(' ').toLocaleLowerCase('tr').includes(q);
     });
-    const inSum = S.balance.filter(b => sign(b) > 0).reduce((a, b) => a + Math.abs(+b.price || 0), 0), outSum = S.balance.filter(b => sign(b) < 0).reduce((a, b) => a + Math.abs(+b.price || 0), 0);
-    const debtors = S.users.filter(u => (Number(u.balance) || 0) < 0).sort((a, b) => a.balance - b.balance), creditors = S.users.filter(u => (Number(u.balance) || 0) > 0);
-    return head('Finans', 'Cari hesap', `${num(S.balance.length)} hareket · ${num(S.users.length)} hesap`, acts) + odeme + `
+    const ad = (a, b) => userName(a.u).localeCompare(userName(b.u), 'tr');
+    const tar = (r, k) => r.z?.[k]?.[0] || '';
+    L.sort(C.s === 'ad' ? ad : C.s === 'odeme' ? (a, b) => tar(a, 'odeme').localeCompare(tar(b, 'odeme')) || a.bal - b.bal
+      : C.s === 'hareket' ? (a, b) => tar(b, 'hareket').localeCompare(tar(a, 'hareket')) || ad(a, b) : (a, b) => a.bal - b.bal || ad(a, b));
+    const bekle = CZ.yuk && !CZ.v;
+    const odemeHucre = r => {
+      if (bekle) return '<span class="cz-bos">Paraşüt\'ten alınıyor…</span>';
+      if (!r.z) return `<b>—</b><small>${CZ.v ? 'Paraşüt eşleşmesi yok' : ''}</small>`;
+      if (!r.z.odeme) return `<b>—</b><small class="${r.gec ? 'cz-gec' : ''}">Ödeme yok</small>`;
+      const [t, tutar, tur] = r.z.odeme;
+      return `<b>${dt(t)}</b><small class="${r.gec ? 'cz-gec' : ''}">${once(r.son)} · ${tl(tutar)} · ${esc(tur)}</small>`;
+    };
+    const hareketHucre = r => {
+      if (bekle) return '';
+      if (!r.z?.hareket) return '<b>—</b>';
+      const [t, tur] = r.z.hareket;
+      return `<b>${dt(t)}</b><small>${once(gecen(t))} · ${esc(tur)}</small>`;
+    };
+    const durum = r => r.bal < -0.5 ? 'Borçlu' : r.bal > 0.5 ? 'Alacaklı' : 'Kapalı';
+    const satir = r => `<li class="cz-tr" data-user="${r.u.id}">
+      <div class="k"><b>${esc(userName(r.u))}</b><small>${esc(r.u.phone || r.u.email || r.u.code || '')}</small></div>
+      <div class="b"><b class="num ${r.bal < -0.5 ? 'neg' : r.bal > 0.5 ? 'pos' : ''}">${tl2(r.bal)}</b><small>${durum(r)}</small></div>
+      <div class="o"><span class="m">Son ödeme</span>${odemeHucre(r)}</div>
+      <div class="h"><span class="m">Son hareket</span>${hareketHucre(r)}</div>
+    </li>`;
+    const zaman = CZ.v?.zaman ? new Date(CZ.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const altYazi = CZ.hata ? `<span class="cz-gec">Son ödeme tarihleri alınamadı: ${esc(CZ.hata)}</span>`
+      : CZ.yuk ? 'Son ödeme ve hareket tarihleri Paraşüt\'ten alınıyor…' : zaman ? `Ödeme ve hareket tarihleri Paraşüt'ten, ${zaman} itibarıyla. Satıra dokununca müşterinin hareketleri açılır.` : '';
+    return head('Finans', 'Cari hesap', `${num(R.length)} müşteri`, acts) + odeme + `
       <div class="kpis">
-        <div class="kpi hero"><div class="k">Toplam alacak</div><div class="v">${tl(Math.abs(debtors.reduce((a, u) => a + Number(u.balance), 0)))}</div><div class="s">${num(debtors.length)} müşterinin borcu</div></div>
-        <div class="kpi"><div class="k">Müşteri alacağı</div><div class="v">${tlc(creditors.reduce((a, u) => a + Number(u.balance), 0))}</div><div class="s">${num(creditors.length)} hesapta artı bakiye</div></div>
-        <div class="kpi"><div class="k">Giriş</div><div class="v">${tlc(inSum)}</div><div class="s">tahsilat ve yüklemeler</div></div>
-        <div class="kpi"><div class="k">Çıkış</div><div class="v">${tlc(outSum)}</div><div class="s">sipariş ve çıkışlar</div></div>
+        <div class="kpi hero"><div class="k">Toplam alacak</div><div class="v">${tl(Math.abs(debtors.reduce((a, r) => a + r.bal, 0)))}</div><div class="s">${num(debtors.length)} müşterinin borcu</div></div>
+        <div class="kpi"><div class="k">Müşteri alacağı</div><div class="v">${tlc(creditors.reduce((a, r) => a + r.bal, 0))}</div><div class="s">${num(creditors.length)} hesapta artı bakiye</div></div>
+        <div class="kpi ${gec.length ? 'bad' : ''}"><div class="k">${GEC} gündür ödemeyen</div><div class="v">${CZ.v ? tlc(Math.abs(gec.reduce((a, r) => a + r.bal, 0))) : '…'}</div><div class="s">${CZ.v ? num(gec.length) + ' borçlu müşteri' : 'tarihler alınıyor'}</div></div>
+        <div class="kpi"><div class="k">Son 7 günde ödeyen</div><div class="v">${CZ.v ? num(yedi) : '…'}</div><div class="s">müşteri</div></div>
       </div>
-      <div class="grid2" style="margin-top:18px">
-        <div class="card"><div class="card-h"><div><h3>Hareketler</h3><p class="sub">En yeniden eskiye</p></div></div>
-          <div class="tools"><input type="search" id="cq" placeholder="Müşteri veya ödeme yöntemi ara" value="${esc(C.q)}"></div>
-          <div class="chips">${[['all', 'Tümü'], ['in', 'Girişler'], ['out', 'Çıkışlar'], ['adj', 'Düzeltmeler']].map(([k, l]) => `<button class="chip" data-ct="${k}" aria-pressed="${C.t === k}">${l}</button>`).join('')}</div>${ledger(L, true)}</div>
-        <div class="card"><div class="card-h"><div><h3>Borçlu hesaplar</h3><p class="sub">Bakiyesi eksiye düşen müşteriler</p></div></div>
-          ${debtors.length ? `<ul class="rows">${debtors.map(u => `<li data-user="${u.id}"><span class="th av-s">${esc((userName(u).match(/\p{L}/gu) || ['?']).slice(0, 2).join('').toLocaleUpperCase('tr'))}</span><div class="t"><b>${esc(userName(u))}</b><small>${esc(u.phone || u.email || '')}</small></div><b class="num neg">${tl2(u.balance)}</b></li>`).join('')}</ul>` : '<p class="sub">Borçlu hesap yok.</p>'}</div>
+      <div class="card cz" style="margin-top:18px">
+        <div class="card-h"><div><h3>Müşteri carileri</h3><p class="sub">${altYazi}</p></div></div>
+        <div class="tools"><input type="search" id="cq" placeholder="Müşteri ara" value="${esc(C.q)}"></div>
+        <div class="chips">${[['hepsi', 'Hepsi', R.length], ['borclu', 'Borçlu', debtors.length], ['alacakli', 'Alacaklı', creditors.length], ['gec', GEC + ' gündür ödemeyen', CZ.v ? gec.length : '']].map(([k, l, n]) => `<button class="chip" data-cf="${k}" aria-pressed="${C.f === k}">${l}${n !== '' ? ` <b>${n}</b>` : ''}</button>`).join('')}</div>
+        <div class="cz-sira"><span>Sırala:</span>${[['borc', 'Borca göre'], ['odeme', 'Son ödemeye göre'], ['hareket', 'Son harekete göre'], ['ad', 'Ada göre']].map(([k, l]) => `<button class="chip sm" data-cs="${k}" aria-pressed="${C.s === k}">${l}</button>`).join('')}</div>
+        ${L.length ? `<ul class="cz-tb"><li class="cz-th"><div>Müşteri</div><div>Bakiye</div><div>Son ödeme</div><div>Son hareket</div></li>${L.map(satir).join('')}</ul>` : '<p class="sub">Bu seçimde müşteri yok.</p>'}
       </div>`;
   };
   views.bind_cari = () => {
     const q = $('#cq'); q?.addEventListener('input', () => { C.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
-    $$('[data-ct]').forEach(b => b.addEventListener('click', () => { C.t = b.dataset.ct; render(); }));
+    $$('[data-cf]').forEach(b => b.addEventListener('click', () => { C.f = b.dataset.cf; S.keepScroll = true; render(); }));
+    $$('[data-cs]').forEach(b => b.addEventListener('click', () => { C.s = b.dataset.cs; S.keepScroll = true; render(); }));
     CLK.tahsilat?.bagla?.();
   };
 
@@ -234,6 +296,7 @@
     else if (act === 'bekleyenGit') { F.s = -1; F.q = ''; F.plat = ''; F.shown = 40; go('siparisler'); }
     else if (act === 'oIptal' || act === 'oDuzelt') { const o = S.orders.find(x => String(O.id(x)) === el.dataset.id); if (o) (act === 'oIptal' ? siparisIptal : siparisDuzelt)(o); }
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
+    else if (act === 'czYenile') { CLK.loadUsers(true); CZ.tekrar = 0; cariOzetYukle(true); }
     else if (act === 'copy') { navigator.clipboard?.writeText(el.dataset.v).then(() => CLK.toast('Kopyalandı'), () => CLK.toast('Kopyalanamadı')); }
     else prevAct?.(act, el, e);
   };

@@ -1087,3 +1087,30 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
   .sk7-tb .m{display:inline}
 }
 .odm-sekil{margin-top:12px}
+
+/* Cari hesap › Müşteri carileri (celik 02.11.2026: hareketler yerine müşteri bazlı cari, son ödeme ve son hareket) */
+.cz-sira{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-8px 0 14px}
+.cz-sira>span{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.cz-sira .chip{min-height:32px;padding:5px 11px;font-size:11px}
+.cz-tb{list-style:none;margin:0 -8px;padding:0}
+.cz-tb li{display:grid;grid-template-columns:minmax(0,1.5fr) 150px minmax(0,1.25fr) minmax(0,1.25fr);gap:14px;align-items:center;padding:11px 8px;border-bottom:1px solid var(--line)}
+.cz-tb li:last-child{border-bottom:0}
+.cz-tb li.cz-th{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-top:4px;padding-bottom:8px}
+.cz-tb li.cz-tr{cursor:pointer;border-radius:10px}
+.cz-tb li.cz-tr:hover{background:var(--sunk)}
+.cz-tb li>div{min-width:0}
+.cz-tb li>div>b{display:block;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cz-tb li>div>small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cz-tb .b{text-align:right}
+.cz-tb li.cz-th .b{text-align:right}
+.cz-tb .m{display:none}
+.cz-tb small.cz-gec,.cz .cz-gec{color:var(--bad);font-weight:700}
+.cz-bos{color:var(--muted);font-size:12px}
+@media(max-width:760px){
+  .cz-tb li.cz-th{display:none}
+  .cz-tb li{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"k b" "o h";gap:6px 12px;padding:12px 8px}
+  .cz-tb .k{grid-area:k}.cz-tb .b{grid-area:b}.cz-tb .o{grid-area:o}.cz-tb .h{grid-area:h;text-align:right}
+  .cz-tb .m{display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .cz-tb li>div>b{font-size:13px}
+  .cz-tb li>div>small{white-space:normal}
+}
