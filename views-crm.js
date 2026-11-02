@@ -113,7 +113,11 @@
   };
 
   views.musteri = () => {
-    const u = userById(S.arg), pasif = !!u && Number(u.status) === 0; const back = `${u && !pasif ? CLK.tahsilat?.dugme(u.id) || '' : ''}<button class="btn sm" data-go="musteriler">← Müşteriler</button>`;
+    const u = userById(S.arg), pasif = !!u && Number(u.status) === 0;
+    // geri düğmesi müşteri kartının açıldığı sayfaya döner (celik 02.11: "cari hesaptan müşteriye girdiğimizde geri cari hesap sayfasına geçmek için düğme bırak")
+    const don = S.ui.mDon && GERI[S.ui.mDon.r] ? S.ui.mDon : null;
+    const back = `${u && !pasif ? CLK.tahsilat?.dugme(u.id) || '' : ''}${don ? `<button class="btn sm" data-act="mGeri">← ${GERI[don.r]}</button>` : '<button class="btn sm" data-go="musteriler">← Müşteriler</button>'}`;
+    if (u && CLK.izin('cari')) cariOzetGerekirse();
     if (!u) return head('Müşteri', 'Bulunamadı', '', back) + (S.uLoading ? skel() : '<div class="card empty"><h3>Müşteri bulunamadı</h3></div>');
     const s = custStats(u), os = ordersOf(u.id), bs = balOf(u.id), bal = Number(u.balance) || 0;
     const prices = { 0: 'Varsayılan', 2: 'Bayi fiyatı 1', 3: 'Bayi fiyatı 2', 4: 'Bayi fiyatı 3', 5: 'Bayi fiyatı 4' };
@@ -127,7 +131,7 @@
         ${CLK.izin('cari') ? `<div class="card"><div class="card-h"><div><h3>Cari hareketler</h3><p class="sub">${bs.length} hareket</p></div></div>${ledger(bs, false)}</div>` : ''}
       </div>
       <aside class="summary"><div class="sum-card">
-        ${CLK.izin('cari') ? `<div><small style="color:#a99f90;letter-spacing:.16em;font-size:10px;font-weight:700">GÜNCEL BAKİYE</small><div class="big" style="color:${bal < 0 ? '#f0a39a' : 'var(--gold-2)'}">${tl2(bal)}</div><small style="color:#a99f90">${bal < 0 ? 'Müşterinin borcu' : bal > 0 ? 'Müşterinin alacağı' : 'Hesap kapalı'}</small></div>` : ''}
+        ${CLK.izin('cari') ? `<div><small style="color:#a99f90;letter-spacing:.16em;font-size:10px;font-weight:700">GÜNCEL BAKİYE</small><div class="big" style="color:${bal < 0 ? '#f0a39a' : 'var(--gold-2)'}">${tl2(bal)}</div><small style="color:#a99f90">${bal < 0 ? 'Müşterinin borcu' : bal > 0 ? 'Müşterinin alacağı' : 'Hesap kapalı'}</small>${sonOdeme(u)}</div>${notKutu(u)}` : ''}
         <dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>E-posta</dt><dd style="word-break:break-all">${esc(u.email || '—')}</dd>
           ${u.taxId ? `<dt>Vergi</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId)}</dd>` : ''}<dt>Fiyat grubu</dt><dd>${esc(prices[u.priceType] || 'Varsayılan')}</dd>
           <dt>İskonto</dt><dd>%${num(u.discountRate)}</dd><dt>Açık hesap limiti</dt><dd>${Number(u.nBalanceStatus) === 1 ? (Number(u.nBalanceLimit) ? tl(u.nBalanceLimit) : 'Limitsiz') : 'Kapalı'}</dd>
@@ -151,18 +155,108 @@
      Her müşteri bir satır: site bakiyesi, Paraşüt'teki son ödemesi (tahsilat, çek ya da senet) ve son hareketi (satış, iade, ödeme).
      Tarihler gider-cek cari_ozet işleminden gelir (20 dk saklanır, eskiyse arka planda yenilenir). Hareket listesi müşteri sayfasında. */
   const C = (S.ui.c ||= { q: '', f: 'hepsi', s: 'borc' });
+  /* ---------- ödeme notları (celik 02.11: "bakiyelerin yanına ödeme notu bırak. örnek duman kırtasiye 8 ekim kart çekeceğim dedi. bunu not et bana 8inde hatırlat") ----------
+     Müşteri başına bir not: yazı, isteğe bağlı ödeme günü ve tutar. Sunucuda gider-cek cari_not (sp_ayar cari_not:<üye id>; yalnız panel kaydı, Paraşüt'e yazılmaz).
+     Cari hesapta bakiyenin yanında, müşteri sayfasında bakiyenin altında; ödeme günü gelen ve geçenler ana panelde "Ödeme sözleri" kartında.
+     Not yazıldıktan sonra Paraşüt'te ödeme görülürse "Ödeme geldi" yazar (cari_ozet son ödeme tarihi). */
+  const NT = (S.ui.nt ||= { l: null, ed: null });
+  const GERI = { cari: 'Cari hesap', musteriler: 'Müşteriler', panel: 'Panel', siparis: 'Sipariş', siparisler: 'Siparişler', ekstre: 'Müşteri ekstresi' };
+  const notMap = () => { const m = {}; for (const n of NT.l || []) m[n.site] = n; return m; };
+  const ozetMap = () => { const m = {}; for (const x of CZ.v?.musteriler || []) if (x.site) m[x.site] = x; return m; };
+  const paraOku = v => {
+    let s = String(v ?? '').replace(/[\s₺TLtl]/g, '');
+    if (!s) return 0;
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    const n = Number(s);
+    return Number.isFinite(n) && n > 0 && n < 1e8 ? Math.round(n * 100) / 100 : 0;
+  };
+  const yerelGun = iso => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const gunAdi = g => new Date(g + 'T12:00:00').toLocaleDateString('tr-TR', { weekday: 'long' });
+  const kimAd = k => String(k || '').split('@')[0];
+  // notun durumu: ok = not yazıldıktan sonra ödeme geldi; bad = ödeme günü geçti; warn = bugün ya da yarın; ileri; '' = günsüz
+  const notDurum = (n, z) => {
+    const yaz = yerelGun(n.zaman), od = z?.odeme?.[0];
+    if (od && yaz && (od > yaz || (n.tarih && od >= n.tarih && od >= yaz))) return { k: 'ok', t: `Ödeme geldi · ${dt(od)} ${tl(z.odeme[1])}` };
+    if (!n.tarih) return { k: '', t: '' };
+    const d = -gecen(n.tarih);
+    return d < 0 ? { k: 'bad', t: `${dt(n.tarih)} · ${-d} gün geçti` } : d === 0 ? { k: 'warn', t: 'Bugün' } : d === 1 ? { k: 'warn', t: 'Yarın' }
+      : { k: 'ileri', t: `${dt(n.tarih)} ${gunAdi(n.tarih)} · ${d} gün sonra` };
+  };
+  const notForm = koyu => { const e = NT.ed; return `<div class="nt-ed${koyu ? ' koyu' : ''}">
+      <label class="f"><span>Ödeme notu</span><textarea id="ntMetin" rows="2" maxlength="300" placeholder="Örn. 8'inde kartla ödeyecek">${esc(e.metin)}</textarea></label>
+      <div class="nt-2"><label class="f"><span>Ödeme günü</span><input id="ntTarih" type="date" value="${esc(e.tarih)}"></label>
+        <label class="f"><span>Tutar <em>isteğe bağlı</em></span><input id="ntTutar" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(e.tutar)}"></label></div>
+      ${e.hata ? `<div class="msg err">${esc(e.hata)}</div>` : ''}
+      <div class="nt-btn"><button class="btn gold sm" data-act="ntKaydet" ${e.is ? 'disabled' : ''}>${e.is ? 'Kaydediliyor' : 'Kaydet'}</button><button class="btn sm" data-act="ntKapat" ${e.is ? 'disabled' : ''}>Vazgeç</button>${e.var ? `<button class="btn sm ghost" data-act="ntSil" ${e.is ? 'disabled' : ''}>Notu kaldır</button>` : ''}</div>
+      <small>Ödeme günü gelince ana panelde ve Cari hesapta uyarı çıkar. Yalnız panelde durur, Paraşüt'e yazılmaz.</small>
+    </div>`; };
+  const notYazi = (n, d) => `${d.t ? `<b class="nt-d ${d.k}">${esc(d.t)}</b>` : ''}<span class="nt-m">${esc(n.metin || 'Ödeme günü')}${n.tutar ? ` · <b>${tl(n.tutar)}</b>` : ''}</span>`;
+  // müşteri sayfası: bakiyenin altında not kutusu
+  const notKutu = u => {
+    if (NT.ed?.id === String(u.id)) return notForm(true);
+    const n = notMap()[u.id];
+    if (!n) return NT.l ? `<button class="nt-ekle" data-act="ntAc" data-id="${u.id}">+ Ödeme notu ekle</button>` : '';
+    const d = notDurum(n, ozetMap()[u.id]);
+    return `<div class="nt-kutu ${d.k}"><small>ÖDEME NOTU</small><div>${notYazi(n, d)}</div>${n.tarih && (d.k === 'ok' || d.k === 'warn') ? `<span class="nt-g">Ödeme günü ${dt(n.tarih)} ${gunAdi(n.tarih)}</span>` : ''}
+      <span class="nt-g">${esc(kimAd(n.kim))} · ${dtt(n.zaman)}</span><button class="btn sm" data-act="ntAc" data-id="${u.id}">Düzenle</button></div>`;
+  };
+  const sonOdeme = u => { const z = ozetMap()[u.id]; return z?.odeme ? `<small style="display:block;color:#a99f90;margin-top:4px">Son ödeme ${dt(z.odeme[0])} · ${tl(z.odeme[1])} · ${esc(z.odeme[2])}</small>` : ''; };
+  function notAc(id) {
+    const n = notMap()[id];
+    NT.ed = { id: String(id), metin: n?.metin || '', tarih: n?.tarih || '', tutar: n?.tutar ? String(n.tutar).replace('.', ',') : '', var: !!n, is: false, hata: '' };
+    S.keepScroll = true; render(); setTimeout(() => document.getElementById('ntMetin')?.focus(), 0);
+  }
+  async function notKaydet(sil) {
+    const e = NT.ed; if (!e || e.is) return;
+    const metin = sil ? '' : e.metin.trim(), tarih = sil ? '' : e.tarih, tutar = sil ? 0 : paraOku(e.tutar);
+    if (!sil && !metin && !tarih) { e.hata = 'Notu ya da ödeme gününü yazın.'; S.keepScroll = true; render(); return; }
+    if (!sil && String(e.tutar).trim() && !tutar) { e.hata = 'Tutarı anlaşılır yazın (ör. 25.000).'; S.keepScroll = true; render(); return; }
+    const u = userById(e.id);
+    e.is = true; e.hata = ''; S.keepScroll = true; render();
+    try {
+      const j = await CLK.tahsilat.sor({ islem: 'cari_not', site: Number(e.id), ad: u ? userName(u) : '', metin, tarih, tutar });
+      NT.l = j.notlar || []; NT.ed = null; CLK.toast(sil ? 'Ödeme notu kaldırıldı' : 'Ödeme notu kaydedildi');
+    } catch (er) { e.is = false; e.hata = er.message; }
+    S.keepScroll = true; render();
+  }
+  const notBagla = () => {
+    for (const [id, k] of [['ntMetin', 'metin'], ['ntTarih', 'tarih'], ['ntTutar', 'tutar']]) {
+      const el = document.getElementById(id);
+      el?.addEventListener('input', () => { if (NT.ed) NT.ed[k] = el.value; });
+      el?.addEventListener('change', () => { if (NT.ed) NT.ed[k] = el.value; });
+    }
+  };
+  views.bind_musteri = () => notBagla();
+  // ana panel: ödeme günü gelen (yarın dahil) ve geçen notlar
+  CLK.cariNot = {
+    panel: () => {
+      if (!CLK.izin('cari')) return '';
+      cariOzetGerekirse();
+      const z = ozetMap();
+      const L = (NT.l || []).filter(n => n.tarih && gecen(n.tarih) >= -1).map(n => ({ n, u: userById(n.site), d: notDurum(n, z[n.site]) }))
+        .filter(x => x.u).sort((a, b) => a.n.tarih.localeCompare(b.n.tarih));
+      if (!L.length) return '';
+      return `<div class="card"><div class="card-h"><div><h3>Ödeme sözleri</h3><p class="sub">Ödeme günü gelen ve geçen müşteri notları</p></div><button class="btn sm ghost" data-go="cari">Cari hesap</button></div>
+        <ul class="rows">${L.map(({ n, u, d }) => { const bal = Number(u.balance) || 0; return `<li data-user="${u.id}"><div class="t"><b>${esc(userName(u))}</b><small>${esc(n.metin || 'Ödeme günü')}${n.tutar ? ' · ' + tl(n.tutar) : ''} · ${dt(n.tarih)}</small></div>
+          <span class="pill ${d.k === 'ok' ? 'ok' : d.k === 'bad' ? 'bad' : 'warn'}">${esc(d.k === 'ok' ? 'Ödeme geldi' : d.k === 'bad' ? 'Geçti' : d.t)}</span><b class="num ${bal < -0.5 ? 'neg' : ''}" style="margin-left:8px">${tl2(bal)}</b></li>`; }).join('')}</ul></div>`;
+    }
+  };
   const CZ = (S.ui.cz ||= { v: null, yuk: false, hata: '', zaman: 0, tekrar: 0 });
+  const cariOzetGerekirse = () => { if (!CZ.yuk && !CZ.hata && (!CZ.v || Date.now() - CZ.zaman > 20 * 60e3)) setTimeout(() => cariOzetYukle(false), 0); };
   async function cariOzetYukle(yenile) {
     if (CZ.yuk || !CLK.tahsilat?.sor) return;
     CZ.yuk = true; CZ.hata = ''; if (S.route === 'cari') { S.keepScroll = true; render(); }
+    const ciz = () => { if (['cari', 'musteri', 'panel'].includes(S.route) && !(NT.ed && document.activeElement?.id?.startsWith('nt'))) { S.keepScroll = true; render(); } };
     try {
       const j = await CLK.tahsilat.sor({ islem: 'cari_ozet', yenile: !!yenile });
       if (j.musteriler?.length || !CZ.v) CZ.v = j;
+      if (Array.isArray(j.notlar)) NT.l = j.notlar;
       CZ.zaman = Date.now();
       // sunucu eski listeyi verip yenisini arka planda hesaplıyorsa biraz sonra yeniden sorulur
       if (j.eski && CZ.tekrar < 4) { CZ.tekrar++; setTimeout(() => { if (S.route === 'cari') cariOzetYukle(false); }, 40000); } else CZ.tekrar = 0;
     } catch (e) { CZ.hata = e.message; }
-    CZ.yuk = false; if (S.route === 'cari') { S.keepScroll = true; render(); }
+    CZ.yuk = false; ciz();
   }
   const gunNo = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
   const bugunNo = () => { const d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
@@ -178,12 +272,12 @@
   };
   views.cari = () => {
     // Ödeme gir (views-tahsilat.js): müşteriden alınan ödeme Paraşüt'e tahsilat olarak girilir, site carisine de yazılır
-    if (!CZ.yuk && !CZ.hata && (!CZ.v || Date.now() - CZ.zaman > 20 * 60e3)) setTimeout(() => cariOzetYukle(false), 0);
+    cariOzetGerekirse();
     const acts = `${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="czYenile" ${S.uLoading || CZ.yuk ? 'disabled' : ''}>${S.uLoading || CZ.yuk ? 'Yükleniyor' : 'Yenile'}</button>`;
     const odeme = CLK.tahsilat?.kart() || '';
     if (S.uErr && !S.users.length) return head('Finans', 'Cari hesap', '', acts) + odeme + errBox(S.uErr, 'reloadU');
     if (!S.uLoaded && !S.users.length) return head('Finans', 'Cari hesap', 'Alınıyor…', acts) + odeme + skel();
-    const R = cariSatirlar();
+    const R = cariSatirlar(), nm = notMap();
     const debtors = R.filter(r => r.bal < -0.5), creditors = R.filter(r => r.bal > 0.5), gec = R.filter(r => r.gec);
     const yedi = R.filter(r => r.son !== null && r.son <= 7).length;
     const q = C.q.trim().toLocaleLowerCase('tr');
@@ -191,6 +285,7 @@
       if (C.f === 'borclu' && !(r.bal < -0.5)) return false;
       if (C.f === 'alacakli' && !(r.bal > 0.5)) return false;
       if (C.f === 'gec' && !r.gec) return false;
+      if (C.f === 'not' && !nm[r.u.id]) return false;
       return !q || [userName(r.u), r.u.phone, r.u.email, r.u.code, r.z?.ad].join(' ').toLocaleLowerCase('tr').includes(q);
     });
     const ad = (a, b) => userName(a.u).localeCompare(userName(b.u), 'tr');
@@ -212,12 +307,15 @@
       return `<b>${dt(t)}</b><small>${once(gecen(t))} · ${esc(tur)}</small>`;
     };
     const durum = r => r.bal < -0.5 ? 'Borçlu' : r.bal > 0.5 ? 'Alacaklı' : 'Kapalı';
-    const satir = r => `<li class="cz-tr" data-user="${r.u.id}">
+    const notH = r => { const n = nm[r.u.id]; if (!n) return ''; const d = notDurum(n, r.z);
+      return `<div class="n"><button class="nt-satir ${d.k}" data-act="ntAc" data-id="${r.u.id}" title="Ödeme notunu düzenle"><i>Not</i>${notYazi(n, d)}<small>${esc(kimAd(n.kim))} · ${dt(n.zaman)}</small></button></div>`; };
+    const satir = r => `<li class="cz-tr${nm[r.u.id] ? ' notlu' : ''}" data-user="${r.u.id}">
       <div class="k"><b>${esc(userName(r.u))}</b><small>${esc(r.u.phone || r.u.email || r.u.code || '')}</small></div>
-      <div class="b"><b class="num ${r.bal < -0.5 ? 'neg' : r.bal > 0.5 ? 'pos' : ''}">${tl2(r.bal)}</b><small>${durum(r)}</small></div>
+      <div class="b"><b class="num ${r.bal < -0.5 ? 'neg' : r.bal > 0.5 ? 'pos' : ''}">${tl2(r.bal)}</b><small>${durum(r)}${!nm[r.u.id] && NT.l ? ` · <button class="nt-arti" data-act="ntAc" data-id="${r.u.id}" title="Ödeme notu ekle">+ Not</button>` : ''}</small></div>
       <div class="o"><span class="m">Son ödeme</span>${odemeHucre(r)}</div>
       <div class="h"><span class="m">Son hareket</span>${hareketHucre(r)}</div>
-    </li>`;
+      ${notH(r)}
+    </li>${NT.ed?.id === String(r.u.id) ? `<li class="cz-ed">${notForm(false)}</li>` : ''}`;
     const zaman = CZ.v?.zaman ? new Date(CZ.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
     const altYazi = CZ.hata ? `<span class="cz-gec">Son ödeme tarihleri alınamadı: ${esc(CZ.hata)}</span>`
       : CZ.yuk ? 'Son ödeme ve hareket tarihleri Paraşüt\'ten alınıyor…' : zaman ? `Ödeme ve hareket tarihleri Paraşüt'ten, ${zaman} itibarıyla. Satıra dokununca müşterinin hareketleri açılır.` : '';
@@ -231,7 +329,7 @@
       <div class="card cz" style="margin-top:18px">
         <div class="card-h"><div><h3>Müşteri carileri</h3><p class="sub">${altYazi}</p></div></div>
         <div class="tools"><input type="search" id="cq" placeholder="Müşteri ara" value="${esc(C.q)}"></div>
-        <div class="chips">${[['hepsi', 'Hepsi', R.length], ['borclu', 'Borçlu', debtors.length], ['alacakli', 'Alacaklı', creditors.length], ['gec', GEC + ' gündür ödemeyen', CZ.v ? gec.length : '']].map(([k, l, n]) => `<button class="chip" data-cf="${k}" aria-pressed="${C.f === k}">${l}${n !== '' ? ` <b>${n}</b>` : ''}</button>`).join('')}</div>
+        <div class="chips">${[['hepsi', 'Hepsi', R.length], ['borclu', 'Borçlu', debtors.length], ['alacakli', 'Alacaklı', creditors.length], ['gec', GEC + ' gündür ödemeyen', CZ.v ? gec.length : ''], ['not', 'Ödeme notu olan', NT.l ? R.filter(r => nm[r.u.id]).length : '']].map(([k, l, n]) => `<button class="chip" data-cf="${k}" aria-pressed="${C.f === k}">${l}${n !== '' ? ` <b>${n}</b>` : ''}</button>`).join('')}</div>
         <div class="cz-sira"><span>Sırala:</span>${[['borc', 'Borca göre'], ['odeme', 'Son ödemeye göre'], ['hareket', 'Son harekete göre'], ['ad', 'Ada göre']].map(([k, l]) => `<button class="chip sm" data-cs="${k}" aria-pressed="${C.s === k}">${l}</button>`).join('')}</div>
         ${L.length ? `<ul class="cz-tb"><li class="cz-th"><div>Müşteri</div><div>Bakiye</div><div>Son ödeme</div><div>Son hareket</div></li>${L.map(satir).join('')}</ul>` : '<p class="sub">Bu seçimde müşteri yok.</p>'}
       </div>`;
@@ -240,6 +338,7 @@
     const q = $('#cq'); q?.addEventListener('input', () => { C.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
     $$('[data-cf]').forEach(b => b.addEventListener('click', () => { C.f = b.dataset.cf; S.keepScroll = true; render(); }));
     $$('[data-cs]').forEach(b => b.addEventListener('click', () => { C.s = b.dataset.cs; S.keepScroll = true; render(); }));
+    notBagla();
     CLK.tahsilat?.bagla?.();
   };
 
@@ -297,6 +396,11 @@
     else if (act === 'oIptal' || act === 'oDuzelt') { const o = S.orders.find(x => String(O.id(x)) === el.dataset.id); if (o) (act === 'oIptal' ? siparisIptal : siparisDuzelt)(o); }
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'czYenile') { CLK.loadUsers(true); CZ.tekrar = 0; cariOzetYukle(true); }
+    else if (act === 'ntAc') notAc(el.dataset.id);
+    else if (act === 'ntKapat') { NT.ed = null; S.keepScroll = true; render(); }
+    else if (act === 'ntKaydet') notKaydet(false);
+    else if (act === 'ntSil') notKaydet(true);
+    else if (act === 'mGeri') { const d = S.ui.mDon; S.ui.mDon = null; go(d?.r || 'musteriler', d?.a); if (d?.y) requestAnimationFrame(() => window.scrollTo({ top: d.y, behavior: 'instant' })); }
     else if (act === 'copy') { navigator.clipboard?.writeText(el.dataset.v).then(() => CLK.toast('Kopyalandı'), () => CLK.toast('Kopyalanamadı')); }
     else prevAct?.(act, el, e);
   };

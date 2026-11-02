@@ -70,6 +70,7 @@
         ${gor.cari ? `<div class="kpi ${debt < 0 ? 'bad' : ''}"><div class="k">Açık cari</div><div class="v">${tlc(Math.abs(debt))}</div><div class="s">${num(S.users.filter(u => (Number(u.balance) || 0) < 0).length)} müşteri borçlu</div></div>` : ''}
       </div>
       ${CLK.senetPanel && gor.cek ? CLK.senetPanel.kisa() : ''}
+      ${gor.cari ? CLK.cariNot?.panel() || '' : ''}
       <div class="card"><div class="card-h"><div><h3>Kategoriler</h3><p class="sub">Üst kategoriler · seçince alt kategorilere ve ürünlere geçilir</p></div><button class="btn sm ghost" data-go="urunler">Tümü</button></div>${views.catTiles(S.products, true)}</div>
       ${gor.ciro ? `<div class="grid2">
         <div class="card"><div class="card-h"><div><h3>Aylık ciro</h3><p class="sub">Son 6 ay · iade ve iptaller hariç</p></div></div>
@@ -206,6 +207,7 @@
   document.addEventListener('click', e => {
     const ed = e.target.closest('[data-edit]'); if (ed) { go('duzenle', ed.dataset.edit); return; }
     const od = e.target.closest('[data-order]'); if (od) { go('siparis', od.dataset.order); return; }
-    const us = e.target.closest('[data-user]'); if (us) { go('musteri', us.dataset.user); }
+    // satırın içindeki düğmeler (ör. Cari hesapta "+ Not") müşteri kartını açmaz; kart, geri düğmesi için açıldığı sayfayı ve kaydırma yerini bilir
+    const us = e.target.closest('[data-user]'); if (us && !e.target.closest('[data-act]')) { CLK.S.ui.mDon = { r: CLK.S.route, a: CLK.S.arg, y: window.scrollY }; go('musteri', us.dataset.user); }
   });
 })();

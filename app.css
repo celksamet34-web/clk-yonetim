@@ -1114,3 +1114,37 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
   .cz-tb li>div>b{font-size:13px}
   .cz-tb li>div>small{white-space:normal}
 }
+/* Cari hesap › ödeme notu (celik 02.11: "bakiyelerin yanına ödeme notu bırak") */
+.cz-tb li.cz-tr .n{grid-column:2 / -1;min-width:0}
+.nt-satir{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 8px;width:100%;text-align:left;background:var(--gold-soft);border:0;border-radius:10px;padding:7px 10px;font-size:12.5px;color:var(--ink);cursor:pointer}
+.nt-satir i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-ink)}
+.nt-satir small{color:var(--muted);font-size:11px;margin-left:auto}
+.nt-satir.bad{background:var(--bad-soft)}.nt-satir.warn{background:var(--warn-soft)}.nt-satir.ok{background:var(--ok-soft)}
+.nt-d{font-weight:700}.nt-d.bad{color:var(--bad)}.nt-d.warn{color:var(--warn)}.nt-d.ok{color:var(--ok)}
+.nt-arti{background:none;border:0;padding:0;color:var(--gold-ink);font-weight:700;cursor:pointer;font-size:inherit}
+.cz-tb li.cz-ed{display:block;padding:2px 8px 14px}
+.nt-ed{display:grid;gap:10px;background:var(--sunk);border-radius:14px;padding:14px;margin-top:6px}
+.nt-ed textarea{min-height:64px}
+.nt-ed input[type=date]{width:100%;min-height:var(--tap);border:1px solid var(--line-2);border-radius:13px;background:#fff;padding:10px 12px;font:inherit;font-size:16px;color:var(--ink)}
+.nt-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nt-btn{display:flex;flex-wrap:wrap;gap:8px}
+.nt-ed>small{color:var(--muted);font-size:11.5px}
+.nt-ed.koyu{background:rgba(255,255,255,.06)}
+.nt-ed.koyu .f>span,.nt-ed.koyu>small{color:#a99f90}
+.nt-ed.koyu textarea,.nt-ed.koyu input{color:var(--ink)}
+.nt-ed.koyu .nt-2{grid-template-columns:1fr}
+.nt-ed.koyu .btn:not(.gold):not(.ghost){color:var(--ink)}
+.nt-ed.koyu .btn.ghost{color:#ddd5c8}
+.nt-kutu{display:grid;gap:3px;background:rgba(255,255,255,.06);border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13px;color:#ddd5c8}
+.nt-kutu>small{font-size:10px;font-weight:700;letter-spacing:.16em;color:#a99f90}
+.nt-kutu .nt-d{display:block;color:#fff}.nt-kutu .nt-m{color:#fff}
+.nt-kutu .nt-g{font-size:11.5px;color:#a99f90}
+.nt-kutu .btn{justify-self:start;margin-top:6px}
+.nt-kutu.bad{box-shadow:inset 3px 0 0 #f0a39a}.nt-kutu.warn{box-shadow:inset 3px 0 0 var(--gold-2)}.nt-kutu.ok{box-shadow:inset 3px 0 0 #7fc79a}
+.nt-kutu .nt-d.bad{color:#f0a39a}.nt-kutu .nt-d.warn{color:var(--gold-2)}.nt-kutu .nt-d.ok{color:#9ad6ae}
+.nt-ekle{margin-top:10px;width:100%;background:none;border:1px dashed rgba(255,255,255,.25);color:var(--gold-2);border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:700;cursor:pointer}
+@media(max-width:760px){
+  .cz-tb li.cz-tr.notlu{grid-template-areas:"k b" "o h" "n n"}
+  .cz-tb li.cz-tr .n{grid-area:n}
+  .nt-2{grid-template-columns:1fr}
+}
