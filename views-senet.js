@@ -101,11 +101,13 @@
     for (const b of D.c?.bordrolar || []) for (const e of b.evraklar || []) if (evrakDurum(e, b) === 'bekliyor') m[e.id] = b;
     return m;
   }
+  // alış tarihine göre (celik 02.11), CLK.evrak.alisSira ile aynı
+  const alisSira = (a, b) => (a.tarih || '').localeCompare(b.tarih || '') || (a.vade || '').localeCompare(b.vade || '') || String(a.seri || '').localeCompare(String(b.seri || ''), 'tr');
   const portfoy = () => (D.c?.cekler || []).filter(c => c.yon === 'alinan' && c.kalan > 0.009 && (c.doviz || 'TRL') === 'TRL')
-    .sort((a, b) => a.vade.localeCompare(b.vade) || a.tutar - b.tutar);
+    .sort(alisSira);
   function seciliEvrak() {
     const ayr = ayrilan(), l = portfoy().filter(c => !ayr[c.id]);
-    return D.f.secili.map(id => l.find(c => c.id === id)).filter(Boolean).sort((a, b) => a.vade.localeCompare(b.vade));
+    return D.f.secili.map(id => l.find(c => c.id === id)).filter(Boolean).sort(alisSira);
   }
   function pfFiltre() {
     const q = D.pfAra.trim().toLocaleUpperCase('tr'), l = portfoy(), say = { senet: 0, cek: 0, hepsi: l.length };

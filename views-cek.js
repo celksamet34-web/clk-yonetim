@@ -54,7 +54,9 @@
   // müşteri evrakı: gelecek (vadesi gelmedi), surede (vadesi geldi, son gün gelmedi), songun (bugün son gün), gecti (son gün geçti)
   const odemeDurum = c => { const v = gunFark(c.vade), s = gunFark(sonGun(c)); return v > 0 ? 'gelecek' : s > 0 ? 'surede' : s === 0 ? 'songun' : 'gecti'; };
   const acik = c => (c.yon === 'verilen' || c.yon === 'alinan') ? c.kalan > 0.009 : c.yon === 'ciro' && sonGun(c) >= bugun();
-  CLK.evrak = { senetMi, tur, banka, sonGun, kisaGun, sonYaz, odemeDurum };
+  // evrak listeleri alış (veriliş) tarihine göre sıralanır, vadeye göre değil (celik 02.11: "çek ve senetleri sıralarken alış tarihini baz al vadeyi değil")
+  const alisSira = (a, b) => (a.tarih || '').localeCompare(b.tarih || '') || (a.vade || '').localeCompare(b.vade || '') || String(a.seri || '').localeCompare(String(b.seri || ''), 'tr');
+  CLK.evrak = { senetMi, tur, banka, sonGun, kisaGun, sonYaz, odemeDurum, alisSira };
   // Senet gir sayfasında tedarikçiye çıkış bordrosu hazırlanmış ama Paraşüt'te henüz ciro edilmemiş evraklar: id → bordro
   let AYR = {};
   function ayrilanlar() {
@@ -163,7 +165,7 @@
     return Object.values(m).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
   };
   const musteriEvrak = (ad, gecmis) => (D.v?.cekler || []).filter(c => (c.yon === 'ciro' || c.yon === 'alinan') && c.kimden === ad && (gecmis || sonGun(c) >= bugun()))
-    .sort((a, b) => a.vade.localeCompare(b.vade) || a.tarih.localeCompare(b.tarih));
+    .sort(alisSira);
   const evrakAdi = c => [tur(c), banka(c), c.seri ? 'No ' + c.seri : ''].filter(Boolean).join(' · ');
   const durumYaz = c => {
     const n = gunFark(c.vade);
@@ -284,7 +286,7 @@
     const gl = alisGunleri(D.rm), tarih = gl.some(x => x.tarih === D.mTarih) ? D.mTarih : gl[0]?.tarih;
     raporSifirla();
     if (!tarih) { D.rDurum = 'Bu müşteriden alınmış çek ya da senet yok.'; S.keepScroll = true; render(); return; }
-    const l = (D.v.cekler || []).filter(c => (c.yon === 'ciro' || c.yon === 'alinan') && c.kimden === D.rm && c.tarih === tarih).sort((a, b) => a.vade.localeCompare(b.vade));
+    const l = (D.v.cekler || []).filter(c => (c.yon === 'ciro' || c.yon === 'alinan') && c.kimden === D.rm && c.tarih === tarih).sort(alisSira);
     D.rMakbuz = { kisi: D.rm, tarih, evraklar: l.map(c => ({ seri: c.seri, banka: c.banka, bankaAd: c.bankaAd, vade: c.vade, tutar: c.tutar })) };
     rBlob = await makbuzCiz(D.rMakbuz);
     D.rResim = URL.createObjectURL(rBlob); D.rTur = 'makbuz';
@@ -422,7 +424,7 @@
     const araF = c => !q || buyukHarf([c.kimden, c.kime, c.seri, banka(c), c.bankaAd, c.aciklama, tur(c), String(c.tutar)].join(' ')).includes(q);
     const say = k => l.filter(c => SEKME[k][1](c) && ayF(c) && araF(c)).length;
     const liste = l.filter(c => SEKME[D.sekme][1](c) && ayF(c) && araF(c))
-      .sort((a, b) => (acik(a) && acik(b) ? a.vade.localeCompare(b.vade) : acik(a) !== acik(b) ? (acik(a) ? -1 : 1) : b.vade.localeCompare(a.vade)));
+      .sort((a, b) => (acik(a) && acik(b) ? alisSira(a, b) : acik(a) !== acik(b) ? (acik(a) ? -1 : 1) : alisSira(b, a)));
 
     return `${ust}
       <div class="kpis cs-kpis">
@@ -544,7 +546,7 @@
     return `<span class="sp-d y">${c.yon === 'ciro' ? 'Ciro edildi, süresi geçti' : al ? 'Tahsil edildi' : 'Ödendi'}</span>`;
   }
   function pnEvraklar(k) {
-    const l = k.l.slice().sort((a, b) => { const r = x => { const p = pnParca(x); return p.k > 0.009 ? 0 : p.t > 0.009 ? 1 : 2; }; return r(a) - r(b) || (r(a) === 2 ? b.vade.localeCompare(a.vade) : a.vade.localeCompare(b.vade)); });
+    const l = k.l.slice().sort((a, b) => { const r = x => { const p = pnParca(x); return p.k > 0.009 ? 0 : p.t > 0.009 ? 1 : 2; }; return r(a) - r(b) || (r(a) === 2 ? alisSira(b, a) : alisSira(a, b)); });
     return `<div class="sp-ev">${l.map(c => {
       const p = pnParca(c), cls = p.k > 0.009 ? 'k' : p.t > 0.009 ? 't' : 'y', bk = banka(c);
       return `<div class="sp-e ${cls}"><span class="sp-e-n"><b>${esc(tur(c))}${c.seri ? ' ' + esc(c.seri) : ''}</b>${bk ? `<small>${esc(bk)}</small>` : ''}</span>
@@ -593,7 +595,7 @@
     const tut = c => (c.yon === 'ciro' ? c.tutar : c.kalan);
     const ayr = ayrilanlar();
     const l = (D.v.cekler || []).filter(c => (!c.doviz || c.doviz === 'TRL') && c.vade && (c.yon === 'ciro' ? c.tutar > 0.009 : c.kalan > 0.009));
-    const sira = (a, b) => a.vade.localeCompare(b.vade) || (a.kimden || a.kime || '').localeCompare(b.kimden || b.kime || '', 'tr');
+    const sira = (a, b) => alisSira(a, b) || (a.kimden || a.kime || '').localeCompare(b.kimden || b.kime || '', 'tr');
     const gel = l.filter(c => (c.yon === 'alinan' || c.yon === 'ciro') && gunFark(c.vade) <= 7 && gunFark(sonGun(c)) >= 0).sort(sira);
     const ver = l.filter(c => c.yon === 'verilen' && gunFark(c.vade) <= 7).sort(sira);
     const top = x => x.reduce((t, c) => t + tut(c), 0);
