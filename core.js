@@ -150,6 +150,7 @@ window.CLK = (() => {
     instagram: '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6"/></svg>',
     katalog: '<svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/><path d="M15.5 8h2M15.5 11h2"/></svg>',
     senet: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 11h7M9 14.5h7M9 18h4"/></svg>',
+    odemeler: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/></svg>',
     personel: '<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 11-4.7"/><rect x="15" y="14" width="6" height="6" rx="1"/><path d="M16.5 14v-1.5a1.5 1.5 0 0 1 3 0V14"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
@@ -159,7 +160,7 @@ window.CLK = (() => {
     ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['urunlistesi', 'Satış faturası'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi']]],
     ['Site ürünleri', [['yeni', 'Yeni ürün'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['katalog', 'Katalog'], ['instagram', 'Instagram'], ['banner', 'Banner']]],
     ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
-    ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet']]],
+    ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet'], ['odemeler', 'Ödeme takvimi']]],
     ['Eşitleme', [['stokesitle', 'Stok eşitle'], ['eslestirme', 'Eşleştirme']]],
     ['Ayarlar', [['personel', 'Personel']]]
   ];
@@ -170,7 +171,7 @@ window.CLK = (() => {
   const yonetici = () => !S.yetki || S.yetki.rol === 'yonetici';
   function izin(k) {
     if (k === 'panel') return true;
-    if (k === 'personel') return yonetici();
+    if (k === 'personel' || k === 'odemeler') return yonetici(); // Ödeme takvimi personele gizli (celik 02.11)
     if (yonetici()) return true;
     const a = ALT_SAYFA[k], l = S.yetki.sayfalar || [];
     return Array.isArray(a) ? a.some(x => l.includes(x)) : l.includes(a || k);

@@ -1148,3 +1148,51 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
   .cz-tb li.cz-tr .n{grid-area:n}
   .nt-2{grid-template-columns:1fr}
 }
+
+/* Finans › Ödeme takvimi (views-odeme.js, yalnız yönetici; celik 02.11) */
+.od-form{margin-top:18px;display:grid;gap:16px}
+.od-form .chips{margin:0}
+.od-form .card-h{margin-bottom:0}
+.od-2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.od-btn{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.od-sil{margin-left:auto;color:var(--bad)}
+.od-tb{list-style:none;margin:0;padding:0}
+.od-tb li.od-r{display:grid;grid-template-columns:64px minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.od-tb li.od-r:last-child{border-bottom:0}
+.od-g{display:grid;place-items:center;text-align:center;border-radius:14px;padding:7px 4px;background:var(--sunk);line-height:1.1}
+.od-g b{font:700 22px var(--f-d,inherit);font-variant-numeric:tabular-nums}
+.od-g small{font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.od-r.bad .od-g{background:var(--bad-soft);color:var(--bad)}
+.od-r.warn .od-g{background:var(--warn-soft);color:var(--warn)}
+.od-k{min-width:0;display:grid;gap:4px}
+.od-k b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.od-k small{color:var(--muted);font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.od-k .pill{padding:2px 8px;font-size:10px;background:var(--gold-soft);color:var(--gold-ink)}
+.od-d{text-align:right;display:grid;gap:3px}
+.od-d b{font-size:13px;white-space:nowrap}.od-d b.bad{color:var(--bad)}.od-d b.warn{color:var(--warn)}
+.od-d small{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.od-a{display:flex;gap:6px}
+.od-tb li.od-sat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:end;padding:14px;margin:0 0 12px;border-radius:16px;background:var(--gold-soft);border:1px solid #eadcc2}
+.od-sat .msg{grid-column:1/-1}
+.od-bos{display:grid;justify-items:start;gap:10px;color:var(--muted)}
+.od-liste{list-style:none;margin:0;padding:0}
+.od-liste li{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.od-liste li:last-child{border-bottom:0}
+.od-liste li>div{min-width:0;display:grid;gap:3px}
+.od-liste small{color:var(--muted);font-size:12px}
+.od-h4{margin:18px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.od-bildirim p{font-size:13.5px;line-height:1.55;margin:0 0 10px}
+.od-konu{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
+.od-konu code{flex:1 1 180px;min-width:0;padding:9px 12px;border-radius:12px;background:var(--sunk);font-size:13px;overflow-wrap:anywhere;user-select:all}
+@media(max-width:760px){
+  .od-2{grid-template-columns:1fr 1fr}
+  .od-tb li.od-r{grid-template-columns:56px minmax(0,1fr) auto;grid-template-areas:"g k d" "a a a";row-gap:10px}
+  .od-g{grid-area:g}.od-k{grid-area:k}.od-d{grid-area:d}.od-a{grid-area:a}
+  .od-a .btn{flex:1}
+  .od-tb li.od-sat{grid-template-columns:1fr 1fr}
+  .od-sat .od-btn{grid-column:1/-1}
+  .od-sil{margin-left:0}
+}
+@media(max-width:420px){.od-2{grid-template-columns:1fr}}
+.od-konu a.btn{text-decoration:none;color:inherit}
+@media(max-width:900px){.od-kpis .kpi .v{font-size:24px}.od-kpis .kpi.hero .v{font-size:32px}}
