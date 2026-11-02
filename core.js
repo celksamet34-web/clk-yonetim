@@ -10,7 +10,7 @@ window.CLK = (() => {
     user: null, route: 'panel',
     products: [], pLoaded: false, pLoading: false, pErr: '', pAt: null, pProg: '',
     orders: [], oLoaded: false, oLoading: false, oErr: '',
-    users: [], uLoaded: false, uLoading: false, uErr: '',
+    users: [], pasifUsers: [], uLoaded: false, uLoading: false, uErr: '',
     balance: [], bLoaded: false, bLoading: false, bErr: '',
     categories: [],
     ui: {}
@@ -87,7 +87,8 @@ window.CLK = (() => {
   }
   async function loadUsers(force) {
     if (S.uLoading || (S.uLoaded && !force)) return; S.uLoading = true; S.uErr = ''; render();
-    try { S.users = await pagedData('users', 100); S.uLoaded = true; } catch (e) { S.uErr = e.message; }
+    // pasif üyeler (Paraşüt'ten silinen müşteri siteden pasif yapılır, celik 02.11) listelerde görünmez; eski sipariş ve hareketlerde adı için S.pasifUsers'ta durur
+    try { const l = await pagedData('users', 100); S.users = l.filter(u => Number(u.status) !== 0); S.pasifUsers = l.filter(u => Number(u.status) === 0); S.uLoaded = true; } catch (e) { S.uErr = e.message; }
     S.uLoading = false; render();
   }
   async function loadBalance(force) {

@@ -3,7 +3,7 @@
   const { S, $, $$, esc, tl, tl2, tlc, num, dt, dtt, P, O, ORDER_STATUS, BAL_TYPE, head, skel, errBox, views, go, render } = CLK;
   const st = s => { const [l, c] = ORDER_STATUS[s] || ['—', 'off']; return `<span class="pill ${c}">${l}</span>`; };
   const userName = u => [u.name, u.lastname].filter(Boolean).join(' ') || u.title || u.email || 'Müşteri';
-  const userById = id => S.users.find(u => Number(u.id) === Number(id));
+  const userById = id => S.users.find(u => Number(u.id) === Number(id)) || (S.pasifUsers || []).find(u => Number(u.id) === Number(id));
   const ordersOf = id => S.orders.filter(o => O.userId(o) === Number(id));
   const balOf = id => S.balance.filter(b => Number(b.userId) === Number(id));
   const sign = b => { const t = (BAL_TYPE[b.type] || ['', 'adj'])[1]; return t === 'in' ? 1 : t === 'out' ? -1 : (Number(b.price) >= 0 ? 1 : -1); };
@@ -113,13 +113,13 @@
   };
 
   views.musteri = () => {
-    const u = userById(S.arg); const back = `${u ? CLK.tahsilat?.dugme(u.id) || '' : ''}<button class="btn sm" data-go="musteriler">← Müşteriler</button>`;
+    const u = userById(S.arg), pasif = !!u && Number(u.status) === 0; const back = `${u && !pasif ? CLK.tahsilat?.dugme(u.id) || '' : ''}<button class="btn sm" data-go="musteriler">← Müşteriler</button>`;
     if (!u) return head('Müşteri', 'Bulunamadı', '', back) + (S.uLoading ? skel() : '<div class="card empty"><h3>Müşteri bulunamadı</h3></div>');
     const s = custStats(u), os = ordersOf(u.id), bs = balOf(u.id), bal = Number(u.balance) || 0;
     const prices = { 0: 'Varsayılan', 2: 'Bayi fiyatı 1', 3: 'Bayi fiyatı 2', 4: 'Bayi fiyatı 3', 5: 'Bayi fiyatı 4' };
     const fav = {}; os.filter(O.counts).forEach(o => O.items(o).forEach(i => { (fav[i.code] ||= { name: i.name, code: i.code, q: 0 }).q += Number(i.netQuantity ?? i.quantity) || 0; }));
     const favs = Object.values(fav).sort((a, b) => b.q - a.q).slice(0, 5);
-    return head(Number(u.dealerStatus) === 1 ? 'Bayi' : 'Müşteri', esc(userName(u)), `${esc(u.code || '')}${u.createdAt ? ' · Kayıt ' + dt(u.createdAt) : ''}${u.lastLoginAt ? ' · Son giriş ' + dt(u.lastLoginAt) : ''}`, back) + `
+    return head(Number(u.dealerStatus) === 1 ? 'Bayi' : 'Müşteri', esc(userName(u)), `${esc(u.code || '')}${u.createdAt ? ' · Kayıt ' + dt(u.createdAt) : ''}${u.lastLoginAt && !/^0000/.test(u.lastLoginAt) ? ' · Son giriş ' + dt(u.lastLoginAt) : ''}${pasif ? ' · Pasif üye' : ''}`, back) + `
       <div class="ed"><div class="stack">
         <div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
         <div class="card"><div class="card-h"><div><h3>Siparişleri</h3><p class="sub">${os.length} sipariş</p></div></div>
