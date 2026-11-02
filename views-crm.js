@@ -178,6 +178,7 @@
   views.bind_cari = () => {
     const q = $('#cq'); q?.addEventListener('input', () => { C.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
     $$('[data-ct]').forEach(b => b.addEventListener('click', () => { C.t = b.dataset.ct; render(); }));
+    CLK.tahsilat?.bagla?.();
   };
 
   // İptal et ve Düzelt: sunucu Paraşüt'e geçmiş ya da Paraşüt'ten gelmiş siparişi reddeder (orada değiştirilir)

@@ -470,27 +470,17 @@
       <button class="gd-x" data-act="snSonucKapat" aria-label="Kapat">×</button></div>`;
   }
 
-  function formHtml() {
-    const f = D.f, k = D.k;
-    if (!k) return `<div class="card gd-form">${D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn dark" data-act="snYenile">Tekrar dene</button>` : '<div class="skel" style="height:460px"></div>'}</div>`;
-    const ae = acikEvrak(), dun = gunEkle(bugun(), -1), l = kisiler();
+  // seçilen kişinin portföydeki / ödenmemiş evrakları (Senet gir ve Ödeme gir › Senet)
+  function aeHint() {
+    const f = D.f, ae = acikEvrak();
+    if (!ae) return '';
+    return `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, ödeme süresi dolmamış ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>`;
+  }
+  // senet sayısı, tutar, vadeler, alış tarihi ve not (Senet gir'de 2. ve 3. adım; Ödeme gir › Senet'te de aynı)
+  function adimlarHtml(no = 2) {
+    const f = D.f, dun = gunEkle(bugun(), -1);
     const ilkler = [[aySonu(bugun()), 'Bu ay sonu'], [aySonu(ayEkle(bugun(), 1, false)), 'Gelecek ay sonu'], [ayEkle(f.tarih || bugun(), 1, false), '1 ay sonra']];
-    return `<div class="card gd-form">
-      ${makbuzHtml()}${bordroHtml()}${sonucHtml()}
-      <div class="gd-adim"><span>1</span><h3>Kimden, kime?</h3></div>
-      <div class="gd-seg sn-yon" role="group" aria-label="Senet yönü">
-        <button data-act="snYon" data-o="alinan" aria-pressed="${f.yon === 'alinan'}">Müşteriden aldık</button>
-        <button data-act="snYon" data-o="verilen" aria-pressed="${f.yon === 'verilen'}">Tedarikçiye verdik</button></div>
-      ${f.yon === 'verilen' ? `<div class="gd-seg sn-tur" role="group" aria-label="Tedarikçiye ne verildi">
-        <button data-act="snTur" data-o="portfoy" aria-pressed="${f.tur === 'portfoy'}">Portföydeki müşteri evrakı (ciro)</button>
-        <button data-act="snTur" data-o="kendi" aria-pressed="${f.tur !== 'portfoy'}">Kendi senedimiz</button></div>
-      <p class="sn-tur-n ${f.tur === 'portfoy' ? 'uyar' : 'tamam'}">${f.tur === 'portfoy'
-        ? '<b>Paraşüt\'e yazılmaz.</b> Müşteriden aldığımız çek/senetleri tedarikçiye verirken yalnız çıkış bordrosu hazırlar; ciroyu Paraşüt\'te tedarikçiye ödeme olarak ayrıca girin. Yeni, kendi senedimizi verdiysek <b>Kendi senedimiz</b>\'i seçin.'
-        : '<b>Paraşüt\'e yazılır.</b> Firmamızın yeni senedi tedarikçiye verilir; sıra no alır, Paraşüt\'te verilen senet olarak açılır.'}</p>` : ''}
-      <div class="f ara-alan"><span>${f.yon === 'alinan' ? 'Müşteri' : 'Tedarikçi'}</span>${araKutu('snKisi_' + f.yon, l, f.kisi?.ad || '', 'snKisi', { yer: `Paraşüt ${f.yon === 'alinan' ? 'müşterisi' : 'tedarikçisi'} ara (${l.length})` })}</div>
-      ${ciroMu() ? ciroKisiNot() + ciroAdimlar() + '</div>' : ''}${ciroMu() ? '' : `${ae ? `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, ödeme süresi dolmamış ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>` : ''}
-
-      <div class="gd-adim"><span>2</span><h3>Kaç senet, ne kadar?</h3></div>
+    return `<div class="gd-adim"><span>${no}</span><h3>Kaç senet, ne kadar?</h3></div>
       <div class="sn-ust">
         <div class="f"><span>Senet sayısı</span><div class="sn-adet"><button data-act="snAdet" data-d="-1" aria-label="Azalt" ${f.adet <= 1 ? 'disabled' : ''}>−</button><b>${f.adet}</b><button data-act="snAdet" data-d="1" aria-label="Artır" ${f.adet >= EN_COK ? 'disabled' : ''}>+</button></div></div>
         ${f.adet > 1 ? `<div class="f"><span>Tutar</span><div class="gd-seg" role="group" aria-label="Tutar nasıl girilecek"><button data-act="snMod" data-o="her" aria-pressed="${f.mod === 'her'}">Her senet</button><button data-act="snMod" data-o="toplam" aria-pressed="${f.mod === 'toplam'}">Toplam, eşit böl</button></div></div>` : ''}
@@ -504,13 +494,35 @@
       ${f.adet > 1 ? `<div class="f"><span>Vadeler arası</span><div class="gd-seg" role="group" aria-label="Vadeler arası"><button data-act="snAralik" data-o="ay" aria-pressed="${f.aralik === 'ay'}">Her ay</button><button data-act="snAralik" data-o="15" aria-pressed="${f.aralik === '15'}">15 günde bir</button><button data-act="snAralik" data-o="hafta" aria-pressed="${f.aralik === 'hafta'}">Her hafta</button></div></div>` : ''}
       <div id="snSatirlar">${satirHtml()}</div>
 
-      <div class="gd-adim"><span>3</span><h3>Tarih ve not</h3></div>
+      <div class="gd-adim"><span>${no + 1}</span><h3>Tarih ve not</h3></div>
       <div class="gd-tarih">
         <label class="f"><span>${f.yon === 'alinan' ? 'Alış tarihi' : 'Veriliş tarihi'}</span><input id="snTarih" type="date" value="${esc(f.tarih)}" max="${gunEkle(bugun(), 60)}"></label>
         <div class="gd-hizli"><button class="chip" data-act="snTarihSec" data-g="${bugun()}" aria-pressed="${f.tarih === bugun()}">Bugün</button><button class="chip" data-act="snTarihSec" data-g="${dun}" aria-pressed="${f.tarih === dun}">Dün</button></div>
       </div>
       <label class="f gd-acik"><span>Not (isteğe bağlı)</span><input id="snAciklama" type="text" maxlength="200" autocomplete="off" placeholder="ör. Ekim cari bakiyesi için" value="${esc(f.aciklama)}"></label>
-      <p class="hint">Paraşüt'te açıklamaya "SENET ${f.adet > 1 ? '1/' + f.adet : ''}" ve notunuz yazılır, banka adı SENET olur.</p>
+      <p class="hint">Paraşüt'te açıklamaya "SENET ${f.adet > 1 ? '1/' + f.adet : ''}" ve notunuz yazılır, banka adı SENET olur, sıra no kendiliğinden verilir.</p>`;
+  }
+
+  function formHtml() {
+    const f = D.f, k = D.k;
+    if (!k) return `<div class="card gd-form">${D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn dark" data-act="snYenile">Tekrar dene</button>` : '<div class="skel" style="height:460px"></div>'}</div>`;
+    const l = kisiler();
+    return `<div class="card gd-form">
+      ${makbuzHtml()}${bordroHtml()}${sonucHtml()}
+      <div class="gd-adim"><span>1</span><h3>Kimden, kime?</h3></div>
+      <div class="gd-seg sn-yon" role="group" aria-label="Senet yönü">
+        <button data-act="snYon" data-o="alinan" aria-pressed="${f.yon === 'alinan'}">Müşteriden aldık</button>
+        <button data-act="snYon" data-o="verilen" aria-pressed="${f.yon === 'verilen'}">Tedarikçiye verdik</button></div>
+      ${f.yon === 'verilen' ? `<div class="gd-seg sn-tur" role="group" aria-label="Tedarikçiye ne verildi">
+        <button data-act="snTur" data-o="portfoy" aria-pressed="${f.tur === 'portfoy'}">Portföydeki müşteri evrakı (ciro)</button>
+        <button data-act="snTur" data-o="kendi" aria-pressed="${f.tur !== 'portfoy'}">Kendi senedimiz</button></div>
+      <p class="sn-tur-n ${f.tur === 'portfoy' ? 'uyar' : 'tamam'}">${f.tur === 'portfoy'
+        ? '<b>Paraşüt\'e yazılmaz.</b> Müşteriden aldığımız çek/senetleri tedarikçiye verirken yalnız çıkış bordrosu hazırlar; ciroyu Paraşüt\'te tedarikçiye ödeme olarak ayrıca girin. Yeni, kendi senedimizi verdiysek <b>Kendi senedimiz</b>\'i seçin.'
+        : '<b>Paraşüt\'e yazılır.</b> Firmamızın yeni senedi tedarikçiye verilir; sıra no alır, Paraşüt\'te verilen senet olarak açılır.'}</p>` : ''}
+      <div class="f ara-alan"><span>${f.yon === 'alinan' ? 'Müşteri' : 'Tedarikçi'}</span>${araKutu('snKisi_' + f.yon, l, f.kisi?.ad || '', 'snKisi', { yer: `Paraşüt ${f.yon === 'alinan' ? 'müşterisi' : 'tedarikçisi'} ara (${l.length})` })}</div>
+      ${ciroMu() ? ciroKisiNot() + ciroAdimlar() + '</div>' : ''}${ciroMu() ? '' : `${aeHint()}
+
+      ${adimlarHtml()}
     </div>`}`;
   }
 
@@ -549,7 +561,7 @@
       <div class="gd-alt">${sonKart()}</div>`;
   };
 
-  views.bind_senet = () => {
+  function bagla() {
     const f = D.f;
     const sifirla = () => { D.onay = false; D.uyari = ''; };
     $('#snTutar')?.addEventListener('input', e => { f.tutar = e.target.value; sifirla(); dagit(); satirYenile(); });
@@ -576,6 +588,25 @@
       ozetYenile();
     });
     kutu?.addEventListener('blur', e => { const el = e.target; if (!('snTutar' in el.dataset)) return; const t = para(el.value), s = f.satirlar[+el.dataset.snTutar]; if (t && s) { s.tutar = yaz(t); el.value = s.tutar; } }, true);
+  }
+  views.bind_senet = bagla;
+
+  /* Cari hesap › Ödeme gir › "Senet" (celik 02.11.2026: "ödeme sayfasına senet giri de ekler misin"): Ödeme gir formunda müşteri seçilip
+     ödeme şekli Senet seçilince Senet gir'in senet sayısı/tutar/vade/tarih adımları ve özeti aynı durumla (S.ui.sn) orada çizilir;
+     kayıt Senet gir'deki gibi (gider-cek senet, yon alinan). Müşteri Ödeme gir'deki seçimden gelir. */
+  CLK.senetGom = {
+    hazir: () => !!D.k,
+    html(kisi, no = 2) {
+      const f = D.f;
+      if (f.yon !== 'alinan') { f.yon = 'alinan'; D.onay = false; }
+      if ((kisi?.id || '') !== (f.kisi?.id || '')) { f.kisi = kisi ? { id: kisi.id, ad: kisi.ad } : null; D.onay = false; D.uyari = ''; }
+      if (!D.k && !D.yuk && !D.hata) setTimeout(() => yukle(false), 0);
+      if (!f.satirlar.length) dagit();
+      if (!D.k) return D.hata ? `<p class="msg err">${esc(D.hata)}</p><button class="btn dark" data-act="snYenile">Tekrar dene</button>` : '<p class="hint">Senet bilgileri okunuyor…</p><div class="skel" style="height:220px"></div>';
+      return `${makbuzHtml()}${sonucHtml()}${aeHint()}${adimlarHtml(no)}`;
+    },
+    ozet: () => ozetHtml(),
+    bagla
   };
   araSec.snKisi = m => { D.f.kisi = m; D.onay = false; D.uyari = ''; };
 
@@ -608,7 +639,9 @@
       // yarım kaldıysa kaydedilenler formdan çıkar, kalanlar durur (tekrar basınca yalnız onlar girilir)
       else if (r.senetler.length) { f.satirlar = f.satirlar.slice(r.senetler.length); if (r.belirsiz) f.satirlar = []; }
       D.kaydediyor = false; S.keepScroll = true; render();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const kart = $('#thKart');
+      if (kart) kart.scrollIntoView({ behavior: 'smooth', block: 'start' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (r.site?.durum === 'tamam' && S.route === 'cari') { CLK.loadUsers?.(true); CLK.loadBalance?.(true); }
       if (r.site?.durum === 'bekle') siteBekle(istek);
       // liste ve sıra no yenilenir
       D.c = null; yukle(false);

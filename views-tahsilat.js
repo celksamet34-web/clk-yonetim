@@ -2,7 +2,8 @@
    "paraşütte ki bankaları çekersin direk").
    Müşteriden alınan nakit, havale ya da kart ödemesi Paraşüt'e cari tahsilat olarak seçilen kasa/bankaya girilir, site carisine de yazılır
    (sunucu: Supabase gider-cek, işlem tahsilat_kaynak ve tahsilat). Paraşüt'te silme ya da değiştirme yok.
-   Çek ve senet buradan girilmez: senet Senet gir'den (müşteri carisine kendisi işlenir), çek Paraşüt'ten. */
+   Senetle ödediyse (celik 02.11.2026: "ödeme sayfasına senet giri de ekler misin") ödeme şekli Senet seçilir: Senet gir'in adımları
+   ve özeti burada çizilir (views-senet.js CLK.senetGom), senet Paraşüt'e müşteriden alınan senet olarak açılır. Çek Paraşüt'ten girilir. */
 (() => {
   const { sb, S, $, esc, tl2, num, dt, dtt, toast, views, render, araKutu, araSec, ARA } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/gider-cek';
@@ -21,7 +22,10 @@
   };
   const SON_HESAP = 'clk-tahsilat-hesap';
   const sonHesap = () => { try { return localStorage.getItem(SON_HESAP) || ''; } catch { return ''; } };
-  const yeniForm = () => ({ kisi: null, tutar: '', tarih: bugun(), hesap: sonHesap(), aciklama: '' });
+  const yeniForm = (sekil = 'para') => ({ kisi: null, sekil, tutar: '', tarih: bugun(), hesap: sonHesap(), aciklama: '' });
+  // senetle ödeme yalnız Senet gir yetkisi olana açılır
+  const senetVar = () => !!CLK.senetGom && CLK.izin('senet');
+  const senetMi = () => T.f.sekil === 'senet' && senetVar();
   const T = (S.ui.th ||= { acik: false, k: null, yuk: false, hata: '', f: yeniForm(), onay: false, kaydediyor: false, sonuc: null, uyari: '', siteSec: 0, istek: '' });
 
   async function sor(govde) {
@@ -116,11 +120,23 @@
     const f = T.f, k = T.k, dun = gunEkle(bugun(), -1);
     if (!k) return `<div class="card gd-form">${T.hata ? `<p class="msg err">${esc(T.hata)}</p><button class="btn dark" data-act="thYenile">Tekrar dene</button>` : '<p class="hint">Paraşüt\'teki müşteriler, kasa ve bankalar okunuyor…</p><div class="skel" style="height:300px"></div>'}</div>`;
     const u = siteUye(f.kisi), bal = u ? Number(u.balance) || 0 : 0;
+    const sekil = senetVar() ? `<div class="gd-seg odm-sekil" role="group" aria-label="Nasıl ödedi">
+        <button data-act="thSekil" data-o="para" aria-pressed="${!senetMi()}">Nakit, havale, kart</button>
+        <button data-act="thSekil" data-o="senet" aria-pressed="${senetMi()}">Senet</button></div>` : '';
+    if (senetMi()) return `<div class="card gd-form">
+      ${sonucHtml()}
+      <div class="gd-adim"><span>1</span><h3>Kimden, nasıl?</h3></div>
+      <div class="f ara-alan">${araKutu('thKisi', k.musteriler, f.kisi?.ad || '', 'thKisi', { yer: `Paraşüt müşterisi ara (${num(k.musteriler.length)})` })}
+        ${f.kisi ? `<small class="hint">${u ? `Site carisi ${tl2(bal)}${bal < 0 ? ' (borç)' : bal > 0 ? ' (alacak)' : ''}` : 'Bu müşteri sitede üye olarak eşleşmemiş; senet yalnız Paraşüt\'e yazılır.'}</small>` : ''}</div>
+      ${sekil}
+      ${CLK.senetGom.html(f.kisi, 2)}
+    </div>`;
     return `<div class="card gd-form">
       ${sonucHtml()}
-      <div class="gd-adim"><span>1</span><h3>Kimden?</h3></div>
+      <div class="gd-adim"><span>1</span><h3>${sekil ? 'Kimden, nasıl?' : 'Kimden?'}</h3></div>
       <div class="f ara-alan">${araKutu('thKisi', k.musteriler, f.kisi?.ad || '', 'thKisi', { yer: `Paraşüt müşterisi ara (${num(k.musteriler.length)})` })}
         ${f.kisi ? `<small class="hint">${u ? `Site carisi ${tl2(bal)}${bal < 0 ? ' (borç)' : bal > 0 ? ' (alacak)' : ''}` : 'Bu müşteri sitede üye olarak eşleşmemiş; yalnız Paraşüt\'e yazılır.'}</small>` : ''}</div>
+      ${sekil}
 
       <div class="gd-adim"><span>2</span><h3>Ne kadar?</h3></div>
       <div class="gd-tutar"><input id="thTutar" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(f.tutar)}" aria-label="Tutar"><b>₺</b></div>
@@ -134,7 +150,7 @@
       ${k.hesaplar.length ? `<div class="gd-hesaplar" role="group" aria-label="Kasa ya da banka">${k.hesaplar.map(h => `<button class="gd-hesap" data-act="thHesap" data-id="${h.id}" aria-pressed="${f.hesap === h.id}"><i>${h.tur === 'cash' ? '₺' : '▭'}</i><span>${esc(h.ad)}</span></button>`).join('')}</div>`
         : '<p class="msg err">Paraşüt\'te kasa ya da banka hesabı bulunamadı.</p>'}
       <label class="f gd-acik"><span>Açıklama</span><input id="thAciklama" type="text" maxlength="200" autocomplete="off" placeholder="isteğe bağlı, ör. elden nakit, Ekim ödemesi" value="${esc(f.aciklama)}"></label>
-      <p class="hint">Çek ya da senetle ödediyse buradan girmeyin: senet <button class="link" data-go="senet">Senet gir</button> sayfasından girilir (müşteri carisine kendisi işlenir), çek Paraşüt'ten.</p>
+      <p class="hint">${senetVar() ? 'Senetle ödediyse yukarıdan <b>Senet</b>\'i seçin. ' : ''}Çekle ödediyse buradan girmeyin, çek Paraşüt'ten girilir.</p>
     </div>`;
   }
 
@@ -150,9 +166,9 @@
     if (!T.acik) return '';
     if (!T.k && !T.yuk && !T.hata) setTimeout(() => yukle(false), 0);
     return `<section class="odm" id="thKart">
-      <div class="odm-h"><div><h2>Ödeme gir</h2><p class="sub">Müşteriden alınan nakit, havale ya da kart ödemesi. Kasa ve bankalar Paraşüt'ten gelir.</p></div>
+      <div class="odm-h"><div><h2>Ödeme gir</h2><p class="sub">Müşteriden alınan nakit, havale, kart${senetVar() ? ' ya da senet' : ''}. Kasa ve bankalar Paraşüt'ten gelir.</p></div>
         <button class="btn sm ghost" data-act="thKapat">Kapat</button></div>
-      <div class="gd-ust">${formHtml()}<div class="gd-sag"><div class="card gd-ozet" id="thOzet">${ozetHtml()}</div>${gecmisHtml()}</div></div>
+      <div class="gd-ust">${formHtml()}<div class="gd-sag">${senetMi() && T.k ? `<div class="card gd-ozet" id="snOzet">${CLK.senetGom.ozet()}</div>` : `<div class="card gd-ozet" id="thOzet">${ozetHtml()}</div>`}${gecmisHtml()}</div></div>
     </section>`;
   }
   function ac(siteId) {
@@ -161,7 +177,9 @@
     if (S.route !== 'cari') CLK.go('cari'); else ciz();
     setTimeout(() => $('#thKart')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   }
-  CLK.tahsilat = { kart, ac, dugme: (siteId) => CLK.izin('cari') ? `<button class="btn gold sm" data-act="thAc"${siteId ? ` data-u="${esc(siteId)}"` : ''}>Ödeme gir</button>` : '' };
+  // Cari hesap sayfası çizilince: senet seçiliyse senet alanlarının olayları bağlanır
+  const bagla = () => { if (T.acik && senetMi() && T.k) CLK.senetGom.bagla(); };
+  CLK.tahsilat = { kart, ac, bagla, dugme: (siteId) => CLK.izin('cari') ? `<button class="btn gold sm" data-act="thAc"${siteId ? ` data-u="${esc(siteId)}"` : ''}>Ödeme gir</button>` : '' };
 
   araSec.thKisi = m => { T.f.kisi = m; T.onay = false; T.uyari = ''; };
 
@@ -206,6 +224,7 @@
     else if (act === 'thHesap') { T.f.hesap = el.dataset.id; T.onay = false; T.uyari = ''; ciz(); }
     else if (act === 'thTarihSec') { T.f.tarih = el.dataset.g; T.onay = false; ciz(); }
     else if (act === 'thTamami') { T.f.tutar = el.dataset.v; T.onay = false; ciz(); }
+    else if (act === 'thSekil') { T.f.sekil = el.dataset.o === 'senet' ? 'senet' : 'para'; T.onay = false; T.uyari = ''; ciz(); }
     else if (act === 'thKaydet') kaydet();
     else if (act === 'thSonucKapat') { T.sonuc = null; ciz(); }
     else prevAct?.(act, el, ev);
