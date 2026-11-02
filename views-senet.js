@@ -72,6 +72,7 @@
   /* ---------- tedarikçiye çıkış (ciro) bordrosu ---------- */
   const AY = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
   const EV = () => CLK.evrak || { senetMi, tur: c => (senetMi(c) ? 'Senet' : 'Çek'), banka: c => (senetMi(c) ? '' : c.bankaAd || (c.banka !== 'OTHER' ? c.banka : '')) };
+  const sonG = c => EV().sonGun?.(c) || c.vade;
   const evrakAdi = c => [EV().tur(c), EV().banka(c), c.seri ? 'No ' + c.seri : ''].filter(Boolean).join(' · ');
   const trE = d => (d ? String(d).slice(0, 10).split('-').reverse().join('.') : '');
   const tlE = v => yaz(v) + ' ₺';
@@ -123,9 +124,11 @@
     return e;
   }
   function pfSatir(c, ayr) {
-    const s = D.f.secili.includes(c.id), b = ayr[c.id], n = gunArasi(bugun(), c.vade);
-    const pill = b ? `<span class="pill warn">${esc(b.no)} · ayrıldı</span>` : n < 0 ? `<span class="pill bad">${-n} gün geçti</span>` : n === 0 ? '<span class="pill bad">Bugün</span>' : n <= 7 ? `<span class="pill warn">${n} gün</span>` : `<span class="pill off">${n} gün</span>`;
-    return `<li><label class="sn-pf-r ${s && !b ? 'secili' : ''} ${b ? 'ayrik' : ''} ${n < 0 ? 'gecti' : n <= 7 ? 'yakin' : ''}">
+    const s = D.f.secili.includes(c.id), b = ayr[c.id], n = gunArasi(bugun(), c.vade), ev = EV();
+    // senette ödeme süresi: vade (tatilse sonraki iş günü) ve izleyen iki iş günü (views-cek.js CLK.evrak)
+    const sd = ev.odemeDurum && ev.senetMi(c) && n <= 0 ? ev.odemeDurum(c) : '';
+    const pill = b ? `<span class="pill warn">${esc(b.no)} · ayrıldı</span>` : sd === 'surede' ? `<span class="pill warn">Son gün ${ev.kisaGun(ev.sonGun(c))}</span>` : sd === 'songun' ? '<span class="pill bad">Bugün son gün</span>' : n < 0 ? `<span class="pill bad">${-n} gün geçti</span>` : n === 0 ? '<span class="pill bad">Bugün</span>' : n <= 7 ? `<span class="pill warn">${n} gün</span>` : `<span class="pill off">${n} gün</span>`;
+    return `<li><label class="sn-pf-r ${s && !b ? 'secili' : ''} ${b ? 'ayrik' : ''} ${sd === 'surede' ? 'yakin' : n < 0 || sd === 'songun' ? 'gecti' : n <= 7 ? 'yakin' : ''}">
       <input type="checkbox" data-sn-pf="${esc(c.id)}" ${s && !b ? 'checked' : ''} ${b ? 'disabled' : ''} aria-label="${esc((c.kimden || '') + ' ' + tl2(c.tutar))}">
       <div class="cs-vade"><b>${c.vade.slice(8, 10)}</b><small>${AY[+c.vade.slice(5, 7) - 1]} ${c.vade.slice(2, 4)}</small></div>
       <div class="cs-orta"><b>${esc(c.kimden || 'Kişi yok')}</b><small>${esc(evrakAdi(c))} · alış ${dt(c.tarih)}${b ? ` · ${esc(b.no)} ile ${esc(b.kisi)} firmasına verildi, Paraşüt'te ciro bekliyor` : ''}</small></div>
@@ -148,12 +151,12 @@
     const b = $('#snPfSec'); if (b) b.innerHTML = pfSecHtml();
     ozetYenile();
   };
-  // seçilen tedarikçiye daha önce ciro edilmiş, vadesi gelmemiş evraklar ve Paraşüt'e işlenmemiş bordroları
+  // seçilen tedarikçiye daha önce ciro edilmiş, ödeme süresi dolmamış evraklar ve Paraşüt'e işlenmemiş bordroları
   function ciroKisiNot() {
     const k = D.f.kisi; if (!k || !D.c) return '';
-    const ci = (D.c.cekler || []).filter(c => c.yon === 'ciro' && c.kimeId === k.id && c.vade >= bugun());
+    const ci = (D.c.cekler || []).filter(c => c.yon === 'ciro' && c.kimeId === k.id && sonG(c) >= bugun());
     const bek = (D.c.bordrolar || []).filter(b => b.kisiId === k.id && bordroDurum(b).bekliyor);
-    return `<p class="hint sn-acik">${ci.length ? `Bu tedarikçiye ciro edilmiş, vadesi gelmemiş ${num(ci.length)} evrak var (${tl(ci.reduce((t, c) => t + c.tutar, 0))}); son vade ${dt(ci.map(c => c.vade).sort().at(-1))}.` : 'Bu tedarikçide vadesi gelmemiş ciro evrakı yok.'}${bek.length ? ` Paraşüt'te ciroyu bekleyen bordrosu: ${bek.map(b => esc(b.no)).join(', ')}.` : ''}</p>`;
+    return `<p class="hint sn-acik">${ci.length ? `Bu tedarikçiye ciro edilmiş, ödeme süresi dolmamış ${num(ci.length)} evrak var (${tl(ci.reduce((t, c) => t + c.tutar, 0))}); son vade ${dt(ci.map(c => c.vade).sort().at(-1))}.` : 'Bu tedarikçide ödeme süresi dolmamış ciro evrakı yok.'}${bek.length ? ` Paraşüt'te ciroyu bekleyen bordrosu: ${bek.map(b => esc(b.no)).join(', ')}.` : ''}</p>`;
   }
   function ciroAdimlar() {
     const f = D.f, say = D.c ? pfFiltre().say : { senet: 0, cek: 0, hepsi: 0 }, dun = gunEkle(bugun(), -1);
@@ -387,7 +390,7 @@
   function acikEvrak() {
     const k = D.f.kisi; if (!k || !D.c) return null;
     const l = (D.c.cekler || []).filter(c => D.f.yon === 'alinan' ? c.kimdenId === k.id && c.yon === 'alinan' && c.kalan > 0.009 : c.kimeId === k.id && c.yon === 'verilen' && c.kalan > 0.009);
-    const ciro = D.f.yon === 'alinan' ? (D.c.cekler || []).filter(c => c.kimdenId === k.id && c.yon === 'ciro' && c.vade >= bugun()) : [];
+    const ciro = D.f.yon === 'alinan' ? (D.c.cekler || []).filter(c => c.kimdenId === k.id && c.yon === 'ciro' && sonG(c) >= bugun()) : [];
     return { l, ciro };
   }
   function ayniVar() {
@@ -485,7 +488,7 @@
         ? '<b>Paraşüt\'e yazılmaz.</b> Müşteriden aldığımız çek/senetleri tedarikçiye verirken yalnız çıkış bordrosu hazırlar; ciroyu Paraşüt\'te tedarikçiye ödeme olarak ayrıca girin. Yeni, kendi senedimizi verdiysek <b>Kendi senedimiz</b>\'i seçin.'
         : '<b>Paraşüt\'e yazılır.</b> Firmamızın yeni senedi tedarikçiye verilir; sıra no alır, Paraşüt\'te verilen senet olarak açılır.'}</p>` : ''}
       <div class="f ara-alan"><span>${f.yon === 'alinan' ? 'Müşteri' : 'Tedarikçi'}</span>${araKutu('snKisi_' + f.yon, l, f.kisi?.ad || '', 'snKisi', { yer: `Paraşüt ${f.yon === 'alinan' ? 'müşterisi' : 'tedarikçisi'} ara (${l.length})` })}</div>
-      ${ciroMu() ? ciroKisiNot() + ciroAdimlar() + '</div>' : ''}${ciroMu() ? '' : `${ae ? `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, vadesi gelmemiş ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>` : ''}
+      ${ciroMu() ? ciroKisiNot() + ciroAdimlar() + '</div>' : ''}${ciroMu() ? '' : `${ae ? `<p class="hint sn-acik">${ae.l.length ? `${f.yon === 'alinan' ? 'Portföyde bu müşteriden' : 'Bu tedarikçiye verilmiş, ödenmemiş'} ${num(ae.l.length)} evrak var, toplam ${tl(ae.l.reduce((t, c) => t + c.kalan, 0))}; son vade ${dt(ae.l.map(c => c.vade).sort().at(-1))}.` : f.yon === 'alinan' ? 'Portföyde bu müşteriden açık evrak yok.' : 'Bu tedarikçiye verilmiş ödenmemiş evrak yok.'}${ae.ciro.length ? ` Ciro edilmiş, ödeme süresi dolmamış ${num(ae.ciro.length)} evrakı var (${tl(ae.ciro.reduce((t, c) => t + c.tutar, 0))}).` : ''}</p>` : ''}
 
       <div class="gd-adim"><span>2</span><h3>Kaç senet, ne kadar?</h3></div>
       <div class="sn-ust">

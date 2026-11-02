@@ -956,6 +956,7 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
 .sp-alt{padding:10px;text-align:center;border-top:1px solid var(--line)}
 .sp-bos{padding:18px;text-align:center;color:var(--muted);margin:0}
 .sp-not{font-size:12px;color:var(--muted);margin:10px 0 0}
+.sp .sp-uy{margin:2px 0 14px}
 @media(max-width:700px){
   .sp-kutular{grid-template-columns:1fr;gap:8px}
   .sp-k{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:10px;padding:12px 14px}
