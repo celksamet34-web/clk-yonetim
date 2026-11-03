@@ -110,6 +110,11 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Photoroom planının görsel hakkı bitti (25.10.2026, 402; dekupe de etkilenir). Banner'da varsayılan motor fal.ai Seedream (`engine: 'fal'`, ~0,04 $): aynı yerleştirilmiş girdi düzenlenir (`bannerEditPrompt`: ürün yerinde ve aynen, yalnızca beyaz zemin sahne olur), 1728×2304 istenir, panel 1248×1664'e küçültür; kuyruk `falResult` ile sorulur.
 - Qukasoft API'sinde banner uç noktası yok (API notlarında geçmiyor). Onaylanan banner'ı kullanıcı Qukasoft yönetim paneline giriş yaptıktan sonra Claude tarayıcıdan yükler; kaydetmeden önce sorar. Onaylanan görsel Supabase'e kaydedilir (`banner-*.jpg`, 7 günlük bağlantı, `localStorage` `clk-banner-approved`).
 
+## Panel fotoğrafları ve renkler (urun_gorsel, Supabase west-gorsel; 03.11.2026)
+
+- Ürün fotoğrafları `urun_gorsel` tablosunda (Paraşüt id ile) durur, siteye yalnız Siteye gönder ile gider (gönderince ya da "Hazır fotoğrafları siteye ekle"). Kaynak klasörler: West Polo, DADA, Cambridge Polo (vkn), masaüstü GÖRSELLER (41 ürün).
+- Renkler: Paraşüt'te tek ürün olan modelin renkleri sitede **varyant** (`renk_stok`), her rengi ayrı Paraşüt ürünü olanlar (West Polo, Cambridge Polo) Qukasoft **ürün grubu** (`grup_kur`). celik 03.11: "renkleri de ayarla ya her seferinde söyletme": `urun_gorsel.kaynak.renkler` doluysa `site_ekle` ürün siteye gelince varyantı olmayan ürüne renkleri kendisi açar (her renk `kaynak.renkAdet`, yoksa 2), panel sonuçta "N ürüne renkler eklendi" yazar. 2'şer adet geçicidir, gerçek stok en sonda toplu girilecek (celik: "en son toplu stok gireriz", "stokları paraşüte yansıtma"); bu ürünlerde Stok eşitle'ye basılmaz. Eski adetler `/mnt/project-files/yapilacaklar.md`.
+
 ## Qukasoft API notları (web servis dokümanı v2.3.1)
 
 - Taban: `https://www.clkcanta.com/api/v2/`, başlıklar `apikey` ve `apisecret`. `product/save` kod varsa günceller; tek istekte en çok 5 ürün.

@@ -322,7 +322,7 @@
   const sitedeFotoYok = u => { const p = sitede()[u.id]; return !p || !P.imgs(p).length; };
   const fotoBekliyor = u => !!D.gorsel?.[u.id]?.n && sitedeMi(u) && sitedeFotoYok(u) && !D.fotoSonuc?.[u.id]?.adet;
   async function fotoEkle(urunler, ilerleme) {
-    const pidler = urunler.filter(u => D.gorsel?.[u.id]?.n).map(u => u.id), ozet = { urun: 0, foto: 0, hata: [] };
+    const pidler = urunler.filter(u => D.gorsel?.[u.id]?.n).map(u => u.id), ozet = { urun: 0, foto: 0, renk: 0, hata: [] };
     D.fotoSonuc ||= {};
     for (let i = 0; i < pidler.length; i += 10) {
       ilerleme?.(i, pidler.length);
@@ -333,13 +333,15 @@
         if (!r.ok || j.hata) throw new Error(j.hata || 'Sunucu ' + r.status);
         for (const x of j.sonuc || []) {
           D.fotoSonuc[x.pid] = x;
+          // renkleri panelde kayıtlı ürün siteye gidince renkleri de açılır (celik 03.11: "renkleri de ayarla ya her seferinde söyletme")
+          if (x.renk) { if (x.renk.hata) ozet.hata.push(`${x.pid}: renk ${x.renk.hata}`); else if (x.renk.v) ozet.renk++; }
           if (x.hata) ozet.hata.push(`${x.pid}: ${x.hata}`); else if (x.adet) { ozet.urun++; ozet.foto += x.adet; if (D.gorsel[x.pid]) D.gorsel[x.pid].eklendi = new Date().toISOString(); }
         }
       } catch (e) { ozet.hata.push(e.message); }
     }
     return ozet;
   }
-  const fotoYazi = o => [o.urun && `${num(o.urun)} ürüne ${num(o.foto)} fotoğraf eklendi`, o.hata.length && `${num(o.hata.length)} üründe fotoğraf eklenemedi (${o.hata[0]})`].filter(Boolean).join(', ');
+  const fotoYazi = o => [o.urun && `${num(o.urun)} ürüne ${num(o.foto)} fotoğraf eklendi`, o.renk && `${num(o.renk)} ürüne renkler eklendi`, o.hata.length && `${num(o.hata.length)} üründe fotoğraf eklenemedi (${o.hata[0]})`].filter(Boolean).join(', ');
   const westYazi = o => [o.grup && `${num(o.grup)} West Polo modelinin renkleri gruplandı`, o.hata.length && `${num(o.hata.length)} modelde grup kurulamadı (${o.hata[0]})`].filter(Boolean).join(', ');
 
   const paket = u => ({ pid: u.id, ad: buyuk(deger(u, 'ad')), pad: u.ad, kategori: Number(deger(u, 'kat')) || 0, alis: Number(deger(u, 'alis')) || 0, acik: !!deger(u, 'acik'), fiyat: Object.fromEntries(FIYAT.map(([a]) => [a, fiyat(u, a)])) });
