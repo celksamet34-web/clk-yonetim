@@ -59,6 +59,7 @@
                 var kutu = sag.querySelector('.clk-secili');
                 var cubuk = sag.querySelector('.category-filter-order');
                 if (!kutu) { kutu = document.createElement('div'); kutu.className = 'clk-secili'; }
+                if (cubuk && cubuk.parentNode !== sag && !cubuk.parentNode.classList.contains('clk-f-sar')) cubuk.parentNode.classList.add('clk-f-sar');
                 if (cubuk && kutu.previousElementSibling !== cubuk) cubuk.parentNode.insertBefore(kutu, cubuk.nextSibling);
                 else if (!cubuk && !kutu.parentNode) sag.insertBefore(kutu, sag.firstChild);
                 var html = '';
