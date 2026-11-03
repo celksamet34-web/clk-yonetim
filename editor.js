@@ -227,7 +227,7 @@
   }
   views.yeni = views.duzenle = () => {
     if (!ensure()) return head('Ürün', 'Yükleniyor…', '', `<button class="btn sm" data-go="urunler">← Ürünler</button>`) + CLK.skel();
-    if (!S.categories.length) loadCategories().then(() => render());
+    if (!S.catYuk && Date.now() - (S.catZaman || 0) > 60000) { const eski = S.categories.map(c => c.id + c.path).join(); loadCategories(true).then(() => { if (S.categories.map(c => c.id + c.path).join() !== eski) { S.keepScroll = true; render(); } }); }
     const cats = S.categories;
     const cover = D.shots.front?.preview || D.shots.front?.url || Object.values(D.shots)[0]?.preview || Object.values(D.shots)[0]?.url || '';
     const totalQ = D.variants.length ? D.variants.reduce((a, v) => a + (+v.q || 0), 0) : +D.quantity || 0;

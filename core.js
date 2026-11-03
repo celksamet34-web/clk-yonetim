@@ -96,18 +96,21 @@ window.CLK = (() => {
     try { S.balance = await pagedData('balance', 100); S.bLoaded = true; } catch (e) { S.bErr = e.message; }
     S.bLoading = false; render();
   }
-  async function loadCategories() {
-    if (S.categories.length) return S.categories;
-    try {
+  // site kategorileri 1 dakikadan eskiyse yeniden okunur (celik 03.11: sitede açılan kategori panele gelmiyordu; liste uygulama açık kaldıkça hiç yenilenmiyordu)
+  async function loadCategories(zorla) {
+    if (S.categories.length && !zorla && Date.now() - (S.catZaman || 0) < 60000) return S.categories;
+    if (S.catYuk) return S.catYuk;
+    S.catYuk = (async () => { try {
       const root = (await call('qukasoft-category-list', { query: { parentId: 0 } })).categories || [];
       const out = [];
       for (const c of root) {
         out.push({ id: c.id, name: c.name, path: c.name });
         try { ((await call('qukasoft-category-list', { query: { parentId: c.id } })).categories || []).forEach(k => out.push({ id: k.id, name: k.name, path: c.name + ' › ' + k.name })); } catch {}
       }
-      S.categories = out;
-    } catch {}
-    return S.categories;
+      if (out.length) S.categories = out;
+    } catch {} finally { S.catZaman = Date.now(); S.catYuk = null; }
+    return S.categories; })();
+    return S.catYuk;
   }
 
   /* sipariş yardımcıları */

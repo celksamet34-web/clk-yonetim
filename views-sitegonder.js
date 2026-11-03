@@ -102,9 +102,10 @@
   // site kategorileri alt kategorileriyle (WEST POLO › ERKEK CÜZDANLARI gibi); sunucu okuyamazsa eski liste
   async function katYukle() {
     D.katYuk = true;
+    const eski = JSON.stringify(D.kats);
     try { const r = await sor({ islem: 'site_kategoriler' }); if (!Array.isArray(r)) throw new Error(); D.kats = r.map(c => ({ id: c.id, path: c.path })); }
-    catch { D.kats = (await loadCategories()).map(c => ({ id: c.id, path: c.path })); }
-    D.katYuk = false; otoEsle(); render();
+    catch { D.kats = (await loadCategories(true)).map(c => ({ id: c.id, path: c.path })); }
+    D.katYuk = false; D.katZaman = Date.now(); otoEsle(); if (JSON.stringify(D.kats) !== eski) { S.keepScroll = true; render(); }
   }
   // eşleştirilmemiş Paraşüt kategorisi adı benzeyen site kategorisine kendiliğinden bağlanır ve kaydedilir (celik: "eşleştirmelerle uğraştırma", 30.10.2026):
   // ad aynıysa ya da biri ötekiyle başlıyorsa (VALİZ → VALİZLER), olmazsa ilk kelime (EVRAK Ç. → EVRAK ÇANTALARI, SPOR SEYAHAT → SPOR ÇANTA)
@@ -232,7 +233,7 @@
   views.sitegonder = () => {
     if (!D.urunler && !D.yukleniyor && !D.hata) yukle(false);
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
-    if (!D.kats && !D.katYuk) katYukle();
+    if (!D.katYuk && (!D.kats || Date.now() - (D.katZaman || 0) > 60000)) katYukle();
     const westSitede = (D.urunler || []).filter(u => westKod(u.ad) && sitedeMi(u));
     const fotoSay = (D.urunler || []).filter(fotoBekliyor).length;
     const acts = `${fotoSay ? `<button class="btn" data-act="stgFoto" ${D.gonderiyor ? 'disabled' : ''} title="Sitede fotoğrafı olmayan ürünlere paneldeki hazır fotoğrafları ekler">${D.foOnay ? 'Emin misin? Tekrar bas' : `Hazır fotoğrafları siteye ekle (${num(fotoSay)})`}</button>` : ''}${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo ürünlerinde aynı modelin renklerini ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'West Polo renklerini grupla'}</button>` : ''}<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
