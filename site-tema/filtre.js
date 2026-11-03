@@ -106,6 +106,24 @@
             var i = (b.parentNode.clkSecili || [])[+b.getAttribute('data-k')];
             if (i) { var l = i.parentNode.querySelector('label'); (l || i).click(); }
         });
+        // telefonda her seçim sayfayı yeniler: pencere açıksa yenilenince yeniden aç
+        var ACIK = 'clkFiltreAcik';
+        var kaydir = function () { return col.querySelector('.p-g-b-c-wrapper'); };
+        col.addEventListener('click', function (e) {
+            if (!mobil() || !col.classList.contains('active')) return;
+            if (e.target.closest && e.target.closest('.lag-checkbox, .category-price-inputs button')) {
+                try { sessionStorage.setItem(ACIK, JSON.stringify({ t: Date.now(), y: kaydir() ? kaydir().scrollTop : 0 })); } catch (x) {}
+            }
+        }, true);
+        try {
+            var ac = JSON.parse(sessionStorage.getItem(ACIK) || 'null');
+            sessionStorage.removeItem(ACIK);
+            if (ac && Date.now() - ac.t < 30000 && mobil()) {
+                col.classList.add('active', 'clk-f-anisiz');
+                document.body.classList.add('hidden-scroll', 'clk-f-acik');
+                setTimeout(function () { if (kaydir()) kaydir().scrollTop = ac.y || 0; }, 0);
+            }
+        } catch (x) {}
         // arka plana dokununca kapat
         document.addEventListener('click', function (e) {
             if (!document.body.classList.contains('clk-f-acik')) return;
