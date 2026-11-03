@@ -224,7 +224,8 @@
     if (!D.urunler && !D.yukleniyor && !D.hata) yukle(false);
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
     if (!D.kats && !D.katYuk) katYukle();
-    const acts = `<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
+    const westSitede = (D.urunler || []).filter(u => westKod(u.ad) && sitedeMi(u));
+    const acts = `${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo ürünlerinde aynı modelin renklerini ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'West Polo renklerini grupla'}</button>` : ''}<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
     const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="stgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = D.kats || [];
@@ -284,6 +285,28 @@
     });
   };
 
+  // West Polo renkleri (celik 03.11.2026): Paraşüt'te her renk ayrı ürün; sitede aynı model kodunun renkleri ürün grubuyla bağlanır
+  // (Supabase west-grup). Gönderilen West Polo ürünlerinden sonra kendiliğinden, "West Polo renklerini grupla" ile sitedekilerin hepsi.
+  const WG = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/west-grup';
+  const westKod = ad => (String(ad || '').trim().toLocaleUpperCase('tr').match(/^WEST POLO (\S+) /) || [])[1] || '';
+  async function westGrupla(urunler, ilerleme) {
+    const model = new Map();
+    for (const u of urunler) { const k = westKod(u.ad); if (k && !model.has(k)) model.set(k, u.id); }
+    const pidler = [...model.values()], ozet = { grup: 0, tek: 0, hata: [] };
+    for (let i = 0; i < pidler.length; i += 10) {
+      ilerleme?.(i, pidler.length);
+      try {
+        const { data } = await sb.auth.getSession();
+        const r = await fetch(WG, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ pidler: pidler.slice(i, i + 10) }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || j.hata) throw new Error(j.hata || 'Sunucu ' + r.status);
+        for (const x of j.sonuc || []) { if (x.hata) ozet.hata.push(`${x.kod}: ${x.hata}`); else if (x.atlandi) ozet.tek++; else ozet.grup++; }
+      } catch (e) { ozet.hata.push(e.message); }
+    }
+    return ozet;
+  }
+  const westYazi = o => [o.grup && `${num(o.grup)} West Polo modelinin renkleri gruplandı`, o.hata.length && `${num(o.hata.length)} modelde grup kurulamadı (${o.hata[0]})`].filter(Boolean).join(', ');
+
   const paket = u => ({ pid: u.id, ad: buyuk(deger(u, 'ad')), pad: u.ad, kategori: Number(deger(u, 'kat')) || 0, alis: Number(deger(u, 'alis')) || 0, acik: !!deger(u, 'acik'), fiyat: Object.fromEntries(FIYAT.map(([a]) => [a, fiyat(u, a)])) });
   // site aynı anda gelen istekleri reddedebiliyor: beşerli parçalar sırayla gider, parça hata verirse bir kez daha denenir
   async function gonder() {
@@ -319,14 +342,26 @@
       }
       sakla();
     }
+    const westler = liste.filter(u => westKod(u.ad) && D.sonuc[u.id]?.id);
+    const wo = westler.length ? await westGrupla(westler, () => { D.ilerleme = 'West Polo renkleri gruplanıyor…'; S.keepScroll = true; render(); }) : null;
     D.gonderiyor = false;
-    D.ilerleme = hatali ? `${num(tamam)} ürün gönderildi, ${num(hatali)} üründe sorun var (Gönderilemeyen filtresine bakın)` : `${num(tamam)} ürün siteye gönderildi`;
+    D.ilerleme = (hatali ? `${num(tamam)} ürün gönderildi, ${num(hatali)} üründe sorun var (Gönderilemeyen filtresine bakın)` : `${num(tamam)} ürün siteye gönderildi`) + (wo && westYazi(wo) ? ' · ' + westYazi(wo) : '');
     toast(D.ilerleme); S.keepScroll = true; render();
     loadProducts(true);
   }
 
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
+    if (act === 'stgWest') {
+      if (!D.wgOnay) { D.wgOnay = true; S.keepScroll = true; render(); setTimeout(() => { if (D.wgOnay && !D.gonderiyor) { D.wgOnay = false; S.keepScroll = true; render(); } }, 6000); return; }
+      D.wgOnay = false; D.gonderiyor = true;
+      const l = (D.urunler || []).filter(u => westKod(u.ad) && sitedeMi(u));
+      westGrupla(l, (i, t) => { D.ilerleme = `West Polo renkleri gruplanıyor… ${num(i)} / ${num(t)} model`; S.keepScroll = true; render(); }).then(o => {
+        D.gonderiyor = false; D.ilerleme = westYazi(o) || 'Gruplanacak West Polo modeli yok (sitede her modelin tek rengi var)';
+        toast(D.ilerleme); S.keepScroll = true; render();
+      });
+      return;
+    }
     if (act === 'stgYenile') { yukle(true); if (!S.pLoading) loadProducts(true); D.kats = null; katYukle(); }
     else if (act === 'stgFiltre') { D.filtre = el.dataset.k; D.goster = 100; render(); }
     else if (act === 'stgDaha') { D.goster += 200; S.keepScroll = true; render(); }
