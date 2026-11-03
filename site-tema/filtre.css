@@ -94,7 +94,7 @@ body.clk-filtre .mobil-filtre .product-view-select { margin-left: auto !importan
 /* telefon ve tablet: üst çubuk + alttan açılan sayfa */
 @media (max-width: 991px) {
   body.clk-filtre .mobil-filtre .clk-f-sar { display: contents !important; }
-  body.clk-filtre .mobil-filtre .category-filter-order { position: sticky; top: 60px; z-index: 30; margin: 0 -15px 14px !important; padding: 10px 15px !important; background: rgba(255,255,255,.96) !important; backdrop-filter: blur(8px); border-bottom: 1px solid #eee9df !important; }
+  body.clk-filtre .mobil-filtre .category-filter-order { position: sticky; top: 60px; z-index: 9; margin: 0 -15px 14px !important; padding: 10px 15px !important; background: rgba(255,255,255,.96) !important; backdrop-filter: blur(8px); border-bottom: 1px solid #eee9df !important; }
   body.clk-filtre .mobil-filtre .category-filter-order .list-wrap { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
   body.clk-filtre .mobil-filtre .category-filter-order .cat-responsive-buttons { display: block !important; margin: 0 !important; padding: 0 !important; width: auto !important; }
   body.clk-filtre .mobil-filtre .category-filter-order .mobile-filter-btn { display: flex !important; align-items: center; justify-content: center; gap: 8px; width: 100% !important; height: 44px !important; margin: 0 !important; padding: 0 12px !important; border: 0 !important; border-radius: 12px !important; background: #111 !important; color: #fff !important; font-size: 13.5px !important; font-weight: 600; letter-spacing: .02em; box-shadow: none !important; }
