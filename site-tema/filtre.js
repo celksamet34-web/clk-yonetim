@@ -65,7 +65,8 @@
                 var html = '';
                 secili.forEach(function (i, k) {
                     var m = i.closest('.p-g-mod');
-                    html += '<button type="button" data-k="' + k + '"><small>' + (m ? temizBaslik(m) : '') + '</small>' + etiket(i).replace(/</g, '&lt;') + '<i>×</i></button>';
+                    var ad = m ? temizBaslik(m) : ''; if (/^fiyat/i.test(ad)) ad = 'Fiyat';
+                    html += '<button type="button" data-k="' + k + '"><small>' + ad + '</small>' + etiket(i).replace(/</g, '&lt;') + '<i>×</i></button>';
                 });
                 if (secili.length > 1 && temizleLink()) html += '<button type="button" class="clk-temizle">Tümünü temizle</button>';
                 if (kutu.clkHtml !== html) { kutu.innerHTML = html; kutu.clkHtml = html; }
