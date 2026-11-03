@@ -55,8 +55,10 @@
   };
   // Paraşüt ürünleri (arşivdekiler hariç), fiyat kuralları ve kategori eşleştirmesi
   async function oku() {
-    const [v, k, a] = await Promise.all([sor({ islem: 'urunler' }), sb.from('fiyat_kural').select('*'), sb.from('fiyat_ayar').select('ad,deger')]);
+    const [v, k, a, g] = await Promise.all([sor({ islem: 'urunler' }), sb.from('fiyat_kural').select('*'), sb.from('fiyat_ayar').select('ad,deger'), sb.from('urun_gorsel').select('parasut_id,urls,site_eklendi').limit(5000)]);
     if (k.error) throw new Error(k.error.message);
+    // panelde saklanan ürün fotoğrafları (urun_gorsel; tablo yoksa ya da yetki yoksa boş)
+    if (!g.error) D.gorsel = Object.fromEntries((g.data || []).map(r => [String(r.parasut_id), { n: (r.urls || []).length, eklendi: r.site_eklendi }]));
     const liste = v.urunler.filter(x => !x[7]), imza = JSON.stringify(liste);
     if (imza !== D.imza) D.urunler = liste.map(([id, ad, alis, satis, stok, , , , kat]) => ({ id: String(id), ad, alis: Number(alis) || 0, satis: Number(satis) || 0, stok: Number(stok) || 0, kat: kat || '' }));
     D.imza = imza; D.zaman = v.zaman;
@@ -197,6 +199,13 @@
     return Object.entries(say).sort((a, b) => (a[0] === 'KATEGORİSİZ') - (b[0] === 'KATEGORİSİZ') || b[1] - a[1]);
   };
 
+  const fotoNot = u => {
+    const g = D.gorsel?.[u.id], f = D.fotoSonuc?.[u.id];
+    if (!g?.n) return '';
+    if (f?.adet) return ` · 📷 ${num(f.adet)} fotoğraf eklendi`;
+    if (f?.hata) return ` · <span class="stg-zarar" title="${esc(f.hata)}">📷 fotoğraf eklenemedi</span>`;
+    return sitedeMi(u) && !sitedeFotoYok(u) ? '' : ` · 📷 ${num(g.n)} fotoğraf hazır`;
+  };
   const satir = (u, katSecenek) => {
     const t = taslak[u.id] || {}, p = sitede()[u.id], s = D.sonuc[u.id], sec = D.secili.has(u.id), ek = sec ? eksik(u) : [];
     const kat = String(deger(u, 'kat') || ''), katYeni = !('kat' in t) && !s?.deger && !!katDegisti(u);
@@ -212,7 +221,7 @@
     return `<tr class="${Object.keys(t).length || katYeni ? 'sk-satir-deg' : ''}">
       <td><input type="checkbox" data-sec="${u.id}" ${sec ? 'checked' : ''} aria-label="Seç ${esc(u.ad)}"></td>
       <td class="stg-urun"><input class="sk-in sk-ad-in ${'ad' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="ad" value="${esc(deger(u, 'ad'))}" aria-label="Sitedeki adı ${esc(u.ad)}">
-        <small>${esc(katAd(u))} · stok ${fmt(u.stok)}${p ? ' · ' + esc(p.code) : ''}</small></td>
+        <small>${esc(katAd(u))} · stok ${fmt(u.stok)}${p ? ' · ' + esc(p.code) : ''}${fotoNot(u)}</small></td>
       <td><select class="stg-kat ${'kat' in t || katYeni ? 'sk-deg' : ''} ${sec && ek.includes('site kategorisi') ? 'fk-uyari' : ''}" data-id="${u.id}" data-a="kat" aria-label="Site kategorisi ${esc(u.ad)}" ${katYeni ? 'title="Paraşüt kategorisi değişti; gönderince sitede bu kategoriye taşınır"' : ''}><option value="">${p ? 'Değiştirme' : 'Kategori seç'}</option>${kat ? katSecenek.replace(`value="${kat}"`, `value="${kat}" selected`) : katSecenek}</select></td>
       <td><input class="sk-in sk-num ${'alis' in t ? 'sk-deg' : ''}" data-id="${u.id}" data-a="alis" value="${deger(u, 'alis') > 0 ? String(deger(u, 'alis')).replace('.', ',') : ''}" placeholder="—" inputmode="decimal" aria-label="Alış ${esc(u.ad)}"></td>
       ${FIYAT.map(([a]) => fiyatKutu(a)).join('')}
@@ -225,8 +234,9 @@
     if (!S.pLoaded && !S.pLoading && !S.pErr) loadProducts();
     if (!D.kats && !D.katYuk) katYukle();
     const westSitede = (D.urunler || []).filter(u => westKod(u.ad) && sitedeMi(u));
-    const acts = `${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo ürünlerinde aynı modelin renklerini ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'West Polo renklerini grupla'}</button>` : ''}<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
-    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Fotoğraf ve açıklama Ürünler sayfasından eklenir.`, acts);
+    const fotoSay = (D.urunler || []).filter(fotoBekliyor).length;
+    const acts = `${fotoSay ? `<button class="btn" data-act="stgFoto" ${D.gonderiyor ? 'disabled' : ''} title="Sitede fotoğrafı olmayan ürünlere paneldeki hazır fotoğrafları ekler">${D.foOnay ? 'Emin misin? Tekrar bas' : `Hazır fotoğrafları siteye ekle (${num(fotoSay)})`}</button>` : ''}${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo ürünlerinde aynı modelin renklerini ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'West Polo renklerini grupla'}</button>` : ''}<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
+    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Panelde hazır fotoğrafı olan ürün (📷) siteye gidince fotoğrafları da eklenir; sitede fotoğrafı olan ürüne dokunulmaz. Diğer fotoğraflar ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="stgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = D.kats || [];
     const katSecenek = kats.map(c => `<option value="${c.id}">${esc(c.path)}</option>`).join('');
@@ -305,6 +315,30 @@
     }
     return ozet;
   }
+  // panel fotoğrafları (celik 03.11.2026: "bizim panelden siteye atacağız"): fotoğrafı panelde saklanan ürün siteye gidince ya da
+  // "Hazır fotoğrafları siteye ekle" ile, sitede hiç fotoğrafı yoksa sırasıyla eklenir (Supabase west-gorsel site_ekle). Fotoğrafı olana dokunulmaz.
+  const WGO = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/west-gorsel';
+  const sitedeFotoYok = u => { const p = sitede()[u.id]; return !p || !P.imgs(p).length; };
+  const fotoBekliyor = u => !!D.gorsel?.[u.id]?.n && sitedeMi(u) && sitedeFotoYok(u) && !D.fotoSonuc?.[u.id]?.adet;
+  async function fotoEkle(urunler, ilerleme) {
+    const pidler = urunler.filter(u => D.gorsel?.[u.id]?.n).map(u => u.id), ozet = { urun: 0, foto: 0, hata: [] };
+    D.fotoSonuc ||= {};
+    for (let i = 0; i < pidler.length; i += 10) {
+      ilerleme?.(i, pidler.length);
+      try {
+        const { data } = await sb.auth.getSession();
+        const r = await fetch(WGO, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ islem: 'site_ekle', pidler: pidler.slice(i, i + 10) }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || j.hata) throw new Error(j.hata || 'Sunucu ' + r.status);
+        for (const x of j.sonuc || []) {
+          D.fotoSonuc[x.pid] = x;
+          if (x.hata) ozet.hata.push(`${x.pid}: ${x.hata}`); else if (x.adet) { ozet.urun++; ozet.foto += x.adet; if (D.gorsel[x.pid]) D.gorsel[x.pid].eklendi = new Date().toISOString(); }
+        }
+      } catch (e) { ozet.hata.push(e.message); }
+    }
+    return ozet;
+  }
+  const fotoYazi = o => [o.urun && `${num(o.urun)} ürüne ${num(o.foto)} fotoğraf eklendi`, o.hata.length && `${num(o.hata.length)} üründe fotoğraf eklenemedi (${o.hata[0]})`].filter(Boolean).join(', ');
   const westYazi = o => [o.grup && `${num(o.grup)} West Polo modelinin renkleri gruplandı`, o.hata.length && `${num(o.hata.length)} modelde grup kurulamadı (${o.hata[0]})`].filter(Boolean).join(', ');
 
   const paket = u => ({ pid: u.id, ad: buyuk(deger(u, 'ad')), pad: u.ad, kategori: Number(deger(u, 'kat')) || 0, alis: Number(deger(u, 'alis')) || 0, acik: !!deger(u, 'acik'), fiyat: Object.fromEntries(FIYAT.map(([a]) => [a, fiyat(u, a)])) });
@@ -344,14 +378,25 @@
     }
     const westler = liste.filter(u => westKod(u.ad) && D.sonuc[u.id]?.id);
     const wo = westler.length ? await westGrupla(westler, () => { D.ilerleme = 'West Polo renkleri gruplanıyor…'; S.keepScroll = true; render(); }) : null;
+    const fotolu = liste.filter(u => D.sonuc[u.id]?.id && D.gorsel?.[u.id]?.n && sitedeFotoYok(u));
+    const fo = fotolu.length ? await fotoEkle(fotolu, (i, t) => { D.ilerleme = `Fotoğraflar ekleniyor… ${num(i)} / ${num(t)} ürün`; S.keepScroll = true; render(); }) : null;
     D.gonderiyor = false;
-    D.ilerleme = (hatali ? `${num(tamam)} ürün gönderildi, ${num(hatali)} üründe sorun var (Gönderilemeyen filtresine bakın)` : `${num(tamam)} ürün siteye gönderildi`) + (wo && westYazi(wo) ? ' · ' + westYazi(wo) : '');
+    D.ilerleme = (hatali ? `${num(tamam)} ürün gönderildi, ${num(hatali)} üründe sorun var (Gönderilemeyen filtresine bakın)` : `${num(tamam)} ürün siteye gönderildi`) + (wo && westYazi(wo) ? ' · ' + westYazi(wo) : '') + (fo && fotoYazi(fo) ? ' · ' + fotoYazi(fo) : '');
     toast(D.ilerleme); S.keepScroll = true; render();
     loadProducts(true);
   }
 
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
+    if (act === 'stgFoto') {
+      if (!D.foOnay) { D.foOnay = true; S.keepScroll = true; render(); setTimeout(() => { if (D.foOnay && !D.gonderiyor) { D.foOnay = false; S.keepScroll = true; render(); } }, 6000); return; }
+      D.foOnay = false; D.gonderiyor = true;
+      fotoEkle((D.urunler || []).filter(fotoBekliyor), (i, t) => { D.ilerleme = `Fotoğraflar ekleniyor… ${num(i)} / ${num(t)} ürün`; S.keepScroll = true; render(); }).then(o => {
+        D.gonderiyor = false; D.ilerleme = fotoYazi(o) || 'Fotoğraf eklenecek ürün yok';
+        toast(D.ilerleme); S.keepScroll = true; render(); loadProducts(true);
+      });
+      return;
+    }
     if (act === 'stgWest') {
       if (!D.wgOnay) { D.wgOnay = true; S.keepScroll = true; render(); setTimeout(() => { if (D.wgOnay && !D.gonderiyor) { D.wgOnay = false; S.keepScroll = true; render(); } }, 6000); return; }
       D.wgOnay = false; D.gonderiyor = true;

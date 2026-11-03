@@ -61,6 +61,12 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Yetki anahtarları = MENU sayfa anahtarları + `esitle` (Şimdi eşitle düğmesi) + `ciro` (panelde ciro, kâr, stok değeri). Panel herkese açık; açık cari kartı `cari`, senet kartı `cek`, bekleyen siparişler `siparisler` ister. Alt sayfalar: siparis→siparisler, musteri→musteriler, duzenle→urunler/yeni/stok.
 - Sunucu denetimi: clk-data (users/orders: sipariş-müşteri sayfaları; balance: cari/ekstre; cari yetkisi yoksa users yanıtından balance alanları silinir), siparis-parasut ve gider-cek (işlem → sayfa `YETKI` haritası), stok-esitle, qukasoft-product-save, ai-product-image köprüsü, Netlify ai-product-image ve qukasoft. RLS: panel tabloları `panel_yetki()`, sp_parasut_musteri cari/ekstre/satış faturası/West Polo/eşleştirme, sp_geri/sp_siparis/sp_site_musteri eşleştirme, ug_* Ürün Giriş.
 
+## Panel ürün fotoğrafları (Siteye gönder; 03.11.2026)
+
+- celik: "siteden değil bizim ürünlerden ekle", "bizim panelden siteye atacağız". Tedarikçi (West Polo) fotoğrafları Paraşüt ürünleriyle kod ve renkten eşleştirildi (520 ürün, ~2250 foto, mankensiz), 1200×1600 beyaz zemine ortalandı ve Supabase'de saklanır: tablo `urun_gorsel` (parasut_id, ad, urls, kaynak, site_eklendi; RLS okuma `panel_yetki(sitegonder/urunler/yeni)`), depo `urun-gorsel` (herkese açık, `west/<pid>/…jpg`).
+- Edge fonksiyonu `west-gorsel` (kaynağı depoda değil): `depola` (yalnız x-gorev; raw.githubusercontent adreslerinden indirip depoya koyar) ve `site_ekle` (sitegonder yetkisi; `PRS-<pid>` sitede varsa ve **hiç fotoğrafı yoksa** fotoğrafları sırayla `product/save` ile ekler, geri okuyup fotoğraf dışı alanlar ve sayı karşılaştırılır; fotoğrafı olana dokunmaz).
+- Siteye gönder (views-sitegonder.js): satırda "📷 N fotoğraf hazır"; gönderilen ürünün sitede fotoğrafı yoksa gönderimden sonra kendiliğinden eklenir; sitedeki fotoğrafsız ürünler için "Hazır fotoğrafları siteye ekle (N)" (iki basış).
+
 ## Katalog (views-katalog.js, sayfa #katalog; 01.11.2026)
 
 - celik isteği: "pdf çıktı olarak katalog yapma şablonu… fiyatlı yada fiyatsız… metaads gibi düşün". Site ürünleri menüsünde, Siteye gönder ile Banner arasında.
