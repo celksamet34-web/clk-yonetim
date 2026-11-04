@@ -324,20 +324,73 @@
   const PW = 1200, PH = 1600;
   // focus yoksa görsel %92'ye sığdırılır (beyaz kenar). focus varsa kaplanır: yanlardan kırpılır, verilmişse
   // focus.x0–x1 (görsel genişliğine oranla çanta) kadrajda kalır.
+  // Kaliteli küçültme (celik 04.11.2026 "görüntü kalitesi çok düşüyor"): telefon fotoğrafı (~5700 px) tek adımda 1200 px'e çizilince
+  // tarayıcı düşük kaliteli örnekleme yapıyor, doku ve dikişler bulanıklaşıyordu. Görsel yarıya yarıya, yüksek kaliteyle küçültülür.
+  function kucult(im, sx, sy, sw, sh, dw, dh) {
+    let src = im, x0 = sx, y0 = sy, w = sw, h = sh;
+    while (w / 2 >= dw * 1.05 && h / 2 >= dh * 1.05) {
+      const nw = Math.round(w / 2), nh = Math.round(h / 2), c = document.createElement('canvas'); c.width = nw; c.height = nh;
+      const cx = c.getContext('2d'); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.drawImage(src, x0, y0, w, h, 0, 0, nw, nh);
+      src = c; x0 = 0; y0 = 0; w = nw; h = nh;
+    }
+    return { src, sx: x0, sy: y0, sw: w, sh: h };
+  }
+  function ciz(x, im, sx, sy, sw, sh, dx, dy, dw, dh) {
+    const k = kucult(im, sx, sy, sw, sh, dw, dh);
+    x.save(); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(k.src, k.sx, k.sy, k.sw, k.sh, dx, dy, dw, dh); x.restore();
+  }
+  // Yeni çekilen fotoğrafta ürün kadraja göre küçük kalırsa (tripod uzak) vitrin onu büyütüp bulanıklaştırıyordu. Ürün, zeminden
+  // (kenar piksellerinin rengi) ayrılan piksellerden bulunur ve tam çözünürlükteki fotoğraftan çevresinde pay bırakılarak 3:4 kesilir.
+  // Ürün bulunamazsa ya da kadrajın çoğunu kaplıyorsa fotoğraf olduğu gibi kalır.
+  function urunKadraj(im) {
+    const W = im.naturalWidth || im.width, H = im.naturalHeight || im.height, n = 240, sc = n / Math.max(W, H);
+    const w = Math.max(1, Math.round(W * sc)), h = Math.max(1, Math.round(H * sc));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data, kenar = [];
+    for (let i = 0; i < w; i++) kenar.push(i, i + (h - 1) * w);
+    for (let j = 0; j < h; j++) kenar.push(j * w, j * w + w - 1);
+    const med = o => { const v = kenar.map(i => d[i * 4 + o]).sort((a, b) => a - b); return v[v.length >> 1]; };
+    const zr = med(0), zg = med(1), zb = med(2), esik = 42;
+    const sat = new Array(h).fill(0), sut = new Array(w).fill(0);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const o = (j * w + i) * 4; if (Math.abs(d[o] - zr) + Math.abs(d[o + 1] - zg) + Math.abs(d[o + 2] - zb) > esik) { sat[j]++; sut[i]++; } }
+    const ilk = (a, m) => a.findIndex(v => v > m), son = (a, m) => a.length - 1 - [...a].reverse().findIndex(v => v > m);
+    const y0 = ilk(sat, w * 0.02), y1 = son(sat, w * 0.02), x0 = ilk(sut, h * 0.02), x1 = son(sut, h * 0.02);
+    if (y0 < 0 || x0 < 0 || x1 <= x0 || y1 <= y0) return null;
+    const bw = (x1 - x0 + 1) / sc, bh = (y1 - y0 + 1) / sc;
+    if (bw * bh < W * H * 0.008 || (bw > W * 0.85 && bh > H * 0.85)) return null;
+    // ürün kutusu + %9 pay, 3:4'e genişletilir
+    let cw = bw * 1.18, ch = bh * 1.18; if (cw / ch > PW / PH) ch = cw * PH / PW; else cw = ch * PW / PH;
+    const cx = (x0 + x1 + 1) / 2 / sc, cy = (y0 + y1 + 1) / 2 / sc;
+    return { x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch };
+  }
+  async function hazirla(raw) {
+    const im = await loadImg(raw), W = im.naturalWidth || im.width, H = im.naturalHeight || im.height, r = urunKadraj(im);
+    if (!r) return portrait(raw, false);
+    const c = document.createElement('canvas'); c.width = PW; c.height = PH; const x = c.getContext('2d');
+    // kesim fotoğrafın dışına taşarsa taşan kısım zemin rengindeki kenardan uzatılmaz, beyaz kalır (dekupe zaten temizler)
+    x.fillStyle = '#fff'; x.fillRect(0, 0, PW, PH);
+    const sx = Math.max(0, r.x), sy = Math.max(0, r.y), ex = Math.min(W, r.x + r.w), ey = Math.min(H, r.y + r.h), k = PW / r.w;
+    ciz(x, im, sx, sy, ex - sx, ey - sy, (sx - r.x) * k, (sy - r.y) * k, (ex - sx) * k, (ey - sy) * k);
+    return c.toDataURL('image/jpeg', 0.95);
+  }
   async function portrait(src, mark, focus) {
     const im = await loadImg(src), c = document.createElement('canvas'); c.width = PW; c.height = PH;
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
     const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, PW, PH);
     if (focus) {
-      const s = Math.max(PW / im.width, PH / im.height), w = im.width * s, h = im.height * s, cw = PW / w;
+      const s = Math.max(PW / iw, PH / ih), w = iw * s, h = ih * s, cw = PW / w;
       let L = (1 - cw) / 2; if (focus.x1 != null) { L = Math.min(L, focus.x0); L = Math.max(L, focus.x1 - cw); }
       L = Math.max(0, Math.min(1 - cw, L));
-      x.drawImage(im, -L * w, (PH - h) / 2, w, h);
+      ciz(x, im, 0, 0, iw, ih, -L * w, (PH - h) / 2, w, h);
+    } else if (iw === PW && ih === PH) {
+      x.drawImage(im, 0, 0); // zaten site boyutunda (dekupe çıktısı): yeniden örneklenmez
     } else {
-      const s = Math.min(PW * 0.92 / im.width, PH * 0.92 / im.height); const w = im.width * s, h = im.height * s;
-      x.drawImage(im, (PW - w) / 2, (PH - h) / 2, w, h);
+      const s = Math.min(PW * 0.92 / iw, PH * 0.92 / ih); const w = iw * s, h = ih * s;
+      ciz(x, im, 0, 0, iw, ih, (PW - w) / 2, (PH - h) / 2, w, h);
     }
     if (mark) filigran(x);
-    return c.toDataURL('image/jpeg', 0.9);
+    return c.toDataURL('image/jpeg', 0.93);
   }
   const filigran = x => { x.save(); x.globalAlpha = 0.18; x.fillStyle = '#121110'; x.font = '600 54px "Playfair Display", Georgia, serif'; x.textAlign = 'right'; x.textBaseline = 'bottom'; x.letterSpacing = '12px'; x.fillText('CLK', PW - 40, PH - 34); x.restore(); };
   // Vitrin (ön fotoğraf, celik isteği 31.10.2026): ürün 3:4 karede her üründe aynı büyüklükte ortalanır (anasayfa vitrini ve mobildeki
@@ -631,7 +684,7 @@
   async function processShot(k, raw) {
     const s = (D.shots[k] = { preview: raw, busy: 'Hazırlanıyor…' }); render();
     try {
-      let base = await portrait(raw, false);
+      let base = await hazirla(raw);
       if (D.auto.cutout) { s.busy = 'Arka plan temizleniyor…'; render(); try { base = await aiImage(base, 'cutout'); } catch (e) { toast('Dekupe yapılamadı, orijinal kullanıldı.'); } }
       const final = k === 'front' ? await vitrin(base, D.auto.mark) : await portrait(base, D.auto.mark); s.preview = final; s.raw = raw; if (k === 'front') s.cut = base; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
