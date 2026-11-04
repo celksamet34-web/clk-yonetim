@@ -313,7 +313,7 @@
       ${src ? `<img src="${esc(src)}" alt="${t}">` : `<div class="empty-s">${CLK.ICONS.cam}<b>${t}</b><span>${h}</span></div>`}
       ${s?.busy ? `<div class="busy">${esc(s.busy)}</div>` : ''}
       ${src ? `<div class="ops">${auto ? `<button data-act="${act}">Yeniden</button>` : `<button data-act="edCut" data-k="${k}">Dekupe</button>${k === 'front' ? `<button data-act="edVitrin" data-k="${k}" title="Vitrin boyutu ve gölge, ürüne dokunmadan (ücretsiz)">Vitrin</button>` : ''}`}<button class="x" data-act="edShotDel" data-k="${k}">Sil</button></div>` :
-        auto ? `<div class="ops"><button data-act="${act}" ${D.shots.front ? '' : 'disabled'}>Manken üret</button></div>` : `<label><input type="file" accept="image/*" capture="environment" data-shot="${k}" hidden></label>`}</div>`;
+        auto ? `<div class="ops"><button data-act="${act}" ${D.shots.front ? '' : 'disabled'}>Manken üret</button></div>` : `<label><input type="file" accept="image/*" data-shot="${k}" hidden></label>`}</div>`;
   }
 
   /* ---------- görsel hazırlama ---------- */
