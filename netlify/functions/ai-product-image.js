@@ -269,6 +269,8 @@ exports.handler = async event => {
     }
     const engineError = errors.join(' | ');
     if (errors.length && !apiKey) return reply(422, { success: false, message: engineError });
+    // Dekupe OpenAI'ye düşmez: OpenAI çantayı yeniden çiziyor (logo bozulur, 1024 kare). Panel kendi dekupesini kullanır (celik 04.11.2026).
+    if (action === 'cutout') return reply(422, { success: false, message: engineError || 'Photoroom anahtarı yok.' });
     // Logo ve yazıların korunması için yüksek girdi sadakati; model reddederse ayarsız tekrar dener.
     const edit = async fidelity => {
       const form = new FormData();

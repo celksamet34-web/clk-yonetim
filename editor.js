@@ -364,15 +364,48 @@
     const cx = (x0 + x1 + 1) / 2 / sc, cy = (y0 + y1 + 1) / 2 / sc;
     return { x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch };
   }
-  async function hazirla(raw) {
+  // olc: dekupeye 1,25 kat (1500×2000) gider; Photoroom kenarları daha ince keser, son küçültme panelde yapılır (Netlify 6 MB sınırına sığar).
+  async function hazirla(raw, olc = 1) {
     const im = await loadImg(raw), W = im.naturalWidth || im.width, H = im.naturalHeight || im.height, r = urunKadraj(im);
     if (!r) return portrait(raw, false);
-    const c = document.createElement('canvas'); c.width = PW; c.height = PH; const x = c.getContext('2d');
+    const GW = Math.round(PW * olc), GH = Math.round(PH * olc);
+    const c = document.createElement('canvas'); c.width = GW; c.height = GH; const x = c.getContext('2d');
     // kesim fotoğrafın dışına taşarsa taşan kısım zemin rengindeki kenardan uzatılmaz, beyaz kalır (dekupe zaten temizler)
-    x.fillStyle = '#fff'; x.fillRect(0, 0, PW, PH);
-    const sx = Math.max(0, r.x), sy = Math.max(0, r.y), ex = Math.min(W, r.x + r.w), ey = Math.min(H, r.y + r.h), k = PW / r.w;
+    x.fillStyle = '#fff'; x.fillRect(0, 0, GW, GH);
+    const sx = Math.max(0, r.x), sy = Math.max(0, r.y), ex = Math.min(W, r.x + r.w), ey = Math.min(H, r.y + r.h), k = GW / r.w;
     ciz(x, im, sx, sy, ex - sx, ey - sy, (sx - r.x) * k, (sy - r.y) * k, (ex - sx) * k, (ey - sy) * k);
     return c.toDataURL('image/jpeg', 0.95);
+  }
+  // Panelde dekupe (ücretsiz): fon, kenarlardan başlayarak renksiz ve açık piksellerden doldurulur, kalan ürün şeffaf PNG olur.
+  // Fon kenarların %85'inden azında düz ve açıksa (stüdyo dışı fotoğraf) null döner; zorla=true ise yine dener.
+  // Ürün çok küçük kalırsa (beyaz/açık renkli ürün fona karıştı) null döner, ürün piksellerine dokunulmaz.
+  async function yerelDekupe(src, zorla) {
+    const im = await loadImg(src), W = im.naturalWidth || im.width, H = im.naturalHeight || im.height;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(im, 0, 0);
+    const id = x.getImageData(0, 0, W, H), d = id.data, N = W * H;
+    const lum = i => 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    const renk = i => Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) - Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+    const kenar = []; for (let i = 0; i < W; i += 2) kenar.push(i, (H - 1) * W + i); for (let j = 0; j < H; j += 2) kenar.push(j * W, j * W + W - 1);
+    const lv = kenar.map(lum).sort((a, b) => a - b), zl = lv[lv.length >> 1];
+    const duz = kenar.filter(i => renk(i) <= 22 && lum(i) >= 170).length / kenar.length;
+    if (!zorla && (duz < 0.85 || zl < 185)) return null;
+    const alt = Math.max(150, zl - 55);
+    const fon = i => renk(i) <= 24 && lum(i) >= alt;
+    const bg = new Uint8Array(N), q = new Int32Array(N); let h = 0, t = 0;
+    const it = i => { if (!bg[i] && fon(i)) { bg[i] = 1; q[t++] = i; } };
+    for (let i = 0; i < W; i++) { it(i); it((H - 1) * W + i); } for (let j = 0; j < H; j++) { it(j * W); it(j * W + W - 1); }
+    while (h < t) { const i = q[h++], X = i % W; if (X > 0) it(i - 1); if (X < W - 1) it(i + 1); if (i >= W) it(i - W); if (i < N - W) it(i + W); }
+    const urun = N - t; if (urun < N * 0.02) return null;
+    for (let i = 0; i < N; i++) {
+      if (bg[i]) { d[i * 4 + 3] = 0; continue; }
+      const X = i % W;
+      if ((X > 0 && bg[i - 1]) || (X < W - 1 && bg[i + 1]) || (i >= W && bg[i - W]) || (i < N - W && bg[i + W])) {
+        const l = lum(i); d[i * 4 + 3] = Math.max(110, Math.min(255, Math.round((zl - l) * 255 / Math.max(30, zl - alt + 30))));
+      }
+    }
+    x.putImageData(id, 0, 0);
+    return c.toDataURL('image/png');
   }
   async function portrait(src, mark, focus) {
     const im = await loadImg(src), c = document.createElement('canvas'); c.width = PW; c.height = PH;
@@ -385,6 +418,8 @@
       ciz(x, im, 0, 0, iw, ih, -L * w, (PH - h) / 2, w, h);
     } else if (iw === PW && ih === PH) {
       x.drawImage(im, 0, 0); // zaten site boyutunda (dekupe çıktısı): yeniden örneklenmez
+    } else if (Math.abs(iw * PH - ih * PW) < iw * 2) {
+      ciz(x, im, 0, 0, iw, ih, 0, 0, PW, PH); // 3:4 (panelin kestiği, payı içinde): yalnız küçültülür
     } else {
       const s = Math.min(PW * 0.92 / iw, PH * 0.92 / ih); const w = iw * s, h = ih * s;
       ciz(x, im, 0, 0, iw, ih, (PW - w) / 2, (PH - h) / 2, w, h);
@@ -684,8 +719,14 @@
   async function processShot(k, raw) {
     const s = (D.shots[k] = { preview: raw, busy: 'Hazırlanıyor…' }); render();
     try {
-      let base = await hazirla(raw);
-      if (D.auto.cutout) { s.busy = 'Arka plan temizleniyor…'; render(); try { base = await aiImage(base, 'cutout'); } catch (e) { toast('Dekupe yapılamadı, orijinal kullanıldı.'); } }
+      let base = await hazirla(raw, D.auto.cutout ? 1.25 : 1);
+      if (D.auto.cutout) {
+        s.busy = 'Arka plan temizleniyor…'; render();
+        // celik 04.11.2026: Photoroom hakkı bitti, sunucu OpenAI'ye geçip çantayı yeniden çizdi (logo bozulur, 1024 kare, düşük kalite).
+        // Sunucu dekupede artık OpenAI'ye geçmez; Photoroom olmazsa dekupe panelde ücretsiz yapılır (ürün piksellerine dokunulmaz).
+        try { base = await aiImage(base, 'cutout'); }
+        catch (e) { const y2 = await yerelDekupe(base, true).catch(() => null); if (y2) { base = y2; toast('Photoroom kullanılamadı (' + String(e.message).slice(0, 60) + '), panelin kendi dekupesi kullanıldı.'); } else toast('Dekupe yapılamadı, orijinal kullanıldı.'); }
+      }
       const final = k === 'front' ? await vitrin(base, D.auto.mark) : await portrait(base, D.auto.mark); s.preview = final; s.raw = raw; if (k === 'front') s.cut = base; s.busy = 'Yükleniyor…'; render();
       s.path = await upload(final); delete s.busy; delete s.url; delete s.existing;
       if (k === 'front' && !D.shots.model && hasSize()) makeModel();
