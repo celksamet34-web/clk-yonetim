@@ -236,7 +236,7 @@
     if (!D.katYuk && (!D.kats || Date.now() - (D.katZaman || 0) > 60000)) katYukle();
     const westSitede = (D.urunler || []).filter(u => westKod(u.ad) && sitedeMi(u));
     const fotoSay = (D.urunler || []).filter(fotoBekliyor).length;
-    const acts = `${fotoSay ? `<button class="btn" data-act="stgFoto" ${D.gonderiyor ? 'disabled' : ''} title="Sitede fotoğrafı olmayan ürünlere paneldeki hazır fotoğrafları ekler">${D.foOnay ? 'Emin misin? Tekrar bas' : `Hazır fotoğrafları siteye ekle (${num(fotoSay)})`}</button>` : ''}${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo ürünlerinde aynı modelin renklerini ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'West Polo renklerini grupla'}</button>` : ''}<button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
+    const acts = `${fotoSay ? `<button class="btn" data-act="stgFoto" ${D.gonderiyor ? 'disabled' : ''} title="Sitede fotoğrafı olmayan ürünlere paneldeki hazır fotoğrafları ekler">${D.foOnay ? 'Emin misin? Tekrar bas' : `Hazır fotoğrafları siteye ekle (${num(fotoSay)})`}</button>` : ''}${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo ürünlerinde aynı modelin renklerini ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'West Polo renklerini grupla'}</button>` : ''}<button class="btn" data-act="stgSira" ${D.gonderiyor ? 'disabled' : ''} title="Kategori sayfalarında fotoğraflı ürünler üstte, fotoğrafsızlar altta görünür (Qukasoft sıralama önceliği)">${D.siOnay ? 'Emin misin? Tekrar bas' : 'Fotoğraflıları öne al'}</button><button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
     const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Panelde hazır fotoğrafı olan ürün (📷) siteye gidince fotoğrafları da eklenir; sitede fotoğrafı olan ürüne dokunulmaz. Diğer fotoğraflar ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="stgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = D.kats || [];
@@ -341,6 +341,23 @@
     }
     return ozet;
   }
+  // celik 04.11.2026 "fotoğrafı olmayan ürünleri kategori bazlı sıralamada aşağıya al": Qukasoft "En yeniler" sıralamasında sıralama önceliği büyük olan önce gelir.
+  // west-gorsel 'sira' fotoğraflı ürünlere 10 verir, fotoğrafı kalmamış üründe 10'u 0 yapar; her çağrıda 20 ürün, kalan bitene kadar. Fotoğraf eklenince site_ekle de 10 verir.
+  async function siraDuzenle(ilerleme) {
+    const o = { yazilan: 0, hata: [] };
+    for (let tur = 0; tur < 40; tur++) {
+      try {
+        const { data } = await sb.auth.getSession();
+        const r = await fetch(WGO, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ islem: 'sira', adet: 20 }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || j.hata) throw new Error(j.hata || 'Sunucu ' + r.status);
+        o.yazilan += j.yazilan || 0; (j.hatalar || []).forEach(x => o.hata.push(`${x.code}: ${x.hata}`));
+        ilerleme?.(o.yazilan, o.yazilan + (j.kalan || 0));
+        if (!j.kalan || (j.hatalar || []).length >= 5) break;
+      } catch (e) { o.hata.push(e.message); break; }
+    }
+    return o;
+  }
   const fotoYazi = o => [o.urun && `${num(o.urun)} ürüne ${num(o.foto)} fotoğraf eklendi`, o.renk && `${num(o.renk)} ürüne renkler eklendi`, o.hata.length && `${num(o.hata.length)} üründe fotoğraf eklenemedi (${o.hata[0]})`].filter(Boolean).join(', ');
   const westYazi = o => [o.grup && `${num(o.grup)} West Polo modelinin renkleri gruplandı`, o.hata.length && `${num(o.hata.length)} modelde grup kurulamadı (${o.hata[0]})`].filter(Boolean).join(', ');
 
@@ -397,6 +414,16 @@
       fotoEkle((D.urunler || []).filter(fotoBekliyor), (i, t) => { D.ilerleme = `Fotoğraflar ekleniyor… ${num(i)} / ${num(t)} ürün`; S.keepScroll = true; render(); }).then(o => {
         D.gonderiyor = false; D.ilerleme = fotoYazi(o) || 'Fotoğraf eklenecek ürün yok';
         toast(D.ilerleme); S.keepScroll = true; render(); loadProducts(true);
+      });
+      return;
+    }
+    if (act === 'stgSira') {
+      if (!D.siOnay) { D.siOnay = true; S.keepScroll = true; render(); setTimeout(() => { if (D.siOnay && !D.gonderiyor) { D.siOnay = false; S.keepScroll = true; render(); } }, 6000); return; }
+      D.siOnay = false; D.gonderiyor = true; D.ilerleme = 'Sıralama düzenleniyor…'; S.keepScroll = true; render();
+      siraDuzenle((i, t) => { D.ilerleme = `Sıralama düzenleniyor… ${num(i)} / ${num(t)} ürün`; S.keepScroll = true; render(); }).then(o => {
+        D.gonderiyor = false;
+        D.ilerleme = [o.yazilan ? `${num(o.yazilan)} ürünün sırası düzenlendi; fotoğraflılar kategorilerde üstte` : 'Sıralama zaten düzgün', o.hata.length && `${num(o.hata.length)} üründe hata (${o.hata[0]})`].filter(Boolean).join(', ');
+        toast(D.ilerleme); S.keepScroll = true; render();
       });
       return;
     }

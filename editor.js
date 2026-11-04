@@ -651,6 +651,10 @@
   }
 
   /* ---------- kaydetme ---------- */
+  // celik 04.11.2026 "fotoğrafı olmayan ürünleri kategori bazlı sıralamada aşağıya al": Qukasoft "En yeniler" sıralamasında sıralama önceliği (seq) büyük olan önce gelir.
+  // Fotoğraflı ürün en az 10 alır, fotoğrafsız ürünün 10'u 0'a iner (elle verilmiş başka değerlere dokunulmaz). Sunucuda west-gorsel 'sira' aynı kuralı uygular.
+  const FOTO_SIRA = 10;
+  const fotoSira = (seq, foto) => (foto ? Math.max(seq, FOTO_SIRA) : seq === FOTO_SIRA ? 0 : seq);
   function buildProduct(urls) {
     const n = v => (v === '' || v === null || v === undefined ? undefined : Number(v));
     const desc = D.longDescription || autoDesc();
@@ -658,7 +662,7 @@
       shortDescription: D.shortDescription || undefined, longDescription: desc || undefined, taxRate: +D.taxRate, currency: 'TL', shipmentPayment: +D.shipmentPayment ? 1 : 0,
       buyPrice: n(D.buyPrice), listPrice: n(D.listPrice), salePrice: n(D.salePrice), fastSalePrice: n(D.fastSalePrice), dealerPrice1: n(D.dealerPrice1), dealerPrice2: n(D.dealerPrice2), dealerPrice3: n(D.dealerPrice3),
       dealerPrice4: n(D.dealerPrice4), desi: n(D.desi), type: 0, criticalStockStatus: 1, criticalStockQuantity: +D.critical >= 0 && D.critical !== '' ? +D.critical : RULES.critical,
-      invoiceName: D.invoiceName.trim(), modelCode: D.modelCode.trim(), mpn: D.mpn.trim(), domestic: D.domestic ? 1 : 0, showcaseStatus: D.showcase ? 1 : 0, seq: n(D.seq) ?? 0,
+      invoiceName: D.invoiceName.trim(), modelCode: D.modelCode.trim(), mpn: D.mpn.trim(), domestic: D.domestic ? 1 : 0, showcaseStatus: D.showcase ? 1 : 0, seq: fotoSira(n(D.seq) ?? 0, (urls || []).length),
       specialCode1: D.specialCode1.trim(), specialCode2: D.specialCode2.trim(), specialCode3: D.specialCode3.trim(),
       seoTitle: D.seoTitle.trim(), seoDescription: D.seoDescription.trim(), seoKeywords: D.seoKeywords.trim(), slug: D.slug.trim() || undefined,
       videoText: D.videoText.trim(), unitId: n(D.unitId) || 1 };
