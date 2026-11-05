@@ -842,9 +842,17 @@
   function fillSeo() {
     const [noun] = productKind(), cut = (s, n) => s.length <= n ? s : s.slice(0, s.lastIndexOf(' ', n - 1) > 0 ? s.lastIndexOf(' ', n - 1) : n).trim();
     const name = [D.brand, D.name].filter(Boolean).join(' ').replace(/^(\S+) \1/i, '$1');
-    if (!D.seoTitle.trim()) D.seoTitle = cut(`${name} ${noun.charAt(0).toLocaleUpperCase('tr') + noun.slice(1)} | CLK Çanta`, 60);
+    // Sitedeki SEO şablonu başlığın sonuna "| CLK Çanta" ekler; burada yazılmaz. Ad sitede BÜYÜK kalır, başlık düzgün harfle (site-seo ile aynı kural)
+    const tur = name.toLocaleLowerCase('tr').includes(noun.toLocaleLowerCase('tr')) ? '' : ' ' + noun;
+    if (!D.seoTitle.trim()) D.seoTitle = cut(seoHarf((name + tur).replace(/\bKOD:?\s+/gi, '')), 60);
     if (!D.seoDescription.trim()) D.seoDescription = cut(D.shortDescription.trim() || autoShort(), 160);
     if (!D.seoKeywords.trim()) D.seoKeywords = [...new Set([D.brand, D.name, noun, D.material, ...D.variants.map(v => `${v.v.toLocaleLowerCase('tr')} ${noun}`), ...String(D.categoryName).split('›')].map(s => String(s || '').trim().toLocaleLowerCase('tr')).filter(Boolean))].join(', ');
+  }
+  // "WEST POLO 6008 ARSEL EL PORTFÖYÜ" → "West Polo 6008 Arsel El Portföyü"; kısaltmalar (PP, ABS, CLK…), rakamlı ve sesli harfsiz kısa kelimeler aynen kalır
+  function seoHarf(s) {
+    const buyuk = new Set(['PP', 'ABS', 'CLK', 'BYB', 'YKM', 'MCG', 'AYB', 'PU', 'USB', 'XL', 'XXL', 'DADA', 'PVC', 'EVA', 'TPU']), kucuk = new Set(['VE', 'İLE', 'İÇİN', 'DE', 'DA']);
+    const k = p => { const u = p.toLocaleUpperCase('tr'); if (!p || /\d/.test(p) || buyuk.has(u) || (u.length <= 3 && !/[AEIİOÖUÜ]/.test(u))) return p; const l = p.toLocaleLowerCase('tr'); return kucuk.has(u) ? l : l.charAt(0).toLocaleUpperCase('tr') + l.slice(1); };
+    return String(s).split(/\s+/).filter(Boolean).map(w => w.split('-').map(k).join('-')).join(' ');
   }
   function autoShort() {
     const [noun] = productKind(), size = sizeLine();
