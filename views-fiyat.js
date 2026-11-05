@@ -30,7 +30,9 @@
     if (!r) return null;
     const oran = v => (v == null || v === '' ? null : Number(v));
     if (alan !== 'site') return CLK.fiyatla(alis, oran(r[alan]), yuvarla);
-    return CLK.fiyatla(CLK.fiyatla(alis, oran(r.b1), yuvarla) ?? alis, oran(r.site), yuvarla);
+    // site fiyatı her zaman 49 ya da 99 ile biter, yukarı yuvarlanır (celik 05.11.2026: "sitede ki rakamlar ne olursa olsun 49 yada 99 ile bitsin")
+    const f = CLK.fiyatla(CLK.fiyatla(alis, oran(r.b1), yuvarla) ?? alis, oran(r.site), yuvarla);
+    return f == null ? null : CLK.end4999(f);
   };
   const fiyat = (alis, oran) => CLK.fiyatla(alis, oran, D.ayar.yuvarla);
 
@@ -38,7 +40,7 @@
     const t = D.taslak[r.kategori] || {}, alis = Number(D.ayar.ornek_alis) || 0;
     const oranlar = ALAN.map(([a]) => deger(r, a));
     return `<tr class="${Object.keys(t).length ? 'sk-satir-deg' : ''}"><td class="sk-ad"><b>${esc(r.kategori)}</b></td>${ALAN.map(([a], i) => {
-      const v = oranlar[i], f = a === 'site' ? fiyat(fiyat(alis, oranlar[0]) ?? alis, v) : fiyat(alis, v);
+      const v = oranlar[i], fs = a === 'site' ? fiyat(fiyat(alis, oranlar[0]) ?? alis, v) : null, f = a === 'site' ? (fs == null ? null : CLK.end4999(fs)) : fiyat(alis, v);
       return `<td><div class="fk-hucre"><input class="sk-in sk-num ${a in t ? 'sk-deg' : ''}" data-k="${esc(r.kategori)}" data-a="${a}" value="${v == null || Number.isNaN(v) ? '' : String(v).replace('.', ',')}" inputmode="decimal" placeholder="—" aria-label="${esc(r.kategori)} ${a} oranı"><span>%</span></div><small class="fk-ornek">${f == null ? '&nbsp;' : fmt(f) + ' ₺'}</small></td>`;
     }).join('')}</tr>`;
   };
@@ -47,7 +49,7 @@
     const n = Object.keys(D.taslak).length;
     // Paraşüt'te eklenen/silinen kategori her dakika tabloya yansır: sayfa açıldığında liste 1 dakikadan eskiyse yeniden okunur (taslak yoksa)
     if (!D.yukleniyor && !D.hata && (!D.kurallar || (!n && Date.now() - (D.zaman || 0) > 6e4))) yukle();
-    const ust = head('Ürünler', 'Fiyat kuralları', 'Sitedeki Bayi 1–4 fiyatı ürünün Paraşüt\'teki alış fiyatına, site (perakende) fiyatı Bayi 1 fiyatına kategorinin oranı eklenerek hesaplanır. Ürün girişinde alış değişince fiyatlar da bu oranlarla yenilenir. Boş kutu: henüz karar verilmedi. Fiyatlar siteye Siteye gönder sayfasından gider.');
+    const ust = head('Ürünler', 'Fiyat kuralları', 'Sitedeki Bayi 1–4 fiyatı ürünün Paraşüt\'teki alış fiyatına, site (perakende) fiyatı Bayi 1 fiyatına kategorinin oranı eklenerek hesaplanır. Ürün girişinde alış değişince fiyatlar da bu oranlarla yenilenir. Site fiyatı her zaman 49 ya da 99 ile biter (yukarı yuvarlanır). Boş kutu: henüz karar verilmedi. Fiyatlar siteye Siteye gönder sayfasından gider.');
     if (!D.kurallar) return ust + (D.hata ? `<div class="card empty"><h3>Oranlar alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="fkYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     return `${ust}
       <div class="card">
@@ -58,7 +60,7 @@
         </div>
         <div class="ul-tablo"><table class="sk-tablo fk-tablo"><thead><tr><th>Kategori</th>${ALAN.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
           <tbody><tr class="fk-hepsi"><td class="sk-ad"><b>Tüm kategoriler</b><small class="fk-ornek" style="text-align:left">Yazılan oran hepsine geçer</small></td>${ALAN.map(([a]) => `<td><div class="fk-hucre"><input class="sk-in sk-num" data-hepsi="${a}" inputmode="decimal" placeholder="—" aria-label="Tüm kategoriler ${a} oranı"><span>%</span></div></td>`).join('')}</tr>${D.kurallar.map(satir).join('')}</tbody></table></div>
-        <p class="sk-say">KATEGORİSİZ: Paraşüt'te kategorisi boş olan ürünler. Site oranı Bayi 1 fiyatının üstüne eklenir (Bayi 1 boşsa alışın üstüne).</p>
+        <p class="sk-say">KATEGORİSİZ: Paraşüt'te kategorisi boş olan ürünler. Site oranı Bayi 1 fiyatının üstüne eklenir (Bayi 1 boşsa alışın üstüne), çıkan fiyat 49 ya da 99'a yuvarlanır.</p>
       </div>
       <div class="sk-cubuk"><span>${n ? `${n} kategoride değişiklik var, kaydedilmedi` : 'Değişiklik yok'}</span>
         <button class="btn" data-act="fkGeriAl" ${n && !D.kayit ? '' : 'disabled'}>Geri al</button>

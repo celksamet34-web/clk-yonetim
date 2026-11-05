@@ -143,7 +143,8 @@
     const r = D.kurallar?.[anahtar(katAd(u))], oran = r?.[a], alis = Number(deger(u, 'alis')) || 0;
     // site (perakende) fiyatı satırdaki Bayi 1 fiyatının üstüne hesaplanır (celik 30.10.2026); Bayi 1 yoksa alışın üstüne
     const taban = a === 'site' ? Number(deger(u, 'b1')) || alis : alis;
-    return CLK.fiyatla?.(taban, oran == null || oran === '' ? null : Number(oran), D.yuvarla) ?? null;
+    const f = CLK.fiyatla?.(taban, oran == null || oran === '' ? null : Number(oran), D.yuvarla) ?? null;
+    return a === 'site' && f > 0 ? CLK.end4999(f) : f;
   };
   const siteKat = p => String(p.categoryId ?? p.categoryID ?? '');
   // Paraşüt'te kategorisi değişen ürün: sitedeki kategorisi eşleşen kategori ya da onun alt kategorisi değilse eşleşen kategori önerilir
@@ -168,9 +169,11 @@
   };
   const deger = (u, a) => (taslak[u.id] && a in taslak[u.id] ? taslak[u.id][a] : varsayilan(u, a));
   // boş Bayi 2–4, Bayi 1 fiyatını alır
-  const fiyat = (u, a) => { const v = deger(u, a); if (v > 0) return v; return a !== 'b1' && a !== 'site' && deger(u, 'b1') > 0 ? deger(u, 'b1') : null; };
+  // site fiyatı her zaman 49 ya da 99 ile biter (celik 05.11.2026), elle yazılan da yukarı yuvarlanır
+  const fiyat = (u, a) => { const v = deger(u, a); if (v > 0) return a === 'site' ? CLK.end4999(v) : v; return a !== 'b1' && a !== 'site' && deger(u, 'b1') > 0 ? deger(u, 'b1') : null; };
   const eksik = u => [!String(deger(u, 'ad') || '').trim() && 'ad', !sitedeMi(u) && !deger(u, 'kat') && 'site kategorisi', !(fiyat(u, 'b1') > 0) && 'Bayi 1', !(fiyat(u, 'site') > 0) && 'site fiyatı'].filter(Boolean);
   function degistir(u, a, v) {
+    if (a === 'site' && typeof v === 'number' && v > 0) v = CLK.end4999(v);
     const t = { ...(taslak[u.id] || {}) };
     if (v === varsayilan(u, a) || (typeof v === 'number' && Number.isNaN(v))) delete t[a]; else t[a] = v;
     if (Object.keys(t).length) taslak[u.id] = t; else delete taslak[u.id];
@@ -237,7 +240,7 @@
     const westSitede = (D.urunler || []).filter(u => grupKod(u.ad) && sitedeMi(u));
     const fotoSay = (D.urunler || []).filter(fotoBekliyor).length;
     const acts = `${fotoSay ? `<button class="btn" data-act="stgFoto" ${D.gonderiyor ? 'disabled' : ''} title="Sitede fotoğrafı olmayan ürünlere paneldeki hazır fotoğrafları ekler">${D.foOnay ? 'Emin misin? Tekrar bas' : `Hazır fotoğrafları siteye ekle (${num(fotoSay)})`}</button>` : ''}${westSitede.length ? `<button class="btn" data-act="stgWest" ${D.gonderiyor ? 'disabled' : ''} title="Sitedeki West Polo modellerinin renklerini ve Yefa serilerinin boylarını ürün grubuyla birbirine bağlar">${D.wgOnay ? 'Emin misin? Tekrar bas' : 'Renk ve boy gruplarını kur'}</button>` : ''}<button class="btn" data-act="stgSira" ${D.gonderiyor ? 'disabled' : ''} title="Kategori sayfalarında fotoğraflı ürünler üstte, fotoğrafsızlar altta görünür (Qukasoft sıralama önceliği)">${D.siOnay ? 'Emin misin? Tekrar bas' : 'Fotoğraflıları öne al'}</button><button class="btn" data-act="stgYenile" ${D.yukleniyor || D.gonderiyor ? 'disabled' : ''}>${D.yukleniyor === 'taze' ? 'Paraşüt okunuyor…' : 'Paraşüt\'ten yenile'}</button>`;
-    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Panelde hazır fotoğrafı olan ürün (📷) siteye gidince fotoğrafları da eklenir; sitede fotoğrafı olan ürüne dokunulmaz. Diğer fotoğraflar ve açıklama Ürünler sayfasından eklenir.`, acts);
+    const ust = head('Paraşüt', 'Siteye gönder', `Paraşüt'teki ürünleri siteye gönderin${D.zaman ? ' (liste ' + dtt(D.zaman) + ')' : ''}. Adı, site kategorisini ve fiyatları kontrol edin, ürünleri seçip "Siteye gönder"e basın. Fiyatlar Fiyat kurallarından gelir, kutuya yazarak değiştirebilirsiniz; boş Bayi 2–4, Bayi 1 fiyatını alır; site fiyatı 49 ya da 99 ile biter. Her fiyatın altında alışa göre kâr oranı ve kâr yazar. Alışı değiştirirseniz gönderirken Paraşüt'e de yazılır ve oranı girilmiş fiyatlar yeni alışla hesaplanır. Yeni ürün stokunu Paraşüt'ten alır; sitede olan ürünün stoku ve renkleri değişmez. Panelde hazır fotoğrafı olan ürün (📷) siteye gidince fotoğrafları da eklenir; sitede fotoğrafı olan ürüne dokunulmaz. Diğer fotoğraflar ve açıklama Ürünler sayfasından eklenir.`, acts);
     if (!D.urunler) return ust + (D.hata ? `<div class="card empty"><h3>Ürünler alınamadı</h3><p>${esc(D.hata)}</p><button class="btn dark" data-act="stgYenile">Tekrar dene</button></div>` : '<div class="card"><div class="skel" style="height:300px"></div></div>');
     const kats = D.kats || [];
     const katSecenek = kats.map(c => `<option value="${c.id}">${esc(c.path)}</option>`).join('');

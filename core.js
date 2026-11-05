@@ -336,5 +336,5 @@ window.CLK = (() => {
   const VERI = { siparis: ['siparisler', 'siparisgir', 'musteriler', 'cari', 'ciro'], musteri: ['musteriler', 'cari', 'siparisgir', 'siparisler', 'ekstre'], bakiye: ['cari', 'ekstre'] };
   function prefetch() { loadProducts(); if (herhangi(VERI.siparis)) loadOrders(); if (herhangi(VERI.musteri)) loadUsers(); if (herhangi(VERI.bakiye)) loadBalance(); }
 
-  return { kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
+  return { end4999, kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
 })();
