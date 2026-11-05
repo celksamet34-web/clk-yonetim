@@ -142,6 +142,7 @@ window.CLK = (() => {
     ekstre: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h3"/></svg>',
     urunlistesi: '<svg viewBox="0 0 24 24"><path d="M9 5h11M9 12h11M9 19h11"/><path d="M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2"/></svg>',
     urungiris: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/><path d="M15 2v4M9 2v4"/></svg>',
+    valizsiparis: '<svg viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="12.5" rx="2"/><path d="M9.5 7V4.5h5V7M9.5 11v5M14.5 11v5M8 19.5V21M16 19.5V21"/></svg>',
     westpolo: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
     stokkart: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h8M8 16h5"/></svg>',
     siparisgir: '<svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><path d="M13 8v5M10.5 10.5h5"/></svg>',
@@ -163,7 +164,7 @@ window.CLK = (() => {
     ['', [['panel', 'Panel']]],
     ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['urunlistesi', 'Satış faturası'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi']]],
     ['Site ürünleri', [['yeni', 'Yeni ürün'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['katalog', 'Katalog'], ['instagram', 'Instagram'], ['banner', 'Banner']]],
-    ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
+    ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['valizsiparis', 'Valiz sipariş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
     ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet'], ['odemeler', 'Ödeme takvimi']]],
     ['Eşitleme', [['stokesitle', 'Stok eşitle'], ['eslestirme', 'Eşleştirme']]],
     ['Ayarlar', [['personel', 'Personel'], ['parasut', 'Paraşüt bağlantısı']]]

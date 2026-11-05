@@ -1202,3 +1202,85 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
 .pb-kopya{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}.pb-kopya code{background:var(--sunk);padding:6px 10px;border-radius:8px;font-size:12px;word-break:break-all}
 .pb-alan{grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0}
 @media (max-width:640px){.pb-satir{grid-template-columns:1fr;gap:2px}.pb-alan{grid-template-columns:1fr}}
+
+/* Valiz sipariş (views-valizsiparis.js; celik 05.11.2026: tedarikçiye gönderilecek valiz siparişi) */
+.vs-ust{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:18px;align-items:start}
+.vs-sol{display:grid;gap:14px;min-width:0}
+.vs-sag{display:grid;gap:18px;position:sticky;top:20px;min-width:0}
+.vs-filtre{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.vs-filtre .chip{min-height:44px}
+.vs-filtre input[type=search]{flex:1 1 220px;width:auto}
+.vs-kaynak{margin:-4px 0 0}
+.vs-seri{padding:16px 18px}
+.vs-seri-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.vs-seri-h h3{font:600 20px/1.15 var(--f-d);margin:0}
+.vs-rozet{background:var(--gold-soft);color:var(--gold-ink);border-radius:999px;padding:4px 10px;font:700 12px var(--f-b);white-space:nowrap}
+.vs-sat{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.vs-sat:first-of-type{border-top:0}
+.vs-sat.secili .vs-bilgi>b{color:var(--gold-ink)}
+.vs-bilgi{display:grid;gap:3px;min-width:0}
+.vs-bilgi>b{font-size:15px;letter-spacing:.01em}
+.vs-bilgi>span{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted)}
+.vs-stok{font-weight:700;color:var(--ok)}
+.vs-stok.warn{color:var(--warn)}
+.vs-stok.bad{color:var(--bad)}
+.vs-renk-dug{border:0;background:none;padding:2px 0;color:var(--gold-ink);font:600 12.5px var(--f-b);cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-align:left}
+.vs-adet{display:inline-flex;align-items:center;border:1px solid var(--line-2);border-radius:14px;background:#fff;overflow:hidden}
+.vs-adet button{width:44px;height:46px;border:0;background:none;font:600 22px var(--f-b);cursor:pointer;color:var(--ink)}
+.vs-adet button:active{background:var(--sunk)}
+.vs-adet input.vs-n{width:58px;min-height:46px;border:0!important;border-left:1px solid var(--line)!important;border-right:1px solid var(--line)!important;border-radius:0;text-align:center;padding:6px 2px;font:700 18px var(--f-b);box-shadow:none!important}
+.vs-toplam{min-height:46px;padding:8px 14px;border:1px solid var(--gold);background:var(--gold-soft);color:var(--gold-ink);border-radius:14px;font:700 15px var(--f-b);cursor:pointer;white-space:nowrap}
+.vs-renk{grid-column:1/-1;display:grid;gap:10px;padding:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px}
+.vs-renk .hint{margin:0}
+.vs-renkler{display:flex;flex-wrap:wrap;gap:6px}
+.vs-renkler .chip{min-height:36px;padding:6px 12px;font-size:11.5px}
+.vs-renk-sec{display:flex;flex-wrap:wrap;gap:8px}
+.vs-renk-s{display:inline-flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--gold);border-radius:12px;padding:2px 4px 2px 12px}
+.vs-renk-s b{font-size:12.5px;margin-right:6px}
+.vs-renk-s i{font-style:normal;font-weight:700;min-width:24px;text-align:center}
+.vs-renk-s button{width:34px;height:34px;border:0;background:none;font:600 19px var(--f-b);cursor:pointer}
+.vs-renk-yeni{display:flex;gap:8px;flex-wrap:wrap}
+.vs-renk-yeni input{flex:1 1 180px;width:auto}
+.vs-ek-s{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.vs-sil{width:40px;height:40px;border:1px solid var(--line-2);background:#fff;border-radius:50%;cursor:pointer;color:var(--bad)}
+.vs-ek-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) 90px minmax(0,1fr);gap:10px;margin-top:10px;align-items:end}
+.vs-ek-dug{grid-column:1/-1;display:flex;gap:8px}
+.vs-oz{display:grid;gap:12px}
+.vs-oz .gd-seg button{padding:9px 18px}
+.vs-oz-l{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-height:46vh;overflow:auto}
+.vs-oz-l li>b{display:block;font-size:12px;letter-spacing:.08em;color:var(--muted);margin-bottom:2px}
+.vs-oz-l li div{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:2px 0}
+.vs-oz-l li em{font-style:normal;color:var(--muted);font-size:12.5px}
+.vs-oz-l li i{font-style:normal;font-weight:700;white-space:nowrap}
+.vs-oz-t{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:10px;font-size:15px}
+.vs-oz-t.ince{border:0;padding:0;font-size:13px;color:var(--muted)}
+.vs-tik{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;min-height:40px}
+.vs-tik input{width:20px;height:20px;accent-color:var(--gold)}
+.vs-hazirla,.vs-temizle{width:100%}
+.vs-hazir{margin-bottom:18px;scroll-margin-top:96px}
+.vs-ted{display:grid;gap:12px;padding:16px 18px}
+.vs-ted-s{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.vs-ted-s>b{font-size:14px;letter-spacing:.04em}
+.vs-ted-s input{flex:1 1 200px;width:auto}
+.vs-dug{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
+.vs-resim{display:block;width:100%;max-width:620px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.vs-g{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px 0;border-top:1px solid var(--line)}
+.vs-g:first-of-type{border-top:0}
+.vs-g-b{display:grid;gap:2px;min-width:0;font-size:13px}
+.vs-g-b>b{font-size:15px}
+.vs-g-k{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs-durum{align-self:start;border-radius:999px;padding:3px 10px;font:700 11.5px var(--f-b);background:var(--sunk);color:var(--ink)}
+.vs-durum.ok{background:var(--ok-soft);color:var(--ok)}
+.vs-durum.bad{background:var(--bad-soft);color:var(--bad)}
+.vs-g-d{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.vs-g-d .btn{min-height:38px;padding:7px 14px;font-size:12px}
+.vs-alt{display:none}
+@media(max-width:900px){
+  .vs-ust{grid-template-columns:1fr}
+  .vs-sag{position:static}
+  .vs-ek-form{grid-template-columns:1fr 1fr}
+  .vs-ek-form .vs-ek-ad{grid-column:1/-1}
+  .vs-alt{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));z-index:30;margin-top:14px;background:var(--ink);color:#fff;border-radius:16px;padding:10px 10px 10px 16px;box-shadow:0 10px 30px -12px rgba(0,0,0,.5)}
+  .vs-alt span{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vs-alt .btn{min-height:44px;padding:8px 16px}
+}
