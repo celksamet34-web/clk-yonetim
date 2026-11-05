@@ -155,6 +155,7 @@ window.CLK = (() => {
     senet: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 11h7M9 14.5h7M9 18h4"/></svg>',
     odemeler: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/></svg>',
     personel: '<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 11-4.7"/><rect x="15" y="14" width="6" height="6" rx="1"/><path d="M16.5 14v-1.5a1.5 1.5 0 0 1 3 0V14"/></svg>',
+    parasut: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
     cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
   };
   // Menü grupları (celik 31.10: "menü sıralamasını düzeltelim"). Masaüstü yan menü ve mobil "Daha" sayfası aynı sırayı kullanır.
@@ -165,7 +166,7 @@ window.CLK = (() => {
     ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
     ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet'], ['odemeler', 'Ödeme takvimi']]],
     ['Eşitleme', [['stokesitle', 'Stok eşitle'], ['eslestirme', 'Eşleştirme']]],
-    ['Ayarlar', [['personel', 'Personel']]]
+    ['Ayarlar', [['personel', 'Personel'], ['parasut', 'Paraşüt bağlantısı']]]
   ];
   /* Personel yetkileri (celik 01.11.2026: "personel giriş yapacak… bütün menüye girişleri olmasın bizim seçtiklerimiz olsun", "çek senet görmesin cari görmesin").
      Yönetici her şeyi görür; personel yalnız işaretlenen sayfaları. Sunucu da aynı listeyi panel_yetki() ile denetler. */
@@ -174,7 +175,7 @@ window.CLK = (() => {
   const yonetici = () => !S.yetki || S.yetki.rol === 'yonetici';
   function izin(k) {
     if (k === 'panel') return true;
-    if (k === 'personel' || k === 'odemeler') return yonetici(); // Ödeme takvimi personele gizli (celik 02.11)
+    if (k === 'personel' || k === 'odemeler' || k === 'parasut') return yonetici(); // Ödeme takvimi personele gizli (celik 02.11)
     if (yonetici()) return true;
     const a = ALT_SAYFA[k], l = S.yetki.sayfalar || [];
     return Array.isArray(a) ? a.some(x => l.includes(x)) : l.includes(a || k);

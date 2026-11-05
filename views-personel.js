@@ -23,7 +23,7 @@
     D.yuk = false; render();
   }
 
-  const sayfaGruplari = () => CLK.MENU.filter(([g]) => g && g !== 'Ayarlar').map(([g, l]) => [g, l.filter(([k]) => k !== 'panel' && k !== 'odemeler')])
+  const sayfaGruplari = () => CLK.MENU.filter(([g]) => g && g !== 'Ayarlar').map(([g, l]) => [g, l.filter(([k]) => k !== 'panel' && k !== 'odemeler' && k !== 'parasut')])
     .concat([['Ek yetkiler', CLK.EK_YETKI]]);
   const sayfaAdi = k => { for (const [, l] of sayfaGruplari()) { const x = l.find(([a]) => a === k); if (x) return x[1]; } return k; };
   const sifreUret = () => { const h = 'abcdefghjkmnpqrstuvwxyz23456789'; let s = ''; const a = crypto.getRandomValues(new Uint32Array(8)); for (const x of a) s += h[x % h.length]; return s; };
