@@ -304,11 +304,14 @@
   const WG = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/west-grup';
   const westKod = ad => (String(ad || '').trim().toLocaleUpperCase('tr').match(/^WEST POLO (\S+) /) || [])[1] || '';
   // Yefa valiz boyları (celik 05.11.2026: "ürünleri küçük orta büyük ve set olarak boy ayarla"): her boy ayrı Paraşüt ürünü; aynı serinin
-  // sitedeki boyları da west-grup ile tek grupta (KÜÇÜK (KABİN), ORTA, BÜYÜK, BATTAL, SET, MAKYAJ). Seri adı sunucudaki yefaParca ile aynı.
+  // sitedeki boyları da west-grup ile tek grupta (KÜÇÜK (KABİN), ORTA, BÜYÜK, BATTAL, SET, MAKYAJ). Seri adı sunucudaki yefaParca ile aynı; Acun da.
   const yefaSeri = ad => {
     let s = String(ad || '').trim().toLocaleUpperCase('tr').replace(/\s+/g, ' ');
+    const BOY = / ((KABİN|KÜÇÜK|ORTA|BÜYÜK) BOY|TEK BÜYÜK|SET KÖRÜKLÜ|SET|MAKYAJ)$/;
+    // Acun valizleri de aynı kuralla (west-grup v9): "ACUN <seri> KÜÇÜK/ORTA/BÜYÜK BOY" → grup "ACUN <seri>"
+    if (s.startsWith('ACUN ')) return BOY.test(s) ? 'ACUN|' + s.replace(BOY, '') : '';
     if (s.startsWith('YEFA ')) s = s.slice(5); else if (!s.startsWith('KARE ABS ')) return '';
-    s = s.replace(/^BATTAL BOY /, '').replace(/ ((KABİN|KÜÇÜK|ORTA|BÜYÜK) BOY|TEK BÜYÜK|SET KÖRÜKLÜ|SET|MAKYAJ)$/, '');
+    s = s.replace(/^BATTAL BOY /, '').replace(BOY, '');
     return 'YEFA|' + (s === 'HAVUÇ ABS' ? 'ABS HAVUÇ' : s);
   };
   const grupKod = ad => westKod(ad) || yefaSeri(ad);
