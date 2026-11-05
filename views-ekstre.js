@@ -21,14 +21,25 @@
   }
   async function ekstreAl(id) {
     const { data } = await sb.auth.getSession();
-    const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ islem: 'ekstre', id }) });
-    const j = await r.json().catch(() => ({}));
+    // Paraşüt aynı anda gelen girişlere "Too many requests" (429) veriyor (celik 05.11 "paraşüt hata verdi ekstre vermedi"): birkaç saniye arayla yeniden dene
+    let r, j;
+    for (let deneme = 0; ; deneme++) {
+      r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ islem: 'ekstre', id }) });
+      j = await r.json().catch(() => ({}));
+      if (deneme < 4 && /429|too many|yanıt vermedi/i.test(String(j.hata || ''))) { await new Promise(s => setTimeout(s, 2000 + deneme * 1500)); continue; }
+      break;
+    }
     if (!r.ok || j.hata) throw new Error(j.hata || 'Sunucu ' + r.status);
     // faturaya bağlanmadan alınan çek ve senetler (Senet gir, Ödeme gir › Senet, Paraşüt'ten cari çek girişi) yukarıdaki
     // ekstrede yoktu; ayrıca okunur, ekstrede zaten olanlar (seri, vade, tutar aynı) atlanır (celik 05.11.2026)
     j.cekUyari = '';
     try {
-      const c = await (await fetch(FN_CEK, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ id }) })).json();
+      let c;
+      for (let deneme = 0; ; deneme++) {
+        c = await (await fetch(FN_CEK, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ id }) })).json();
+        if (deneme < 4 && /429|too many/i.test(String(c.hata || ''))) { await new Promise(s => setTimeout(s, 2000 + deneme * 1500)); continue; }
+        break;
+      }
       if (c.hata || !Array.isArray(c.cekler)) throw new Error(c.hata || 'yanıt yok');
       j.odeme = cekEkle(j.odeme || [], c.cekler);
     } catch (e) { j.cekUyari = 'Faturaya bağlanmadan alınan çek ve senetler okunamadı (' + e.message + '); ekstrede eksik olabilir.'; }
