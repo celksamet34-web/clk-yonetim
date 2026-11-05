@@ -2,6 +2,7 @@
 (() => {
   const { sb, S, $, esc, tl, toast, head, views, render, araKutu, araSec } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
+  const FN_CEK = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/ekstre-cek';
   const gun = d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
   const ilk = () => { const d = new Date(); d.setMonth(d.getMonth() - 3); d.setDate(1); return gun(d); };
   const D = (S.ui.ek ||= { musteriler: null, ad: '', bas: ilk(), son: gun(new Date()), veri: null, yukleniyor: false, durum: '', resim: '' });
@@ -23,7 +24,25 @@
     const r = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ islem: 'ekstre', id }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.hata) throw new Error(j.hata || 'Sunucu ' + r.status);
+    // faturaya bağlanmadan alınan çek ve senetler (Senet gir, Ödeme gir › Senet, Paraşüt'ten cari çek girişi) yukarıdaki
+    // ekstrede yoktu; ayrıca okunur, ekstrede zaten olanlar (seri, vade, tutar aynı) atlanır (celik 05.11.2026)
+    j.cekUyari = '';
+    try {
+      const c = await (await fetch(FN_CEK, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ id }) })).json();
+      if (c.hata || !Array.isArray(c.cekler)) throw new Error(c.hata || 'yanıt yok');
+      j.odeme = cekEkle(j.odeme || [], c.cekler);
+    } catch (e) { j.cekUyari = 'Faturaya bağlanmadan alınan çek ve senetler okunamadı (' + e.message + '); ekstrede eksik olabilir.'; }
     return j;
+  }
+  function cekEkle(odeme, cekler) {
+    const ayni = (o, c) => o[1] === 'c' && !o.eslesti && (o[3] || '') === (c.vade || '') && String(o[4] || '').trim() === String(c.seri || '').trim() && Math.abs(Number(o[2]) - c.tutar) < 0.01;
+    const yeni = odeme.map(o => [...o]);
+    for (const c of cekler) {
+      const o = yeni.find(o => ayni(o, c));
+      if (o) { o.eslesti = true; if (c.senet) o[6] = 1; continue; }
+      if (c.tutar > 0 && c.tarih) yeni.push([c.tarih, 'c', c.tutar, c.vade || '', c.seri || '', '', c.senet ? 1 : 0]);
+    }
+    return yeni.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
   }
 
   // hareketleri sırala; devir = dönem öncesi + Paraşüt bakiyesiyle hareket toplamı arasındaki fark
@@ -32,8 +51,8 @@
     // siteden gelen siparişin faturasında "Satış faturası" yazılmaz, numara ve açıklama kalır (celik isteği 29.10.2026)
     for (const [t, no, v, ac] of m.satis || []) h.push({ t, s: 0, ack: /^clkcanta\.com/i.test(ac || '') ? [no, ac].filter(Boolean).join(' · ') : 'Satış faturası' + (no ? ' ' + no : '') + (ac ? ' · ' + ac : ''), a: v, b: 0 });
     for (const [t, no, v] of m.iade || []) h.push({ t, s: 1, ack: 'İade' + (no ? ' · ' + no : ''), a: 0, b: v });
-    for (const [t, tur, v, vade, seri, hesap] of m.odeme || [])
-      h.push({ t, s: 2, v: vade, ack: tur === 'c' ? `Çek${seri ? ' no ' + seri : ''}${vade ? ' · vade ' + trE(vade) : ''}` : (hesap || 'Tahsilat'), cek: tur === 'c', a: 0, b: v });
+    for (const [t, tur, v, vade, seri, hesap, senet] of m.odeme || [])
+      h.push({ t, s: 2, v: vade, ack: tur === 'c' ? `${senet ? 'Senet' : 'Çek'}${seri ? ' no ' + seri : ''}${vade ? ' · vade ' + trE(vade) : ''}` : (hesap || 'Tahsilat'), cek: tur === 'c', a: 0, b: v });
     for (const [t, ack, v] of m.verilen || []) h.push({ t, s: 3, ack: 'Ödeme · ' + ack, a: v, b: 0 });
     h.sort((x, y) => x.t.localeCompare(y.t) || x.s - y.s || String(x.v || '').localeCompare(String(y.v || '')));
     const fark = m.bakiye - h.reduce((s, x) => s + x.a - x.b, 0);
@@ -90,7 +109,7 @@
       const yy = y + 30;
       yaz(trE(x.t), kol.t, yy, { z: 18, it: x.it });
       if (x.cek) {
-        g.font = `400 18px ${F}`; const on = `Ödeme · Çek${x.seriYaz}`; yaz(on, kol.i, yy, { z: 18 });
+        g.font = `400 18px ${F}`; const on = `Ödeme · ${x.seriYaz || 'Çek'}`; yaz(on, kol.i, yy, { z: 18 });
         if (x.v) yaz(` · vade ${trE(x.v)}`, kol.i + g.measureText(on).width, yy, { b: 700, z: 18 });
       } else {
         // uzun açıklama fatura tutarının üstüne binmesin: yazı biraz küçülür, yine sığmazsa iki satıra bölünür
@@ -111,7 +130,7 @@
     satir({ t: bas, ack: 'Önceki dönemden kalan', kal: r.devir, it: true }, '#f5f7fa');
     for (const x of r.satirlar) {
       const odeme = x.s === 2 && !x.cek;
-      satir({ ...x, ack: odeme ? 'Ödeme · ' + x.ack : x.ack, seriYaz: x.cek && x.ack.match(/^Çek( no \S+)?/)?.[1] || '' }, x.cek ? '#f4fbf7' : null);
+      satir({ ...x, ack: odeme ? 'Ödeme · ' + x.ack : x.ack, seriYaz: x.cek && x.ack.match(/^(Çek|Senet)( no \S+)?/)?.[0] || '' }, x.cek ? '#f4fbf7' : null);
     }
     y += 40;
     g.fillStyle = '#dde2ea'; g.fillRect(P, y - 26, W - 2 * P, 1);
@@ -147,7 +166,7 @@
       blob = await ciz(D.veri, D.bas, D.son);
       if (D.resim) URL.revokeObjectURL(D.resim);
       D.resim = URL.createObjectURL(blob);
-      D.durum = `Ekstre hazır. Paraşüt bakiyesi ${tlE(D.veri.bakiye)}.`;
+      D.durum = `Ekstre hazır. Paraşüt bakiyesi ${tlE(D.veri.bakiye)}.` + (D.veri.cekUyari ? ' ' + D.veri.cekUyari : '');
     } catch (e) { D.durum = 'Olmadı: ' + e.message; }
     D.yukleniyor = false; render();
   }
