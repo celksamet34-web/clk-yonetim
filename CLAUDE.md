@@ -133,6 +133,12 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Kategori adresleri: Saraciye `/saraciye`, Seventeen `/seventeen` (eski `/seventeen-4624` 301). 29 kategoriye "Detaylı Açıklama" ve anahtar kelime. 301 Yönlendirmeleri'nde eski ürün/kategori adresleri (160). SSS 11 soru (İçerikler › Sıkça Sorulan Sorular).
 - Siteyi hızlı yoklayınca Qukasoft "Rate limit exceed" verir; istekler arasında ≥1,5 sn bırak.
 
+## Qukasoft eklentileri (Araçlar › Eklentiler; 05.11.2026, celik "işimize yarayacak ne var orda", SMS hizmeti zaten kullanılıyor)
+
+- celik ilk beşini seçti, kuruldu: **Teklif Yönetimi** (Araçlar › Eklentiler › Teklif Yönetimi; bayiye teklif hazırlama/yazdırma), **Kampanya Barı** (kurulu ama bilgisayar ve telefonda kapalı: tema masaüstünde ve mobilde aynı WhatsApp/toptan şeridini zaten gösteriyor, ikisi alt alta çıkıyordu), **Çerez Kullanım Uyarısı** ("Kabul Et" düğmesi açık, gizlilik bağlantısı), **Ürün Toplama Sihirbazı** (/urun-toplama: Sırt çantası, Beslenme çantası, Kalemlik; Colorful 19 ve 21 kategori yazısında "Okul seti oluştur" bağlantısı), **Google ile giriş** (kurulu, pasif).
+- Google ile giriş celik'in Google Cloud OAuth istemcisini bekliyor: OAuth izin ekranı External (userinfo.email, userinfo.profile, openid), Credentials › Web application, yönlendirme adresi `https://www.clkcanta.com/3rdparty/google-login`; Client ID/Secret'ı celik eklentiye kendisi yazar, aktif yapar, dener. Anahtarlar sohbete yazılmaz.
+- Eklenti kurulumu: `shoNativeModal('tools--app_setup', kod, false, 'showView', 'tools--apps--list')` + `appInstall()`; ayarlar `shoNativeModal('tools--app', kod, false, 'showView', ['tools--apps--list'])`, kayıt `/admin/ajax/form-submit`.
+
 ## Qukasoft API notları (web servis dokümanı v2.3.1)
 
 - Taban: `https://www.clkcanta.com/api/v2/`, başlıklar `apikey` ve `apisecret`. `product/save` kod varsa günceller; tek istekte en çok 5 ürün.
