@@ -1,6 +1,7 @@
 /* CLK Yönetim — Katalog: sitedeki ürünlerden PDF katalog; fiyatsız ya da Site / Bayi 1–4 fiyatlı (celik isteği 01.11.2026).
    06.11: lüks temalar (Fildişi, Siyah ve altın, Mocha; eski düzen "Klasik"), kemerli kapak, arka kapak (WhatsApp QR), sayfada 16 ürünlü fiyat listesi,
-   PDF'te ürüne dokununca WhatsApp'ta o ürünün adıyla mesaj.
+   PDF'te ürüne dokununca WhatsApp'ta o ürünün adıyla mesaj. 07.11: sayfalar iki kat çözünürlükte (A4 2480×3508, ~300 dpi) çizilir,
+   fotoğraflar yüksek kaliteli küçültmeyle konur (celik: "görüntü doğru ama kalitesi düşük"); "Normal" seçilirse eski boyut.
    Sayfalar tarayıcıda tuvale çizilir, jsPDF ile tek PDF yapılır; indirilir ya da WhatsApp'ta paylaşılır. Sunucuya bir şey yazılmaz. */
 (() => {
   const { S, $, esc, num, toast, head, views, render, loadProducts, P } = CLK;
@@ -11,9 +12,10 @@
   const SIRA = [['kat', 'Kategoriye göre'], ['ad', 'Ada göre'], ['artan', 'Fiyat artan'], ['azalan', 'Fiyat azalan'], ['yeni', 'En yeni önce']];
   const TEL = '0534 077 88 67', SITE = 'clkcanta.com', ADRES = 'Birlik Mah. 873 Sk. No:2/A Esenler / İstanbul';
   const RENK = { INK: '#121110', INK2: '#1d1b19', GOLD: '#b48f55', GOLD2: '#d6bd8f', CREAM: '#f6f4f0', LINE: '#e8e3db', MUTED: '#7a746b' };
+  const COZ = [['yuksek', 'Yüksek (net, ~300 dpi)'], ['normal', 'Normal (küçük dosya)']];
   const ayYil = () => new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
-  const VARS = { tema: 'kurumsal', ktema: 'fildisi', arka: true, baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, olcu: true, kat: '', stokta: true, aktif: true };
+  const VARS = { tema: 'kurumsal', ktema: 'fildisi', arka: true, coz: 'yuksek', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, olcu: true, kat: '', stokta: true, aktif: true };
   let kayit = {};
   try { kayit = JSON.parse(localStorage.getItem('clk-katalog') || '{}'); } catch {}
   const D = (S.ui.kt ||= { ...VARS, ...kayit, cikar: new Set(kayit.cikar || []), ara: '', goster: 60, durum: '', calisiyor: false, url: '', blob: null, onizleme: [] });
@@ -70,6 +72,19 @@
   }
 
   /* çizim yardımcıları */
+  // Sayfa mantıksal ölçüde (W×H) çizilir, tuval k katı büyüklüktedir: fotoğraflar küçülmeden kalır. Gölge bulanıklığı ve kayması
+  // dönüşümden etkilenmediği için k ile çarpılır. Fotoğraflar yüksek kaliteli küçültmeyle çizilir (varsayılan düşük kalite tırtıklı ve bulanık).
+  const GOLGE = new Set(['shadowBlur', 'shadowOffsetX', 'shadowOffsetY']);
+  function tuval(W, H, k) {
+    const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
+    const t = c.getContext('2d');
+    const g = k === 1 ? t : new Proxy(t, {
+      get: (o, a) => { const v = o[a]; return typeof v === 'function' ? v.bind(o) : GOLGE.has(a) ? v / k : v; },
+      set: (o, a, v) => { o[a] = GOLGE.has(a) ? v * k : v; return true; }
+    });
+    const hazirla = () => { t.setTransform(k, 0, 0, k, 0, 0); t.globalAlpha = 1; t.globalCompositeOperation = 'source-over'; t.imageSmoothingEnabled = true; t.imageSmoothingQuality = 'high'; t.clearRect(0, 0, W, H); };
+    return { c, g, hazirla };
+  }
   const loadImg = src => new Promise((ok, no) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = no; i.src = src; });
   const gorselOnbellek = new Map();
   // önce doğrudan; olmazsa herkese açık görsel aracısı üzerinden (yalnız sitedeki herkese açık ürün fotoğrafı gider)
@@ -491,23 +506,57 @@
     } catch {}
     fonBellek.set(im, sonuc); return sonuc;
   }
-  // ürünün kutusu: beyaz olmayan piksellerin sınırı + %4 pay (beyaz kenarlar kadrajdan çıkar, pikseller değişmez)
+  // ürünün kutusu: fondan ayrılan piksellerin sınırı + pay (kenarlar kadrajdan çıkar, pikseller değişmez). Fon kenar piksellerinin
+  // ortancasıdır. Ek bilgi (yumusakCiz): her yandaki boşluk ve fon tam beyaz değilse (stüdyo grisi) fon rengi.
   const icBellek = new WeakMap();
   function icerik(im) {
     if (icBellek.has(im)) return icBellek.get(im);
-    let kutu = [0, 0, im.width, im.height];
+    let kutu = [0, 0, im.width, im.height, null];
     try {
       const n = 160, k = Math.min(1, n / Math.max(im.width, im.height)), cw = Math.max(1, Math.round(im.width * k)), ch = Math.max(1, Math.round(im.height * k));
       const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d'); x.drawImage(im, 0, 0, cw, ch);
-      const d = x.getImageData(0, 0, cw, ch).data; let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
-      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) { const i = (yy * cw + xx) * 4; if (Math.min(d[i], d[i + 1], d[i + 2]) < 238) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; } }
+      const d = x.getImageData(0, 0, cw, ch).data, kn = [[], [], []];
+      for (let xx = 0; xx < cw; xx++) for (const yy of [0, ch - 1]) { const i = (yy * cw + xx) * 4; for (let j = 0; j < 3; j++) kn[j].push(d[i + j]); }
+      for (let yy = 0; yy < ch; yy++) for (const xx of [0, cw - 1]) { const i = (yy * cw + xx) * 4; for (let j = 0; j < 3; j++) kn[j].push(d[i + j]); }
+      const fon = kn.map(a => a.sort((p, q) => p - q)[a.length >> 1]), gri = Math.min(...fon) < 247 && Math.min(...fon) > 200;
+      const esik = fon.map(v => Math.min(239, v - 16));
+      let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) { const i = (yy * cw + xx) * 4; if (d[i] < esik[0] || d[i + 1] < esik[1] || d[i + 2] < esik[2]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; } }
       if (x1 > x0 && y1 > y0) {
-        const px = (x1 - x0) * 0.04, py = (y1 - y0) * 0.04;
+        const pay = gri ? 0.08 : 0.04, px = (x1 - x0) * pay, py = (y1 - y0) * pay;
         const a0 = Math.max(0, (x0 - px) / k), b0 = Math.max(0, (y0 - py) / k), a1 = Math.min(im.width, (x1 + 1 + px) / k), b1 = Math.min(im.height, (y1 + 1 + py) / k);
-        kutu = [a0, b0, a1 - a0, b1 - b0];
-      }
+        kutu = [a0, b0, a1 - a0, b1 - b0, { fon: gri ? fon : null, bos: [x0 / k - a0, y0 / k - b0, a1 - (x1 + 1) / k, b1 - (y1 + 1) / k] }];
+      } else if (gri) kutu[4] = { fon, bos: [0, 0, 0, 0] };
     } catch {}
     icBellek.set(im, kutu); return kutu;
+  }
+  // Fotoğraf çarpmayla konunca tam beyaz olmayan fon zeminde kutu gibi görünüyordu (vitrin fotoğrafında ürünün çevresinde 250–252'lik
+  // dikdörtgen pus, stüdyo grisi): fon griyse fon rengi beyaza çekilir (her kanal fon → 255, en çok %8 açma; vitrindeki ışık açma sınırı),
+  // çok açık renksiz pikseller (en küçük kanal ≥240, kanal farkı ≤12) yumuşak geçişle beyaza gider, ürünle kesim kenarı arasındaki
+  // boşluk beyaza yumuşar. Ürünün kendi pikselleri (koyu ve renkli) değişmez. Tek geçici tuval kullanılır (iPhone'da tuval belleği sınırlı).
+  let yc = null;
+  function yumusakCiz(g, im, kutu, dx, dy, iw, ih) {
+    const [sx, sy, sw, sh, ek] = kutu;
+    if (!ek) return g.drawImage(im, sx, sy, sw, sh, dx, dy, iw, ih);
+    const k = Math.abs(g.getTransform?.().a || 1), cw = Math.max(1, Math.round(iw * k)), ch = Math.max(1, Math.round(ih * k));
+    const c = yc ||= document.createElement('canvas'); c.width = cw; c.height = ch;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(im, sx, sy, sw, sh, 0, 0, cw, ch);
+    try {
+      const v = x.getImageData(0, 0, cw, ch), a = v.data, [f0, f1, f2] = (ek.fon || [255, 255, 255]).map(f => Math.min(1.08, 255 / Math.max(1, f)));
+      for (let i = 0; i < a.length; i += 4) {
+        let r = a[i] * f0, gg = a[i + 1] * f1, b = a[i + 2] * f2;
+        const mn = Math.min(r, gg, b);
+        if (mn >= 240 && Math.max(r, gg, b) - mn <= 12) { const t = Math.min(1, (mn - 240) / 9); r += (255 - r) * t; gg += (255 - gg) * t; b += (255 - b) * t; }
+        a[i] = r; a[i + 1] = gg; a[i + 2] = b;
+      }
+      x.putImageData(v, 0, 0);
+    } catch {}
+    const o = cw / sw, [bl, bt, br, bb] = ek.bos.map((b, i) => Math.min(b * o, (i % 2 ? ch : cw) * 0.12));
+    for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [[0, 0, bl, 0, 0, 0, bl, ch], [cw, 0, cw - br, 0, cw - br, 0, br, ch], [0, 0, 0, bt, 0, 0, cw, bt], [0, ch, 0, ch - bb, 0, ch - bb, cw, bb]]) {
+      if (rw < 1 || rh < 1) continue;
+      const gr = x.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(rx, ry, rw, rh);
+    }
+    g.drawImage(c, dx, dy, iw, ih);
   }
   // kemer içinde ürün: beyaz fonlu fotoğraf kemerin tabanına oturur (çarpma), değilse kemeri doldurur
   function kemerFoto(g, im, x, y, w, h, cerceve, k) {
@@ -517,9 +566,9 @@
     g.save(); kemerYol(g, x, y, w, h); g.clip();
     if (!im) { g.fillStyle = '#8b8174'; g.font = F(600, Math.max(11, 18 * k)); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', x + w / 2, y + h * 0.6); g.textAlign = 'left'; }
     else if (beyazFon(im)) {
-      const [sx, sy, sw, sh] = icerik(im), kw = w * 0.8, kx = x + (w - kw) / 2, ky = y + Math.min(w, h) * 0.2, kh = h - Math.min(w, h) * 0.2 - h * 0.07;
+      const kt = icerik(im), [, , sw, sh] = kt, kw = w * 0.8, kx = x + (w - kw) / 2, ky = y + Math.min(w, h) * 0.2, kh = h - Math.min(w, h) * 0.2 - h * 0.07;
       const s = Math.min(kw / sw, kh / sh, 3), iw = sw * s, ih = sh * s;
-      g.globalCompositeOperation = 'multiply'; g.drawImage(im, sx, sy, sw, sh, kx + (kw - iw) / 2, ky + kh - ih, iw, ih);
+      g.globalCompositeOperation = 'multiply'; yumusakCiz(g, im, kt, kx + (kw - iw) / 2, ky + kh - ih, iw, ih);
     } else { const s = Math.max(w / im.width, h / im.height), iw = im.width * s, ih = im.height * s; g.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih); }
     g.restore();
   }
@@ -774,22 +823,21 @@
       if (lux) await bodoniYukle();
       const pdf = new jsPDF({ unit: 'mm', format: b.mm, orientation: 'portrait', compress: true });
       const sl = sayfalar(l), toplam = sl.length + (D.kapak ? 1 : 0) + (D.arka ? 1 : 0);
-      const c = document.createElement('canvas'); c.width = W; c.height = H;
-      const g = c.getContext('2d');
+      const ol = D.coz === 'normal' ? 1 : 2, { c, g, hazirla } = tuval(W, H, ol);
       let no = 0, eksik = 0, lk = [];
       const kx = b.mm[0] / W, ky = b.mm[1] / H;
       const ekle = () => {
         if (no > 0) pdf.addPage(b.mm, 'portrait');
-        pdf.addImage(c.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, b.mm[0], b.mm[1], undefined, 'FAST');
+        pdf.addImage(c.toDataURL('image/jpeg', ol > 1 ? 0.9 : 0.92), 'JPEG', 0, 0, b.mm[0], b.mm[1], undefined, 'FAST');
         // dokunulabilir yerler: ürün → WhatsApp'ta ürün adıyla mesaj, numara → WhatsApp, site → clkcanta.com
         for (const a of lk) try { pdf.link(a.x * kx, a.y * ky, a.w * kx, a.h * ky, { url: a.url }); } catch {}
         lk = [];
-        if (D.onizleme.length < 60) { const k = document.createElement('canvas'); k.width = 300; k.height = Math.round(300 * H / W); k.getContext('2d').drawImage(c, 0, 0, k.width, k.height); D.onizleme.push(k.toDataURL('image/jpeg', 0.8)); }
+        if (D.onizleme.length < 60) { const o = document.createElement('canvas'); o.width = 600; o.height = Math.round(600 * H / W); const og = o.getContext('2d'); og.imageSmoothingQuality = 'high'; og.drawImage(c, 0, 0, o.width, o.height); D.onizleme.push(o.toDataURL('image/jpeg', 0.85)); }
         no++;
       };
       if (D.kapak) {
         const imgs = await Promise.all((lux ? kapakSec(l, 3) : l.slice(0, 4)).map(p => gorsel(P.img(p))));
-        g.clearRect(0, 0, W, H); if (lux) luxKapak(g, W, H, imgs, l, lk); else kapak(g, W, H, imgs, l.length); ekle();
+        hazirla(); if (lux) luxKapak(g, W, H, imgs, l, lk); else kapak(g, W, H, imgs, l.length); ekle();
       }
       for (let i = 0; i < sl.length; i++) {
         D.durum = `Sayfa ${no + 1} / ${toplam} hazırlanıyor…`; const d = $('#ktDurum'); if (d) d.textContent = D.durum;
@@ -797,30 +845,30 @@
         if (sl[i + 1]) sl[i + 1].l.forEach(p => gorsel(P.img(p)));
         const imgs = await Promise.all(sl[i].l.map(p => gorsel(P.img(p))));
         eksik += imgs.filter(x => !x).length;
-        g.clearRect(0, 0, W, H); if (lux) luxSayfa(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); else urunSayfasi(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); ekle();
+        hazirla(); if (lux) luxSayfa(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); else urunSayfasi(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); ekle();
       }
-      if (D.arka) { g.clearRect(0, 0, W, H); arkaKapak(g, W, H, qrf, l, lk); ekle(); }
+      if (D.arka) { hazirla(); arkaKapak(g, W, H, qrf, l, lk); ekle(); }
+      c.width = c.height = 1; // büyük tuvalin belleği bırakılır
       D.blob = pdf.output('blob'); D.url = URL.createObjectURL(D.blob);
       const fs = D.fiyat === 'yok' ? 0 : l.filter(p => !fiyatAl(p)).length;
       D.durum = `${num(l.length)} ürün, ${toplam} sayfa hazır (${(D.blob.size / 1048576).toFixed(1).replace('.', ',')} MB).` + (eksik ? ` ${eksik} ürünün fotoğrafı açılamadı.` : '') + (fs ? ` ${fs} üründe ${FIYAT.find(x => x[0] === D.fiyat)[1]} fiyatı olmadığı için fiyat yazılmadı.` : '');
     } catch (e) { D.durum = 'Katalog hazırlanamadı: ' + (e.message || e); }
-    finally { D.calisiyor = false; S.keepScroll = true; render(); }
+    finally { if (yc) yc.width = yc.height = 1; D.calisiyor = false; S.keepScroll = true; render(); }
   }
   // durum resimleri: her ürün bir JPEG; hepsi birden ya da tek tek paylaşılır
   async function durumlar(l, W, H) {
-    const c = document.createElement('canvas'); c.width = W; c.height = H;
-    const g = c.getContext('2d'), out = []; let eksik = 0;
+    const { c, g, hazirla } = tuval(W, H, 1), out = []; let eksik = 0;
     if (String(D.tema).startsWith('l-')) await bodoniYukle();
     for (let i = 0; i < l.length; i++) {
       D.durum = `Resim ${i + 1} / ${l.length} hazırlanıyor…`; const d = $('#ktDurum'); if (d) d.textContent = D.durum;
       if (l[i + 1]) gorsel(P.img(l[i + 1]));
       const im = await gorsel(P.img(l[i])); if (!im) eksik++;
-      g.clearRect(0, 0, W, H); durumResmi(g, W, H, l[i], im, i);
-      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+      hazirla(); durumResmi(g, W, H, l[i], im, i);
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
       const ad = `CLK-durum-${String(i + 1).padStart(2, '0')}-${String(kodAl(l[i]) || l[i].id).replace(/[^\w-]+/g, '')}.jpg`;
       out.push({ blob, ad, url: URL.createObjectURL(blob) });
     }
-    D.resimler = out;
+    c.width = c.height = 1; D.resimler = out;
     const fs = D.fiyat === 'yok' ? 0 : l.filter(p => !fiyatAl(p)).length;
     D.durum = `${num(out.length)} durum resmi hazır. Tek birini paylaşmak için resmine dokunun.` + (eksik ? ` ${eksik} ürünün fotoğrafı açılamadı.` : '') + (fs ? ` ${fs} üründe fiyat olmadığı için fiyat yazılmadı.` : '') + (out.length > 30 ? ' WhatsApp durumda bir seferde en çok 30 resim paylaşılabilir; az ürün seçin ya da tek tek paylaşın.' : '');
   }
@@ -871,7 +919,7 @@
           <label>Alt başlık<input id="ktAlt" value="${esc(D.alt)}" placeholder="${esc(guzelAd(ayYil()))} · ${num(ic.length)} ürün"></label>
           <label>Biçim${sec('ktBicim', Object.entries(BICIM).map(([k, v]) => [k, v.ad]), D.bicim)}</label>
           ${resim ? `<label>Tasarım${sec('ktTema', [['kurumsal', 'Kurumsal (Meta reklamı)'], ...Object.entries(KTEMA).map(([k, v]) => ['l-' + k, v.ad]), ['renkli', 'Canlı renkli'], ['koyu', 'Siyah ve altın (eski)']], D.tema)}</label>`
-            : `<label>Tema${sec('ktKtema', PTEMA, D.ktema)}</label><label>Sayfada ürün${sec('ktAdet', adetler.map(n => [n, n === 1 ? '1 (büyük, reklam gibi)' : n === 16 ? '16 (fiyat listesi)' : String(n)]), D.adet)}</label>`}
+            : `<label>Tema${sec('ktKtema', PTEMA, D.ktema)}</label><label>Sayfada ürün${sec('ktAdet', adetler.map(n => [n, n === 1 ? '1 (büyük, reklam gibi)' : n === 16 ? '16 (fiyat listesi)' : String(n)]), D.adet)}</label><label>Çözünürlük${sec('ktCoz', COZ, D.coz)}</label>`}
           <label>Sıralama${sec('ktSira', SIRA, D.sira)}</label>
           <label>Alt not<input id="ktNot" value="${esc(D.not)}" placeholder="örn. Fiyatlar 1 Kasım'a kadar geçerlidir"></label>
         </div>
@@ -909,7 +957,7 @@
       if (ciz) { S.keepScroll = true; render(); }
     });
     yaz('ktBaslik', 'baslik'); yaz('ktAlt', 'alt'); yaz('ktNot', 'not');
-    for (const [id, k] of [['ktTema', 'tema'], ['ktKtema', 'ktema'], ['ktArka', 'arka'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktOlcu', 'olcu'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
+    for (const [id, k] of [['ktTema', 'tema'], ['ktKtema', 'ktema'], ['ktArka', 'arka'], ['ktCoz', 'coz'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktOlcu', 'olcu'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
     const a = $('#ktAra');
     a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render.yazinca(); }, 200); });
     $('.kt-liste')?.addEventListener('change', e => {
