@@ -20,6 +20,27 @@
 <div id="app" class="boot"><div class="boot-mark">CLK</div></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="core.js"></script><script src="views-main.js"></script><script src="views-crm.js"></script><script src="editor.js"></script><script src="views-banner.js"></script><script src="views-parasut.js"></script><script src="views-ekstre.js"></script><script src="views-perakende.js"></script><script src="views-urunlistesi.js"></script><script src="views-stokkart.js"></script><script src="views-stokesitle.js"></script><script src="views-fiyat.js"></script><script src="views-sitegonder.js"></script><script src="views-siparisgir.js"></script><script src="views-urungiris.js"></script><script src="views-valizsiparis.js"></script><script src="views-westpolo.js"></script><script src="views-gider.js"></script><script src="views-cek.js"></script><script src="views-senet.js"></script><script src="views-tahsilat.js"></script><script src="views-musteri.js"></script><script src="views-katalog.js"></script><script src="views-instagram.js"></script><script src="views-odeme.js"></script><script src="views-personel.js"></script><script src="views-parasutbag.js"></script><script>CLK.boot(); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<script>
+/* Panel her açılışta en son yayınlanan dosyaları alır (06.11.2026: GitHub Pages dosyaları 10 dk önbellekte tutuyor, telefon yeniledikten sonra da eski
+   sürümü açıyordu). Dosyalar cache: 'no-cache' ile istenir (değişmediyse 304, kısa), sırayla eklenir. İstek olmazsa eski usul script etiketleriyle yüklenir. */
+(function () {
+  var L = ['core.js', 'views-main.js', 'views-crm.js', 'editor.js', 'views-banner.js', 'views-parasut.js', 'views-ekstre.js', 'views-perakende.js', 'views-urunlistesi.js', 'views-stokkart.js', 'views-stokesitle.js', 'views-fiyat.js', 'views-sitegonder.js', 'views-siparisgir.js', 'views-urungiris.js', 'views-valizsiparis.js', 'views-westpolo.js', 'views-gider.js', 'views-cek.js', 'views-senet.js', 'views-tahsilat.js', 'views-musteri.js', 'views-katalog.js', 'views-instagram.js', 'views-odeme.js', 'views-personel.js', 'views-parasutbag.js'];
+  var bitti = false;
+  function bitir() { if (bitti) return; bitti = true; CLK.boot(); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {}); }
+  function eskiUsul() {
+    var i = 0;
+    (function sonraki() {
+      if (i >= L.length) return bitir();
+      var s = document.createElement('script'); s.src = L[i++]; s.onload = s.onerror = sonraki; document.body.appendChild(s);
+    })();
+  }
+  var al = function (f) { return fetch(f, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(f + ' ' + r.status); return r.text(); }); };
+  Promise.all([al('app.css').catch(function () { return null; })].concat(L.map(al))).then(function (t) {
+    if (t[0]) { var st = document.createElement('style'); st.textContent = t[0]; var ln = document.querySelector('link[href="app.css"]'); if (ln) { ln.after(st); ln.remove(); } }
+    for (var i = 0; i < L.length; i++) { var s = document.createElement('script'); s.textContent = t[i + 1] + '\n//# sourceURL=' + new URL(L[i], location.href).href; document.body.appendChild(s); }
+    bitir();
+  }, eskiUsul);
+})();
+</script>
 </body>
 </html>
