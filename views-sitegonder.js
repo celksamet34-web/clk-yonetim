@@ -274,7 +274,7 @@
   };
 
   views.bind_sitegonder = () => {
-    const ara = $('#stgAra'); ara?.addEventListener('input', () => { D.ara = ara.value; D.goster = 100; clearTimeout(ara.t); ara.t = setTimeout(render, 220); });
+    const ara = $('#stgAra'); ara?.addEventListener('input', () => { D.ara = ara.value; D.goster = 100; clearTimeout(ara.t); ara.t = setTimeout(render.yazinca, 220); });
     $('#stgPkat')?.addEventListener('change', e => { D.pkat = e.target.value; D.goster = 100; render(); });
     $('#stgHepsi')?.addEventListener('change', e => { gorunen().slice(0, D.goster).forEach(u => e.target.checked ? D.secili.add(u.id) : D.secili.delete(u.id)); S.keepScroll = true; render(); });
     document.querySelectorAll('[data-katesle]').forEach(el => el.addEventListener('change', async () => {

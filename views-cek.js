@@ -464,7 +464,7 @@
     $('#csRGecmis')?.addEventListener('change', e => { D.rGecmis = e.target.checked; if (D.rResim && D.rTur !== 'makbuz') raporHazirla(); });
     $('#csMTarih')?.addEventListener('change', e => { D.mTarih = e.target.value; if (D.rResim && D.rTur === 'makbuz') makbuzHazirla(); });
     const a = $('#csAra');
-    a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render(); }, 200); });
+    a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render.yazinca(); }, 200); });
   };
 
   const prevAct = views.onAct;

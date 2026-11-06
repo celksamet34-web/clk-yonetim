@@ -908,7 +908,7 @@
         if (el.type === 'checkbox') D[k] = el.checked; else D[k] = el.value;
         if (k === 'categoryId') { const c = S.categories.find(x => String(x.id) === el.value); D.categoryName = c?.path || ''; if (D.isNew) D.desi = isValiz() ? RULES.desiValiz : RULES.desi; S.keepScroll = true; render(); }
         if (k === 'buyPrice' && +el.value > 0) { Object.entries(prices(el.value)).forEach(([pk, v]) => { const map = { market: 'listPrice', retail: 'salePrice', quick: 'fastSalePrice', d1: 'dealerPrice1', d2: 'dealerPrice2', d3: 'dealerPrice3' }; D[map[pk]] = v; const f = document.querySelector(`[data-k="${map[pk]}"]`); if (f) f.value = v; }); }
-        if (['name', 'salePrice', 'buyPrice', 'dealerPrice1'].includes(k)) { clearTimeout(el.t); el.t = setTimeout(() => { S.keepScroll = true; render(); }, 600); }
+        if (['name', 'salePrice', 'buyPrice', 'dealerPrice1'].includes(k)) { clearTimeout(el.t); el.t = setTimeout(() => { S.keepScroll = true; render.yazinca(); }, 600); }
       });
     });
     $$('[data-vk]').forEach(el => el.addEventListener('input', () => { const i = +el.closest('.vrow').dataset.i; const k = el.dataset.vk; D.variants[i][k] = k === 'q' ? (+el.value || 0) : el.value.toLocaleUpperCase('tr'); }));

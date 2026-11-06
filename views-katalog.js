@@ -570,7 +570,7 @@
     yaz('ktBaslik', 'baslik'); yaz('ktAlt', 'alt'); yaz('ktNot', 'not');
     for (const [id, k] of [['ktTema', 'tema'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktOlcu', 'olcu'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
     const a = $('#ktAra');
-    a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render(); }, 200); });
+    a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render.yazinca(); }, 200); });
     $('.kt-liste')?.addEventListener('change', e => {
       const id = e.target.dataset?.ktU; if (!id) return;
       if (e.target.checked) D.cikar.delete(id); else D.cikar.add(id);

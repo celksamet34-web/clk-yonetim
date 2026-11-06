@@ -282,16 +282,40 @@ window.CLK = (() => {
     if (m) { e.preventDefault(); e.stopPropagation(); araSecildi(kutu, m); }
   }, true);
 
-  let raf = 0, sonDegisim = 0;
-  function render() { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }
+  let raf = 0, sonDegisim = 0, sonYazi = 0, kullaniciIstedi = false, yaziBekle = 0, ciziliSayfa = '';
+  // kullanıcının bir olayı (dokunma, Enter, seçim, yazma) sırasında istenen çizim hemen yapılır; veri yüklemelerinden gelen çizim "arka plan" sayılır
+  const KULLANICI_OLAY = /^(click|change|input|keydown|keyup|submit|pointerup|pointerdown|touchend|mouseup|mousedown|hashchange|popstate|paste|drop)$/;
+  function render() {
+    const ev = window.event;
+    if (ev && KULLANICI_OLAY.test(ev.type)) kullaniciIstedi = true;
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(draw);
+  }
+  // yazarken süzgeç için istenen çizim (arama kutuları, gecikmeli): kullanıcı istedi sayılır, bekletilmez
+  render.yazinca = () => { kullaniciIstedi = true; render(); };
   // açık bir seçim listesi arka plandaki yüklemelerin yeniden çizimiyle kapanmasın: seçim yapılana ya da liste bırakılana kadar beklenir
   document.addEventListener('change', () => { sonDegisim = performance.now(); }, true);
+  // telefonda yazı kutusu yeniden çizilince klavye harfe döner (celik 06.11: "sayıya alıyorum yeniden harfe geçiyor 1 sayı yazınca"; arka planda ürün/sipariş/üye sayfaları yüklenirken her sayfada çiziliyordu):
+  // yazı kutusundayken arka plan çizimi kutudan çıkılana ya da 4 sn yazılmayana kadar bekler. Bilgisayarda klavye sıfırlanmadığı için beklenmez.
+  const dokunmatik = () => matchMedia('(pointer: coarse)').matches;
+  const YAZI_DISI = /^(checkbox|radio|button|submit|reset|file|range|color|image|hidden|date|time|month|week|datetime-local)$/;
+  const yaziAlani = el => !!el && !el.readOnly && !el.disabled && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !YAZI_DISI.test(el.type)));
+  document.addEventListener('input', e => { if (yaziAlani(e.target)) sonYazi = performance.now(); }, true);
+  document.addEventListener('focusin', e => { if (yaziAlani(e.target)) sonYazi = performance.now(); }, true);
   function draw() {
-    const app = $('#app'), ae = document.activeElement;
+    const app = $('#app'), ae = document.activeElement, kullanici = kullaniciIstedi;
+    kullaniciIstedi = false;
     if (S.user && ae?.tagName === 'SELECT' && app.contains(ae) && performance.now() - sonDegisim > 400) {
       if (!ae.bekleyen) { ae.bekleyen = true; const devam = () => { ae.removeEventListener('blur', devam); ae.removeEventListener('change', devam); render(); }; ae.addEventListener('blur', devam); ae.addEventListener('change', devam); }
       return;
     }
+    // giriş yapılınca ya da sayfa değişince hemen çizilir; yalnız aynı sayfanın arka plan yenilemesi bekler
+    const sessiz = performance.now() - sonYazi, sayfa = [!!S.user, !!S.yetkiYukleniyor, !!S.yetkiHata, S.route].join('|');
+    if (S.user && !kullanici && sayfa === ciziliSayfa && yaziAlani(ae) && app.contains(ae) && sessiz < 4000 && dokunmatik()) {
+      if (!ae.yaziBekliyor) { ae.yaziBekliyor = true; const devam = () => { ae.removeEventListener('blur', devam); ae.yaziBekliyor = false; render(); }; ae.addEventListener('blur', devam); }
+      clearTimeout(yaziBekle); yaziBekle = setTimeout(render, 4000 - sessiz + 50);
+      return;
+    }
+    clearTimeout(yaziBekle); ciziliSayfa = sayfa;
     if (!S.user) { app.className = ''; app.innerHTML = views.auth(); views.bindAuth(); return; }
     if (S.yetkiYukleniyor) { app.className = ''; app.innerHTML = '<div class="auth"><section class="auth-form"><div class="auth-box"><h2>Giriş yapılıyor…</h2></div></section></div>'; return; }
     if (S.yetkiHata) { app.className = ''; app.innerHTML = `<div class="auth"><section class="auth-form"><div class="auth-box"><h2>Panele erişim yok</h2><div class="msg err">${esc(S.yetkiHata)}</div><button class="btn dark" data-act="logout" style="margin-top:10px">Çıkış yap</button></div></section></div>`; return; }

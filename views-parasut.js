@@ -128,7 +128,7 @@
 `;
   };
   views.bind_eslestirme = () => {
-    const q = $('#esq'); q?.addEventListener('input', () => { D.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
+    const q = $('#esq'); q?.addEventListener('input', () => { D.q = q.value; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $('#esf')?.addEventListener('change', e => { D.f = e.target.value; render(); });
     $$('[data-estab]').forEach(b => b.addEventListener('click', () => { D.tab = b.dataset.estab; D.q = ''; render(); }));
   };

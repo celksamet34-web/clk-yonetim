@@ -34,7 +34,7 @@
         ${L.length > F.shown ? `<div class="more"><button class="btn" data-act="oMore">Daha fazla (${num(L.length - F.shown)})</button></div>` : ''}</div>`;
   };
   views.bind_siparisler = () => {
-    const q = $('#oq'); q?.addEventListener('input', () => { F.q = q.value; F.shown = 40; clearTimeout(q.t); q.t = setTimeout(render, 220); });
+    const q = $('#oq'); q?.addEventListener('input', () => { F.q = q.value; F.shown = 40; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $('#oplat')?.addEventListener('change', e => { F.plat = e.target.value; render(); });
     $$('[data-os]').forEach(b => b.addEventListener('click', () => { F.s = Number(b.dataset.os); F.shown = 40; render(); }));
   };
@@ -107,7 +107,7 @@
           <div class="c3">${Number(u.dealerStatus) === 1 ? '<span class="pill gold">Bayi</span>' : Number(u.dealerStatus) === 2 ? '<span class="pill warn">Onay bekliyor</span>' : ''}${cariGor ? `<b class="num ${bal < 0 ? 'neg' : bal > 0 ? 'pos' : ''}">${tl2(bal)}</b>` : ''}</div></button>`; }).join('') || '<p class="empty">Müşteri bulunamadı.</p>'}</div></div>`;
   };
   views.bind_musteriler = () => {
-    const q = $('#uq'); q?.addEventListener('input', () => { M.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
+    const q = $('#uq'); q?.addEventListener('input', () => { M.q = q.value; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $('#usort')?.addEventListener('change', e => { M.sort = e.target.value; render(); });
     $$('[data-uf]').forEach(b => b.addEventListener('click', () => { M.f = b.dataset.uf; render(); }));
   };
@@ -335,7 +335,7 @@
       </div>`;
   };
   views.bind_cari = () => {
-    const q = $('#cq'); q?.addEventListener('input', () => { C.q = q.value; clearTimeout(q.t); q.t = setTimeout(render, 220); });
+    const q = $('#cq'); q?.addEventListener('input', () => { C.q = q.value; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $$('[data-cf]').forEach(b => b.addEventListener('click', () => { C.f = b.dataset.cf; S.keepScroll = true; render(); }));
     $$('[data-cs]').forEach(b => b.addEventListener('click', () => { C.s = b.dataset.cs; S.keepScroll = true; render(); }));
     notBagla();

@@ -153,7 +153,7 @@
       <div class="ft"><span class="pr">${tl(p.salePrice)}</span><span class="st ${st !== 'ok' ? 'low' : ''}">${num(P.qty(p))} adet</span></div></div></button>`;
   }
   views.bind_urunler = () => {
-    const q = $('#pq'); if (q) q.addEventListener('input', () => { U.q = q.value; U.shown = 48; clearTimeout(q.t); q.t = setTimeout(render, 220); });
+    const q = $('#pq'); if (q) q.addEventListener('input', () => { U.q = q.value; U.shown = 48; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $$('[data-pf]').forEach(b => b.addEventListener('click', () => { U.f = b.dataset.pf; U.shown = 48; render(); }));
   };
 
@@ -188,7 +188,7 @@
         ${L.length > T.shown ? `<div class="more"><button class="btn" data-act="sMore">Daha fazla (${num(L.length - T.shown)})</button></div>` : ''}</div>`;
   };
   views.bind_stok = () => {
-    const q = $('#sq'); if (q) q.addEventListener('input', () => { T.q = q.value; T.shown = 80; clearTimeout(q.t); q.t = setTimeout(render, 220); });
+    const q = $('#sq'); if (q) q.addEventListener('input', () => { T.q = q.value; T.shown = 80; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $('#scat')?.addEventListener('change', e => { T.cat = e.target.value; render(); });
     $('#ssort')?.addEventListener('change', e => { T.sort = e.target.value; render(); });
     $$('[data-sf]').forEach(b => b.addEventListener('click', () => { T.f = b.dataset.sf; T.shown = 80; render(); }));

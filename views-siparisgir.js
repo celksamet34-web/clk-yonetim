@@ -60,6 +60,8 @@
       ]);
       D.siteRenk = sr || {};
       D.musteriler = m;
+      // telefonda müşteri kutusuna yazılırken sayfa çizimi bekleyebilir: öneriler liste gelir gelmez çıksın
+      if (ARA.sgMusteri) ARA.sgMusteri.liste = m;
       D.urunler = u.urunler.filter(x => !x[7]).map(([id, ad, alis, satis, stok, , , , kat]) => ({ id: String(id), ad, alis, satis, stok, kat: kat || '' }));
       D.kurallar = Object.fromEntries((k.data || []).map(r => [buyuk(r.kategori), r]));
       D.yuvarla = (a.data || []).find(x => x.ad === 'yuvarla')?.deger ?? 1;
