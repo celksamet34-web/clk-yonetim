@@ -3,8 +3,8 @@
   "short_name": "CLK",
   "description": "CLK Çanta yönetim paneli",
   "lang": "tr",
-  "start_url": "/#panel",
-  "scope": "/",
+  "start_url": "./#panel",
+  "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#121110",
@@ -15,7 +15,7 @@
     { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Sipariş gir", "url": "/#siparisgir", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
-    { "name": "Müşteri ekstresi", "url": "/#ekstre", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+    { "name": "Sipariş gir", "url": "./#siparisgir", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Müşteri ekstresi", "url": "./#ekstre", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
   ]
 }

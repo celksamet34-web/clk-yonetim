@@ -54,7 +54,7 @@
     const run = async () => {
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');
       for (let attempt = 0; ; attempt++) {
-        const r = await fetch('/.netlify/functions/qukasoft', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ path, ...payload }) });
+        const r = await fetch(CLK.nf('qukasoft'), { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ path, ...payload }) });
         const j = await r.json().catch(() => ({}));
         if (r.ok && j.success) return j.result;
         if (r.status === 502 && attempt === 0) { await new Promise(ok => setTimeout(ok, 900)); continue; }
@@ -676,7 +676,7 @@
   // Bu sitenin görsel fonksiyonu (dekupede Photoroom, mankende fal.ai/Gemini, yedekte OpenAI). Yoksa null döner.
   async function siteImage(body) {
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
-    const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(CLK.nf('ai-product-image'), { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 404 || r.status === 503) return null;
     let j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.message || (r.status === 504 ? 'Sunucu zaman aşımına uğradı.' : 'Görsel hazırlanamadı.'));
@@ -685,7 +685,7 @@
       try {
         for (let i = 0; i < 60 && j.pending; i++) {
           await new Promise(ok => setTimeout(ok, 3000));
-          const p = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'falResult', job }) });
+          const p = await fetch(CLK.nf('ai-product-image'), { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'falResult', job }) });
           j = await p.json().catch(() => ({})); if (!p.ok) throw new Error(j.message || 'fal.ai sonucu alınamadı.');
         }
         if (j.pending) throw new Error('fal.ai zaman aşımı');
@@ -831,7 +831,7 @@
     btn.disabled = true; btn.textContent = 'Yazılıyor…';
     try {
       const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı.');
-      const r = await fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'describe', facts }) });
+      const r = await fetch(CLK.nf('ai-product-image'), { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'describe', facts }) });
       const j = await r.json().catch(() => ({})); if (!r.ok || !j.long) throw new Error(j.message || 'Yanıt alınamadı');
       D.longDescription = safeHtml(j.long).replace(/<\/(p|h3|ul|li)>/g, '</$1>\n').trim();
       if (!D.shortDescription.trim() && j.short) D.shortDescription = j.short;

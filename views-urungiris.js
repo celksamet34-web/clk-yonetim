@@ -206,7 +206,7 @@ Kurallar:
   async function okut(fis) {
     const firma = D.firmalar.find(x => x.ad === fis.firma);
     const { data } = await sb.auth.getSession();
-    const r = await fetch('/.netlify/functions/fis-oku-background', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ fisId: fis.id, talimat: okumaTalimati(firma || { ad: fis.firma }) }) });
+    const r = await fetch(CLK.nf('fis-oku-background'), { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify({ fisId: fis.id, talimat: okumaTalimati(firma || { ad: fis.firma }) }) });
     if (!r.ok && r.status !== 202) throw new Error('Okuma başlatılamadı (' + r.status + ')');
   }
   async function gonder() {

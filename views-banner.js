@@ -160,7 +160,7 @@
     const x = c.getContext('2d'), s = Math.max(W / im.width, H / im.height), w = im.width * s, h = im.height * s;
     x.drawImage(im, (W - w) / 2, (H - h) / 2, w, h); return c.toDataURL('image/jpeg', 0.92);
   }
-  const fn = (t, body) => fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const fn = (t, body) => fetch(CLK.nf('ai-product-image'), { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.message || 'Görsel üretilemedi.'); return j; });
   async function make(sandbox, opts = {}) {
     const p = product(); if (!p) return toast('Önce ürün seç.');

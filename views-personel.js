@@ -48,7 +48,7 @@
 
   function sonucHtml() {
     const r = D.sonuc; if (!r) return '';
-    const metin = `CLK Yönetim paneli\nAdres: ${location.origin}\nKullanıcı adı: ${r.kullanici}\nŞifre: ${r.sifre}`;
+    const metin = `CLK Yönetim paneli\nAdres: ${location.origin + location.pathname.replace(/index\.html$/, '')}\nKullanıcı adı: ${r.kullanici}\nŞifre: ${r.sifre}`;
     return `<div class="card pr-sonuc"><div class="card-h"><div><h3>${esc(r.ad || r.kullanici)} ${r.yeni ? 'oluşturuldu' : 'için yeni şifre'}</h3><p class="sub">Bu bilgiyi personele iletin. Şifre bir daha gösterilmez.</p></div><button class="btn sm ghost" data-act="prSonucKapat">Kapat</button></div>
       <pre class="pr-bilgi">${esc(metin)}</pre>
       <div class="pr-alt"><button class="btn sm" data-act="prKopyala">Kopyala</button><a class="btn sm dark" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(metin)}">WhatsApp ile gönder</a></div></div>`;

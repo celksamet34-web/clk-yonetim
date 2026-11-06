@@ -4,6 +4,10 @@ window.CLK = (() => {
   const SB_KEY = 'sb_publishable_0sbTUikCycbokrRbzxtBAg_JGTfJtr4';
   const FN = SB_URL + '/functions/v1/';
   const sb = window.supabase.createClient(SB_URL, SB_KEY);
+  // Netlify fonksiyonları yalnız Netlify'da çalışır; panel başka adresteyse (GitHub Pages; celik 06.11: Netlify kredisi bitti) aynı işi Supabase'teki kopyaları yapar
+  const NETLIFY = /\.netlify\.app$/i.test(location.hostname);
+  const NF_SB = { 'ai-product-image': 'ai-gorsel', 'qukasoft': 'qukasoft-ek', 'fis-oku-background': 'fis-oku' };
+  const nf = name => NETLIFY ? '/.netlify/functions/' + name : FN + (NF_SB[name] || name);
 
   const RULES = { market: 3, retail: 2.5, quick: 25, d1: 25, d2: 20, d3: 15, stock: 10, critical: 3, desi: 5, desiValiz: 40, kdv: 10 };
   const S = {
@@ -337,5 +341,5 @@ window.CLK = (() => {
   const VERI = { siparis: ['siparisler', 'siparisgir', 'musteriler', 'cari', 'ciro'], musteri: ['musteriler', 'cari', 'siparisgir', 'siparisler', 'ekstre'], bakiye: ['cari', 'ekstre'] };
   function prefetch() { loadProducts(); if (herhangi(VERI.siparis)) loadOrders(); if (herhangi(VERI.musteri)) loadUsers(); if (herhangi(VERI.bakiye)) loadBalance(); }
 
-  return { end4999, kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
+  return { end4999, kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, nf, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
 })();

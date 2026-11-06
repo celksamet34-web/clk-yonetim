@@ -435,7 +435,7 @@
   const sahneHazir = p => p && D.tur !== 'koleksiyon' && D.sahne !== 'yok' ? D.sahneler[sahneAnahtar(p)] || '' : '';
 
   /* yapay zekâ: bu sitenin görsel fonksiyonu; fal.ai kuyruğu 3 sn arayla sorulur (en çok ~3 dk) */
-  const aiFn = (t, body) => fetch('/.netlify/functions/ai-product-image', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const aiFn = (t, body) => fetch(CLK.nf('ai-product-image'), { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.message || (r.status === 504 ? 'Sunucu zaman aşımına uğradı.' : 'Görsel üretilemedi.')); return j; });
   async function ai(body) {
     const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if (!t) throw new Error('Oturum kapandı. Yeniden giriş yap.');
