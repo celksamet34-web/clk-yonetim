@@ -111,11 +111,36 @@
     }
     return son ? son.fiyat : D.urunler?.find(u => u.id === String(id))?.alis || 0;
   }
-  // düzenleme taslağı: fiş açılınca satırlara Paraşüt ürünü tahmin edilir
+  // KOLİ satırı ürün değil (celik 06.11: "yefa fişi işlerken koliyi satış olarak okumasın"): Yefa fişinde grubun altındaki "11 koli 32.000 → M. Barış"
+  // grubun koli sayısı, ara toplamı ve gönderilenidir. Yapay zekâ bunu ürün satırı sanıp gönderileni yalnız ona yazınca koli satışa dönüyordu.
+  // Koli satırı çıkarılır, gönderileni kendinden önceki (önceki koli satırına kadar) gönderilensiz satırlara verilir.
+  const koliMi = s => /^(\d+)?KOL[İI](SAYISI)?$/.test(buyuk(s?.urun).replace(/[^0-9A-ZÇĞİÖŞÜ]/g, ''));
+  function koliAyikla(satirlar) {
+    const out = [], koli = []; let bas = 0;
+    for (const s of satirlar || []) {
+      if (!koliMi(s)) { out.push({ ...s }); continue; }
+      const g = String(s.grup || '').trim(), parca = out.slice(bas);
+      if (g) for (const r of parca) if (!String(r.grup || '').trim()) r.grup = g;
+      const tutar = sayi(s.adet) * sayi(s.fiyat), satir = toplam(parca);
+      // yapay zekâ ara toplamı koli sayısına bölüp fiyat yazıyor (32.000 / 11): kuruş farkı tutarsızlık sayılmaz, satırların toplamı gösterilir
+      const fark = tutar > 0 && Math.abs(tutar - satir) > Math.max(1, tutar * 0.005);
+      koli.push({ adet: sayi(s.adet), grup: g, tutar: fark || !(tutar > 0) ? tutar : satir, fark: fark ? satir : null });
+      bas = out.length;
+    }
+    return { satirlar: out, koli };
+  }
+  // gönderilen müşteri listesinden seçilir (celik 06.11: "kime giden kısmında müşteri listesi açılır liste olsun seçeyim ki karışıklık olmasın")
+  const musteriAdla = ad => D.musteriler.find(m => buyuk(m.ad) === buyuk(ad));
+  const grupTamam = g => clkMi(g) || !!musteriAdla(g);
+  // düzenleme taslağı: fiş açılınca satırlara Paraşüt ürünü tahmin edilir; fişte yazan gönderilen tek bir müşteriye uyuyorsa o seçilir
   function taslak(f) {
-    return D.tas[f.id] ||= { tarih: f.tarih || '', ust: f.ust || '', satirlar: (f.satirlar || []).map(s => {
-      const id = s.parasutId && urunAd(s.parasutId) ? String(s.parasutId) : urunTahmin(f.firma, s.urun);
-      return { adet: s.adet, urun: s.urun, fiyat: s.fiyat, grup: s.grup || '', parasutId: id, pAd: id ? urunAd(id) : (s.yeniAd || '') };
+    if (D.tas[f.id]) return D.tas[f.id];
+    const { satirlar, koli } = koliAyikla(f.satirlar);
+    const musAd = {};
+    for (const s of satirlar) { const g = String(s.grup || '').trim(); if (g && !grupTamam(g) && !(g in musAd)) { const id = musteriTahmini(g); musAd[g] = id ? D.musteriler.find(m => String(m.id) === String(id))?.ad || '' : ''; } }
+    return D.tas[f.id] = { tarih: f.tarih || '', ust: f.ust || '', koli, satirlar: satirlar.map(s => {
+      const id = s.parasutId && urunAd(s.parasutId) ? String(s.parasutId) : urunTahmin(f.firma, s.urun), g = String(s.grup || '').trim();
+      return { adet: s.adet, urun: s.urun, fiyat: s.fiyat, grup: musAd[g] || g, ...(musAd[g] ? { fisGrup: g } : {}), parasutId: id, pAd: id ? urunAd(id) : (s.yeniAd || '') };
     }) };
   }
   // aynı fiş iki kez işlenmesin: ürün ve adetlerin çoğu ya da toplamı aynı olan başka fiş
@@ -146,6 +171,7 @@
     return [...m.entries()].map(([ad, satirlar]) => ({ ad, satirlar }));
   }
   function musteriTahmini(grup) {
+    const tam = musteriAdla(grup); if (tam) return tam.id;
     const k = grupAnahtar(grup);
     if (D.musEsl.has(k)) return D.musEsl.get(k);
     const kel = k.split(' ').filter(w => w.length > 1);
@@ -192,9 +218,10 @@
     const urunler = bilinenUrunler(firma.ad);
     return `Bu görsel(ler), ${firma.ad} adlı tedarikçinin fişi ya da faturasıdır (el yazısı sipariş fişi, fotoğraf ya da PDF sayfası; bazen tek fotoğrafta iki fiş olur). Alıcı firma CLK Çanta (Samet Çelik).
 Her fişi oku ve SADECE şu JSON'u döndür:
-{"fisler":[{"tarih":"YYYY-AA-GG","ust":"fişin üstündeki not (örn. Ambarlar) ya da boş","gruplar":[{"gonderilen":"bu grubun gittiği yer/kişi; yazmıyorsa firma kuralındaki varsayılan, o da yoksa boş","satirlar":[{"adet":10,"urun":"ÜRÜN ADI","fiyat":2300}]}],"fisToplami":0,"sorular":["..."]}]}
+{"fisler":[{"tarih":"YYYY-AA-GG","ust":"fişin üstündeki not (örn. Ambarlar) ya da boş","gruplar":[{"gonderilen":"bu grubun gittiği yer/kişi; yazmıyorsa firma kuralındaki varsayılan, o da yoksa boş","koli":0,"araToplam":0,"satirlar":[{"adet":10,"urun":"ÜRÜN ADI","fiyat":2300}]}],"fisToplami":0,"sorular":["..."]}]}
 Kurallar:
-- Satırlar ara toplam çizgileriyle gruplara ayrılır; grubun altına ya da okla yazılan isim o grubun "gonderilen"idir. Tırnak (") işareti üstteki satırdaki kelimeyi tekrarlar.
+- Satırlar ara toplam çizgileriyle gruplara ayrılır; grubun altına ya da okla yazılan isim o grubun "gonderilen"idir ve o gruptaki BÜTÜN satırlara aittir. Tırnak (") işareti üstteki satırdaki kelimeyi tekrarlar.
+- "KOLİ" bir ürün DEĞİLDİR. Grubun altındaki "11 koli 32.000" gibi satır o grubun koli (paket) sayısı ve ara toplamıdır; yanına ya da okla yazılan isim o grubun "gonderilen"idir. Bu satırı "satirlar"a YAZMA: koli sayısını grubun "koli" alanına, tutarı "araToplam"a, ismi "gonderilen"e yaz. Ara toplam grubun satırlarının toplamını tutmuyorsa "sorular"a yaz.
 - Tutarı adet × fiyat ile kontrol et. Tutmazsa, üstü çizilmiş/düzeltilmiş değer varsa, okunamayan yer varsa "sorular"a kısa Türkçe soru yaz.
 - Ürün adlarını BÜYÜK harfle yaz; kısaltmaları açma, aşağıdaki bilinen adlardan birine benziyorsa o adı kullan ve emin değilsen "sorular"a "X ile Y aynı mı?" diye sor.
 - Birden çok görsel aynı belgenin sayfalarıysa tek fiş olarak döndür.
@@ -257,6 +284,7 @@ Kurallar:
     if (!t.tarih) D.uyari[id] = 'Fiş tarihini girin.';
     else if (!sat.length) D.uyari[id] = 'Fişte satır yok.';
     else if (sat.some(s => !(s.fiyat > 0))) D.uyari[id] = 'Fiyatı boş ya da 0 olan satır var.';
+    else if (sat.some(s => !grupTamam(s.grup))) D.uyari[id] = 'Gönderilen müşteri listede yok: ' + [...new Set(sat.filter(s => !grupTamam(s.grup)).map(s => s.grup))].join(', ') + '. "Gönderilen" sütunundan müşteriyi seçin.';
     else if (benzerFis(f, sat) && !D.emin[id]) { D.emin[id] = true; D.uyari[id] = 'Bu fiş daha önceki bir fişe çok benziyor (yukarıdaki uyarı). Farklı bir fiş olduğundan eminseniz "Yine de aktar"a basın.'; }
     if (D.uyari[id]) return render();
     D.mesgul[id] = 'Paraşüt\'e giriliyor…'; render();
@@ -380,6 +408,21 @@ Kurallar:
     : `<button class="ug-foto bos" data-act="ugGorselEkle" data-id="${f.id}" data-i="${i}">Görsel yok<br><b>Görseli yükle</b><br><small>${esc(d.ad || '')}</small></button>`).join('')}</div>` : '';
   const pill = durum => `<span class="ug-pill p-${durum}">${DURUM[durum] || durum}</span>`;
 
+  // gönderilen seçimi: CLK (bize gelen, yalnız alış), daha önce mal gönderilen müşteriler, bütün Paraşüt müşterileri.
+  // Fişte yazan ad listede yoksa en üstte uyarıyla durur, seçilmeden aktarılmaz.
+  function grupSecim(f, s, i, id) {
+    const g = String(s.grup || '').trim(), clk = clkMi(g), tamam = grupTamam(g);
+    const clkDeger = clk && g ? g : 'CLK ÇANTA';
+    const once = new Set([...D.musEsl.values()].map(String));
+    const opt = (v, ad, sec) => `<option value="${esc(v)}"${sec ? ' selected' : ''}>${esc(ad)}</option>`;
+    const secili = musteriAdla(g)?.ad;
+    const sik = D.musteriler.filter(m => once.has(String(m.id)));
+    return `<select id="${id}" data-ug="${f.id}" data-i="${i}" data-alan="grup" class="ug-grup${tamam ? '' : ' wp-req'}" aria-label="Gönderilen">
+      ${tamam ? '' : opt(g, 'Seçin · fişte: ' + g, true)}
+      ${opt(clkDeger, clkDeger + ' (bize geldi)', clk)}
+      ${sik.length ? `<optgroup label="Daha önce gönderilenler">${sik.map(m => opt(m.ad, m.ad, false)).join('')}</optgroup>` : ''}
+      <optgroup label="Bütün müşteriler">${D.musteriler.map(m => opt(m.ad, m.ad, m.ad === secili)).join('')}</optgroup></select>${s.fisGrup && s.fisGrup !== g ? `<small class="ug-meta">fişte: ${esc(s.fisGrup)}</small>` : ''}`;
+  }
   function duzenTablosu(f) {
     const t = taslak(f), p = 'ug-' + kisa(f.id);
     const satirlar = t.satirlar.map((s, i) => {
@@ -391,13 +434,14 @@ Kurallar:
         <td class="l"><div class="ug-p">${v('pAd', 'text', 'ug-parasut' + (s.parasutId ? '' : ' yeni'), 'list="ugUrunListe" placeholder="Paraşüt\'te yoksa boş bırakın" aria-label="Paraşüt ürünü"')}${s.parasutId ? '' : '<span class="ug-yeni">yeni ürün</span>'}</div></td>
         <td>${v('fiyat', 'text', 'ug-fiyat', 'inputmode="decimal" aria-label="Fiyat"')}${farkli ? `<span class="wp-fark">Önceki alış ${tl(once)} (${yeni > once ? '+' : ''}${tl(yeni - once)})</span>` : ''}</td>
         <td class="ug-tutar">${tl(sayi(s.adet) * sayi(s.fiyat))}</td>
-        <td class="l">${v('grup', 'text', 'ug-grup', 'placeholder="kime gitti" aria-label="Gönderilen"')}</td>
+        <td class="l">${grupSecim(f, s, i, `${p}-${i}-grup`)}</td>
         <td><button class="ug-x" data-act="ugSatirSil" data-id="${f.id}" data-i="${i}" aria-label="Satırı sil">×</button></td></tr>`;
     }).join('');
     return `<div class="ug-ust-alan"><label>Fiş tarihi<input id="${p}-tarih" type="date" data-ug="${f.id}" data-alan="tarih" value="${esc(t.tarih)}"></label>
         <label class="ug-not">Üst not (faturaya açıklama)<input id="${p}-ust" data-ug="${f.id}" data-alan="ust" value="${esc(t.ust)}"></label></div>
       <div class="ul-tablo"><table class="ug-tablo"><thead><tr><th>Adet</th><th>Fişteki ad</th><th>Paraşüt ürünü</th><th>Fiyat</th><th>Tutar</th><th>Gönderilen</th><th></th></tr></thead><tbody>${satirlar}</tbody></table></div>
-      <div class="ug-toplam"><button class="btn" data-act="ugSatirEkle" data-id="${f.id}">+ Satır ekle</button><span>${t.satirlar.reduce((a, s) => a + sayi(s.adet), 0)} adet · Toplam <b>${tl(toplam(t.satirlar))}</b></span></div>`;
+      <div class="ug-toplam"><button class="btn" data-act="ugSatirEkle" data-id="${f.id}">+ Satır ekle</button><span>${t.satirlar.reduce((a, s) => a + sayi(s.adet), 0)} adet · Toplam <b>${tl(toplam(t.satirlar))}</b></span></div>
+      ${t.koli?.length ? `<p class="wp-not">Koli satırları ürün sayılmadı: ${t.koli.map(k => `${k.adet} koli${k.grup ? ' → ' + esc(k.grup) : ''}${k.tutar > 0 ? ' (' + tl(k.tutar) + ')' : ''}`).join(', ')}. Gönderilen, koli satırının üstündeki ürünlere yazıldı.</p>` : ''}`;
   }
   function salt(f) {
     const s = f.satirlar || [];
@@ -426,19 +470,33 @@ Kurallar:
         <div class="ek-dug"><button class="btn dark" data-act="ugSatis" data-id="${f.id}" data-grup="${esc(g.ad)}" ${D.mesgul[k] ? 'disabled' : ''}>${D.mesgul[k] ? esc(D.mesgul[k]) : 'Satış yap (Paraşüt\'e gir)'}</button></div></div>`;
     }).join('')}</div>`;
   }
+  // koli satırı çıkarılınca ona ait sorular düşer; "Fişte toplam X yazıyor, satırların toplamı Y" yeniden hesaplanır
+  function sorular(f, t) {
+    const l = (f.sorular || []).map(String);
+    if (!t?.koli?.length) return l;
+    const out = [];
+    for (const q of l) {
+      if (/KOL[İI]/.test(buyuk(q))) continue;
+      const m = /^Fişte toplam ([\d.,]+) ₺ yazıyor/.exec(q);
+      if (m) { const fis = sayi(m[1]), sat = toplam(t.satirlar); if (Math.abs(fis - sat) > 0.5) out.push(`Fişte toplam ${fis.toLocaleString('tr-TR')} ₺ yazıyor, satırların toplamı ${sat.toLocaleString('tr-TR')} ₺.`); continue; }
+      out.push(q);
+    }
+    for (const k of t.koli) if (k.fark != null) out.push(`${k.grup || 'Bir grup'}: fişte ara toplam ${tl(k.tutar)}, satırların toplamı ${tl(k.fark)}.`);
+    return out;
+  }
   function fisKarti(f) {
     // Paraşüt ürün listesi gelmeden taslak açılmaz (ürün tahmini listeye bakar)
-    const duzen = f.durum === 'okundu' && !!D.urunler, t = duzen ? taslak(f) : null;
+    const duzen = f.durum === 'okundu' && !!D.urunler, t = duzen ? taslak(f) : null, qs = duzen ? sorular(f, t) : [];
     const benzer = duzen ? benzerFis(f, t.satirlar) : null;
     const baslik = [f.dosya_no, f.tarih ? trT(f.tarih) : '', f.firma].filter(Boolean).join(' · ');
     const meta = [f.ust && !duzen ? 'Fişte: ' + f.ust : '', 'Gönderildi ' + new Date(f.gonderilme).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }), f.parasut_id ? 'Paraşüt ' + f.parasut_id : ''].filter(Boolean).join(' · ');
-    return `<article class="card ug-fis${duzen && (f.sorular || []).length ? ' ug-soru-var' : ''}">
+    return `<article class="card ug-fis${qs.length ? ' ug-soru-var' : ''}">
       <div class="ug-fis-ust"><div><h3>${esc(baslik)}</h3><div class="ug-meta">${esc(meta)}</div></div>${pill(f.durum)}</div>
       ${f.dosya_no && f.durum === 'kaydedildi' ? `<div class="ug-no">Klasördeki fiş görselinin yeni adı: <b>${esc(f.dosya_no)}</b></div>` : ''}
       ${fotolar(f)}
       ${f.okuma_hata ? `<div class="wp-uyari">${esc(f.okuma_hata)}</div>` : ''}
       ${f.parasut_not && f.durum === 'kaydedildi' ? `<p class="wp-not">${esc(f.parasut_not)}</p>` : ''}
-      ${duzen && (f.sorular || []).length ? `<div class="ug-sorular"><b>Kontrol etmeniz gerekenler</b><ol>${f.sorular.map(q => `<li>${esc(q)}</li>`).join('')}</ol><small>Tabloyu fişe bakarak düzeltin, sonra aktarın.</small></div>` : ''}
+      ${qs.length ? `<div class="ug-sorular"><b>Kontrol etmeniz gerekenler</b><ol>${qs.map(q => `<li>${esc(q)}</li>`).join('')}</ol><small>Tabloyu fişe bakarak düzeltin, sonra aktarın.</small></div>` : ''}
       ${benzer ? `<div class="wp-uyari"><b>Dikkat, bu fiş daha önce işlenmiş olabilir.</b> ${benzer.fis.tarih ? trT(benzer.fis.tarih) + ' tarihli' : 'Daha önce okunan'} ${esc(benzer.fis.dosya_no || '')} fişle ${benzer.ayni} satırı aynı (ürün ve adet)${benzer.ayniTutar ? ', toplamı da aynı' : ''}${benzer.fis.durum === 'kaydedildi' ? '; o fiş Paraşüt\'e girildi.' : '; o fiş henüz aktarılmadı.'} Aynı fişse aktarmayın, silin.</div>` : ''}
       ${f.durum === 'okundu' && !D.urunler ? '<p class="wp-not">Paraşüt ürünleri yükleniyor…</p>' : ''}
       ${duzen ? duzenTablosu(f) : (f.satirlar || []).length ? salt(f) : f.durum === 'okunuyor' ? '<p class="wp-not">Yapay zekâ fişi okuyor (bir iki dakika)…</p>' : ''}
@@ -514,7 +572,10 @@ Kurallar:
         const t = taslak(f), alan = inp.dataset.alan;
         D.uyari[f.id] = '';
         if (inp.dataset.i == null) return void (t[alan] = inp.value);
-        const s = t.satirlar[+inp.dataset.i]; s[alan] = inp.value;
+        const s = t.satirlar[+inp.dataset.i];
+        // listede olmayan, fişte yazan gönderilen seçilince aynı adı taşıyan bütün satırlar (aynı grup) birlikte değişir
+        if (alan === 'grup' && !grupTamam(s.grup)) { const eski = s.grup; for (const r of t.satirlar) if (r.grup === eski) { r.fisGrup ||= eski; r.grup = inp.value; } return; }
+        s[alan] = inp.value;
         if (alan === 'pAd') { const once = s.parasutId; s.parasutId = adHarita.get(inp.value.trim()) || ''; if (s.parasutId && s.parasutId !== once) ciz(); }
       });
       inp.addEventListener('change', ciz);

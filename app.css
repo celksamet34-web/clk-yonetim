@@ -489,6 +489,8 @@ body{font-size:15px;letter-spacing:0}
 .ug-tablo td.l,.ug-tablo th:nth-child(2),.ug-tablo th:nth-child(3){text-align:left}
 .ug-tablo input{text-align:left;font:inherit;padding:6px 8px;border:1px solid var(--line-2);border-radius:8px;width:100%;box-sizing:border-box}
 .ug-tablo .ug-adet{width:60px;text-align:right}.ug-tablo .ug-fiyat{width:96px;text-align:right}.ug-tablo .ug-urun{min-width:150px}.ug-tablo .ug-grup{min-width:110px}
+.ug-tablo select.ug-grup{font:inherit;padding:6px 8px;border:1px solid var(--line-2);border-radius:8px;width:100%;min-width:170px;max-width:260px;box-sizing:border-box;background:var(--card,#fff);color:inherit}.ug-tablo select.ug-grup.wp-req{border-color:#e9a68c;background:#fff6f2;color:#b42318}
+.ug-tablo td small.ug-meta{display:block;margin-top:2px}
 .ug-p{display:flex;gap:6px;align-items:center;min-width:220px}.ug-parasut.yeni{border-color:#e9a68c}
 .ug-yeni{font-size:11px;font-weight:600;color:#b54708;white-space:nowrap}
 .ug-toplam{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:14px}

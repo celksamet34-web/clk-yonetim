@@ -98,6 +98,12 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 - Manken karesi (celik 01.11: "instagram içinde acaba 1 sayfa da mankenli mi yapsak"): kaydırmalının 2. karesi, fotoğraf tam ekran, altta koyu geçişte italik ad, iletişim, altın logo ve kare no (`mankenCiz`). Varsayılan ürünün 2. fotoğrafı (Yeni ürün sayfası mankeni 2. sıraya koyar); küçük resimlerden başkası ya da Yok seçilir; seçilen fotoğraf ara karelerde tekrar etmez. "Manken üret (~0,04 $)" `action: 'model'` (fal.ai kuyruğu, 3 sn arayla `falResult`), kitle ve taşıma kategoriden tahmin edilir (değiştirilebilir), ölçüler En/Yükseklik/Boy'dan gider; sonuç yalnız oturumda, ürüne kaydedilmez.
 - "Instagram'da paylaş" açıklamayı panoya kopyalar, sonra `navigator.share` ile resimleri verir (olmazsa indirir). Ayarlar `localStorage` `clk-instagram`.
 
+## Ürün Giriş (views-urungiris.js, sayfa #urungiris)
+
+- Tedarikçi fişi yüklenir, okuma talimatını panel yazar (`okumaTalimati`, Supabase `fis-oku` yalnız iletir ve `gruplar[].gonderilen`'i satıra `grup` olarak düzleştirir; talimat değişikliği sunucu yüklemesi istemez). CLK dışındaki gönderilen grupları kaydedildikten sonra satış faturası olur.
+- KOLİ (celik 06.11: "yefa fişi işlerken koliyi satış olarak okumasın"): Yefa fişinde grubun altındaki "11 koli 32.000 → M. Barış" grubun koli sayısı, ara toplamı ve gönderilenidir; yapay zekâ onu ürün satırı sanıp gönderileni yalnız ona yazıyordu (koli satışa dönüyor, Paraşüt'te "KOLİ" ürünü açılacaktı). Talimatta koli satırı yazılmaz (`koli`, `araToplam` alanları); panelde `koliAyikla` taslakta koli satırını çıkarır, gönderilenini önceki koli satırına kadar gönderilensiz satırlara verir, ara toplam tutmazsa soru ekler, koliyle ilgili soruları gizler ve fiş toplamı sorusunu yeniden hesaplar.
+- Gönderilen (celik 06.11: "kime giden kısmında müşteri listesi açılır liste olsun seçeyim ki karışıklık olmasın"): açılır liste (`grupSecim`): CLK ÇANTA (bize geldi), daha önce gönderilen müşteriler (`ug_musteri_eslesme`), bütün Paraşüt müşterileri (`sp_parasut_musteri`). Fişte yazan ad tek müşteriye uyuyorsa (`musteriTahmini`, önce adı birebir) seçili gelir, uymuyorsa "Seçin · fişte: …" kırmızı durur ve seçilmeden aktarılmaz; seçilince aynı adı taşıyan bütün satırlar birlikte değişir.
+
 ## Valiz sipariş (views-valizsiparis.js, sayfa #valizsiparis; 05.11.2026)
 
 - celik 05.11: "valiz sipariş gir formu oluştur. tedarikçiye göndermek adına". Alış ve Paraşüt menüsünde. Paraşüt'e ve siteye hiçbir şey yazmaz.
