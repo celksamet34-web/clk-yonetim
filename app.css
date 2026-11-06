@@ -1545,3 +1545,17 @@ button.mh-sb:hover{background:var(--bg)}
 .ug-tur{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.ug-tur .sk-f{flex:1 1 220px}
 .ug-bp-form select{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;max-width:100%;background:var(--card,#fff);color:inherit}
 .sk-f.ug-pr small{color:#7a5a12}
+/* müşteri bilgilerini düzenleme (views-crm.js bdHtml) */
+.bd-bas{display:flex;justify-content:flex-end;margin:0 0 12px}
+.bd-not{margin:0 0 12px}
+.bd-form{display:grid;gap:12px;background:var(--card,#fff);border:1px solid var(--line-2);border-radius:16px;padding:16px}
+.bd-ust{display:flex;flex-direction:column;gap:2px}.bd-ust b{font-size:15px}.bd-ust small{color:var(--muted);font-size:12.5px}
+.bd-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.bd-a{display:flex;flex-direction:column;gap:5px;min-width:0}
+.bd-a>span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.bd-a input[type=tel]{width:100%;min-width:0;min-height:var(--tap);border:1px solid var(--line-2);border-radius:13px;background:#fff;padding:11px 14px;font-size:16px}
+.bd-genis{grid-column:1/-1}
+.bd-p{color:var(--muted);font-size:12px;line-height:1.4;overflow-wrap:anywhere}.bd-p .link{font-size:12px;margin-left:4px}
+.bd-d{display:flex;gap:8px;flex-wrap:wrap}.bd-d .btn{flex:0 0 auto}
+@media (max-width:600px){.bd-g{grid-template-columns:minmax(0,1fr)}.bd-d .btn{flex:1 1 0}}
+@media (max-width:600px){.bd-form{border:0;padding:0;background:none}}

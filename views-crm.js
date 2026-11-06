@@ -122,6 +122,81 @@
      Özet sekmesi (celik 06.11: "paraşüte bağlı kalma ekstra kendinde bişeyler kat"): ödeme durumu, ortalama ödeme süresi, borç yaşı, aylık grafik,
      alım düzeni, elimizdeki çek/senet ve risk (views-musteri.js ozetHtml); yanda Sipariş gir ve WhatsApp ile Borç hatırlat. */
   const MT = (S.ui.mt ||= { tab: '' });
+  /* müşteri bilgilerini düzenleme (celik 06.11: "müşteri sayfasında bilgiler de düzenleme şansı da tanı. telefon numarası adres vergi no il ilçe
+     fiyat tanımlaması", "bunları siteye de paraşüte de yollarsın"): siparis-parasut musteri_bilgi / musteri_guncelle. Site üyesi ve eşleşmiş Paraşüt
+     müşterisi birlikte yazılır, ikisi de geri okunur, başka alan değişirse eski hali geri yazılır. Paraşüt'te dolu alan boşaltılmaz. Fiyat tanımı ve
+     iskonto yalnız sitede (Paraşüt'te fiyat listesi yok) ve cari yetkisi ister. */
+  const BD = (S.ui.bd ||= { uid: null, not: null });
+  const SPFN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
+  const bdCiz = () => { if (S.route === 'musteri') { S.keepScroll = true; render(); } };
+  async function spSor(govde) {
+    const { data } = await CLK.sb.auth.getSession();
+    const r = await fetch(SPFN, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session?.access_token }, body: JSON.stringify(govde) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j?.hata) throw new Error(j?.hata || 'Sunucu ' + r.status);
+    return j;
+  }
+  const FIYAT = { 0: 'Varsayılan (site fiyatı)', 2: 'Bayi fiyatı 1', 3: 'Bayi fiyatı 2', 4: 'Bayi fiyatı 3', 5: 'Bayi fiyatı 4' };
+  const BD_ALAN = [['phone', 'Telefon', 'tel', 'phone'], ['address', 'Adres', 'text', 'address'], ['district', 'İlçe', 'text', 'district'], ['city', 'İl', 'text', 'city'],
+    ['vergi', 'Vergi no / TC kimlik no', 'numeric', 'tax_number'], ['taxBranch', 'Vergi dairesi', 'text', 'tax_office']];
+  const BD_AD = { phone: 'telefon', invoice: 'fatura adresi', delivery: 'teslimat adresi', nationalId: 'TC kimlik no', taxId: 'vergi no', taxBranch: 'vergi dairesi', priceType: 'fiyat tanımı',
+    discountRate: 'iskonto', address: 'adres', district: 'ilçe', city: 'il', tax_number: 'vergi no', tax_office: 'vergi dairesi' };
+  const bdForm = u => ({ phone: u.phone || '', address: u.invoice?.address || '', district: u.invoice?.district || '', city: u.invoice?.city || '', vergi: u.taxId || u.nationalId || '',
+    taxBranch: u.taxBranch || '', priceType: String(Number(u.priceType) || 0), discountRate: String(Number(u.discountRate) || 0) });
+  const bdDuzenler = () => CLK.izin('musteriler') || CLK.izin('cari');
+  async function bdAc(uid) {
+    const u = userById(uid); if (!u) return;
+    Object.assign(BD, { uid: String(uid), form: bdForm(u), ilk: bdForm(u), p: null, pid: '', pHata: '', yuk: true, kay: false, hata: '', uyari: '', not: null });
+    bdCiz();
+    try {
+      const r = await spSor({ islem: 'musteri_bilgi', uye: Number(uid) });
+      if (BD.uid !== String(uid)) return;
+      if (r.uye) { BD.form = bdForm(r.uye); BD.ilk = bdForm(r.uye); }
+      Object.assign(BD, { p: r.parasut || null, pid: r.pid || '', pHata: r.parasutHata || '' });
+    } catch (e) { if (BD.uid === String(uid)) BD.hata = /Oturum gerekli/.test(e.message) ? 'Sunucu güncellemesi bekleniyor.' : e.message; }
+    BD.yuk = false; bdCiz();
+  }
+  async function bdKaydet() {
+    const u = userById(BD.uid); if (!u || BD.kay || BD.yuk) return;
+    const f = BD.form, vergi = String(f.vergi || '').replace(/\D/g, ''), isk = Number(String(f.discountRate || '0').replace(',', '.'));
+    BD.hata = ''; BD.uyari = '';
+    if (vergi && ![10, 11].includes(vergi.length)) BD.hata = 'Vergi numarası 10, TC kimlik numarası 11 hane olmalı.';
+    else if (!Number.isFinite(isk) || isk < 0 || isk > 100) BD.hata = 'İskonto 0 ile 100 arasında olmalı.';
+    if (BD.hata) return bdCiz();
+    const alanlar = { phone: f.phone, address: f.address, district: f.district, city: f.city, vergi, taxBranch: f.taxBranch,
+      ...(CLK.izin('cari') ? { priceType: Number(f.priceType) || 0, discountRate: isk } : {}) };
+    BD.kay = true; bdCiz();
+    try {
+      const r = await spSor({ islem: 'musteri_guncelle', uye: Number(BD.uid), alanlar });
+      if (r.uye) for (const k of ['phone', 'invoice', 'delivery', 'taxId', 'nationalId', 'taxBranch', 'priceType', 'discountRate']) if (k in r.uye) u[k] = r.uye[k];
+      const sd = r.site?.degisen || [], pd = r.parasut?.degisen || [];
+      const uy = [r.site?.uyari, r.parasut?.hata, r.parasut?.uyari].filter(Boolean);
+      const ad = l => [...new Set(l.map(k => BD_AD[k] || k))].join(', ');
+      const not = !sd.length && !pd.length ? 'Değişiklik yoktu; site ve Paraşüt zaten aynı.'
+        : [sd.length ? 'Sitede ' + ad(sd) : '', pd.length ? 'Paraşüt\'te ' + ad(pd) : '', r.parasut?.yok ? 'bu üye Paraşüt\'te eşleşmemiş, yalnız siteye yazıldı' : ''].filter(Boolean).join(' · ') + ' güncellendi.';
+      if (uy.length) { BD.uyari = not + ' ' + uy.join(' '); BD.kay = false; BD.ilk = bdForm(u); return bdCiz(); }
+      Object.assign(BD, { uid: null, kay: false, not: { uid: String(u.id), yazi: not } });
+      CLK.toast('Bilgiler kaydedildi');
+    } catch (e) { BD.hata = 'Kaydedilemedi: ' + e.message; BD.kay = false; }
+    bdCiz();
+  }
+  function bdHtml(u) {
+    const f = BD.form, kapali = BD.yuk || BD.kay ? 'disabled' : '', fiyatYetki = CLK.izin('cari');
+    const pDeger = (pk, k) => { const v = String(BD.p?.[pk] ?? '').trim(); return v && v.replace(/\s+/g, ' ').toLocaleUpperCase('tr') !== String(BD.ilk?.[k] ?? '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('tr') ? v : ''; };
+    const alan = ([k, ad, tip, pk]) => { const pv = pDeger(pk, k);
+      return `<label class="bd-a${k === 'address' ? ' bd-genis' : ''}"><span>${ad}</span><input id="bd-${k}" data-bd="${k}" value="${esc(f[k])}" ${tip === 'tel' ? 'type="tel" inputmode="tel" autocomplete="off"' : tip === 'numeric' ? 'type="text" inputmode="numeric" autocomplete="off"' : 'type="text"'} ${kapali}>
+        ${pv ? `<small class="bd-p">Paraşüt'te: ${esc(pv)} <button class="link" data-act="bdAl" data-k="${k}" data-v="${esc(pv)}">bunu yaz</button></small>` : ''}</label>`; };
+    return `<div class="bd-form" role="form" aria-label="Müşteri bilgilerini düzenle">
+      <div class="bd-ust"><b>Bilgileri düzenle</b><small>${BD.yuk ? 'Site ve Paraşüt\'ten okunuyor…' : BD.pid ? `Site üyesi ve Paraşüt müşterisi${BD.p?.ad ? ' (' + esc(BD.p.ad) + ')' : ''} birlikte güncellenir` : 'Bu üye Paraşüt\'te bir müşteriyle eşleşmemiş; yalnız siteye yazılır'}</small></div>
+      ${BD.pHata ? `<p class="msg err">${esc(BD.pHata)}</p>` : ''}
+      <div class="bd-g">${BD_ALAN.map(alan).join('')}
+        ${fiyatYetki ? `<label class="bd-a"><span>Fiyat tanımı</span><select id="bd-priceType" data-bd="priceType" ${kapali}>${Object.entries(FIYAT).map(([v, t]) => `<option value="${v}"${String(f.priceType) === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="bd-a"><span>İskonto %</span><input id="bd-discountRate" data-bd="discountRate" type="text" inputmode="decimal" value="${esc(f.discountRate)}" ${kapali}></label>` : ''}</div>
+      <p class="hint">Fatura adresi değişir; teslimat adresi aynıysa o da değişir. Paraşüt'te dolu bir alanı burada boş bırakırsanız Paraşüt'teki değer kalır.${fiyatYetki ? ' Fiyat tanımı ve iskonto yalnız sitede geçerli (Paraşüt\'te fiyat listesi yok).' : ''}</p>
+      ${BD.hata ? `<p class="msg err">${esc(BD.hata)}</p>` : ''}${BD.uyari ? `<p class="msg err">${esc(BD.uyari)}</p>` : ''}
+      <div class="bd-d"><button class="btn dark" data-act="bdKaydet" ${kapali}>${BD.kay ? 'Kaydediliyor…' : 'Kaydet'}</button><button class="btn" data-act="bdKapat" ${BD.kay ? 'disabled' : ''}>Vazgeç</button></div>
+    </div>`;
+  }
   views.musteri = () => {
     const u = userById(S.arg), pasif = !!u && Number(u.status) === 0;
     // geri düğmesi müşteri kartının açıldığı sayfaya döner (celik 02.11: "cari hesaptan müşteriye girdiğimizde geri cari hesap sayfasına geçmek için düğme bırak")
@@ -155,9 +230,10 @@
     const siparisHtml = `<div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
       ${os.length ? `<div class="olist">${os.map(o => `<button class="orow" data-order="${O.id(o)}"><div class="o1"><b>${esc(O.code(o))}</b><small>${dtt(O.date(o))} · ${O.items(o).length} kalem</small></div><div class="o2">${O.items(o).slice(0, 2).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}</div><div class="o3"><b class="num">${tl(O.total(o))}</b>${st(O.status(o))}</div></button>`).join('')}</div>` : '<p class="sub">Sitede sipariş yok.</p>'}`;
     const favHtml = favs.length ? `<h3 class="mk-h3">En çok aldıkları <small>site siparişleri</small></h3><ul class="mk-fav">${favs.map(f => `<li><div><b>${esc(f.name)}</b><small>${esc(f.code)}</small></div><b class="num">${num(f.q)} adet</b></li>`).join('')}</ul>` : '';
-    const bilgiHtml = `<dl class="mk-dl"><dt>Telefon</dt><dd>${u.phone ? `${esc(u.phone)} <button class="btn sm" data-act="copy" data-v="${esc(u.phone)}">Kopyala</button>` : '—'}</dd>
+    const bdNot = BD.not?.uid === String(u.id) ? `<p class="msg ok bd-not">${esc(BD.not.yazi)}</p>` : '';
+    const bilgiHtml = BD.uid === String(u.id) ? bdHtml(u) : `${bdNot}${bdDuzenler() && !pasif ? `<div class="bd-bas"><button class="btn sm dark" data-act="bdAc" data-u="${u.id}">Bilgileri düzenle</button></div>` : ''}<dl class="mk-dl"><dt>Telefon</dt><dd>${u.phone ? `${esc(u.phone)} <button class="btn sm" data-act="copy" data-v="${esc(u.phone)}">Kopyala</button>` : '—'}</dd>
         <dt>E-posta</dt><dd style="word-break:break-all">${esc(u.email || '—')}</dd>
-        ${u.taxId ? `<dt>Vergi</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId)}</dd>` : ''}
+        ${u.taxId || u.nationalId ? `<dt>${u.taxId ? 'Vergi' : 'TC kimlik'}</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId || u.nationalId)}</dd>` : ''}
         <dt>Fiyat grubu</dt><dd>${esc(prices[u.priceType] || 'Varsayılan')}</dd><dt>İskonto</dt><dd>%${num(u.discountRate)}</dd>
         <dt>Açık hesap limiti</dt><dd>${Number(u.nBalanceStatus) === 1 ? (Number(u.nBalanceLimit) ? tl(u.nBalanceLimit) : 'Limitsiz') : 'Kapalı'}</dd>
         ${u.customerGroup?.name ? `<dt>Grup</dt><dd>${esc(u.customerGroup.name)}</dd>` : ''}
@@ -254,7 +330,11 @@
       el?.addEventListener('change', () => { if (NT.ed) NT.ed[k] = el.value; });
     }
   };
-  views.bind_musteri = () => { notBagla(); CLK.tahsilat?.bagla?.(); };
+  views.bind_musteri = () => {
+    notBagla(); CLK.tahsilat?.bagla?.();
+    // bilgi formu: yazarken sayfa çizilmez (telefonda klavye kapanmasın)
+    $$('[data-bd]').forEach(i => i.addEventListener(i.tagName === 'SELECT' ? 'change' : 'input', () => { if (BD.form) BD.form[i.dataset.bd] = i.value; }));
+  };
   // ana panel: ödeme günü gelen (yarın dahil) ve geçen notlar
   CLK.cariNot = {
     panel: () => {
@@ -427,6 +507,10 @@
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'czYenile') { CLK.loadUsers(true); CZ.tekrar = 0; cariOzetYukle(true); }
     else if (act === 'mTab') { MT.tab = el.dataset.k; S.keepScroll = true; render(); }
+    else if (act === 'bdAc') bdAc(el.dataset.u);
+    else if (act === 'bdKapat') { BD.uid = null; bdCiz(); }
+    else if (act === 'bdKaydet') bdKaydet();
+    else if (act === 'bdAl') { if (BD.form) { BD.form[el.dataset.k] = el.dataset.v; const i = $('#bd-' + el.dataset.k); if (i) i.value = el.dataset.v; } }
     else if (act === 'mSiparis') CLK.siparisAc?.(el.dataset.u);
     else if (act === 'ntAc') notAc(el.dataset.id);
     else if (act === 'ntKapat') { NT.ed = null; S.keepScroll = true; render(); }
