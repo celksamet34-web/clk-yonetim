@@ -1,12 +1,10 @@
 /* CLK Yönetim — siparişler, müşteriler, cari hesap */
 (() => {
-  const { S, $, $$, esc, tl, tl2, tlc, num, dt, dtt, P, O, ORDER_STATUS, BAL_TYPE, head, skel, errBox, views, go, render } = CLK;
+  const { S, $, $$, esc, tl, tl2, tlc, num, dt, dtt, P, O, ORDER_STATUS, head, skel, errBox, views, go, render } = CLK;
   const st = s => { const [l, c] = ORDER_STATUS[s] || ['—', 'off']; return `<span class="pill ${c}">${l}</span>`; };
   const userName = u => [u.name, u.lastname].filter(Boolean).join(' ') || u.title || u.email || 'Müşteri';
   const userById = id => S.users.find(u => Number(u.id) === Number(id)) || (S.pasifUsers || []).find(u => Number(u.id) === Number(id));
   const ordersOf = id => S.orders.filter(o => O.userId(o) === Number(id));
-  const balOf = id => S.balance.filter(b => Number(b.userId) === Number(id));
-  const sign = b => { const t = (BAL_TYPE[b.type] || ['', 'adj'])[1]; return t === 'in' ? 1 : t === 'out' ? -1 : (Number(b.price) >= 0 ? 1 : -1); };
 
   /* ---------- siparişler ---------- */
   const F = (S.ui.o ||= { q: '', s: 0, plat: '', shown: 40 });
@@ -112,44 +110,63 @@
     $$('[data-uf]').forEach(b => b.addEventListener('click', () => { M.f = b.dataset.uf; render(); }));
   };
 
+  /* müşteri sayfası (celik 06.11.2026: "müşterilerden x müşteriye girince paraşütten eski satışları yaz. hatta tarayıcıdan gir paraşüt gibi düzenle.
+     ödeme gir senet gir cari hesabını borcu gör. daha farklı kolay yap onu. ekstre ve satış sayfalarını orda toplayalım"):
+     Paraşüt'ün müşteri ekranı gibi: yanda bakiye, Ödeme gir / Senet gir / Ekstre gönder ve ödeme notu; ortada sekmeler: Paraşüt hesap hareketleri
+     (views-musteri.js, satışa dokununca ürünleri, yazdır/PDF), site siparişleri, bilgiler. Ödeme ve senet formu sayfanın üstünde açılır. */
+  const MT = (S.ui.mt ||= { tab: '' });
   views.musteri = () => {
     const u = userById(S.arg), pasif = !!u && Number(u.status) === 0;
     // geri düğmesi müşteri kartının açıldığı sayfaya döner (celik 02.11: "cari hesaptan müşteriye girdiğimizde geri cari hesap sayfasına geçmek için düğme bırak")
     const don = S.ui.mDon && GERI[S.ui.mDon.r] ? S.ui.mDon : null;
-    const back = `${u && !pasif ? CLK.tahsilat?.dugme(u.id) || '' : ''}${don ? `<button class="btn sm" data-act="mGeri">← ${GERI[don.r]}</button>` : '<button class="btn sm" data-go="musteriler">← Müşteriler</button>'}`;
-    if (u && CLK.izin('cari')) cariOzetGerekirse();
+    const back = don ? `<button class="btn sm" data-act="mGeri">← ${GERI[don.r]}</button>` : '<button class="btn sm" data-go="musteriler">← Müşteriler</button>';
+    const cariGor = CLK.izin('cari'), hGor = !!CLK.mHesap?.gorur();
+    if (u && cariGor) cariOzetGerekirse();
     if (!u) return head('Müşteri', 'Bulunamadı', '', back) + (S.uLoading ? skel() : '<div class="card empty"><h3>Müşteri bulunamadı</h3></div>');
-    const s = custStats(u), os = ordersOf(u.id), bs = balOf(u.id), bal = Number(u.balance) || 0;
+    const s = custStats(u), os = ordersOf(u.id), bal = Number(u.balance) || 0;
+    const tabs = [hGor && ['hareket', 'Hesap hareketleri'], ['siparis', 'Site siparişleri'], ['bilgi', 'Bilgiler']].filter(Boolean);
+    if (!tabs.some(([k]) => k === MT.tab)) MT.tab = tabs[0][0];
     const prices = { 0: 'Varsayılan', 2: 'Bayi fiyatı 1', 3: 'Bayi fiyatı 2', 4: 'Bayi fiyatı 3', 5: 'Bayi fiyatı 4' };
     const fav = {}; os.filter(O.counts).forEach(o => O.items(o).forEach(i => { (fav[i.code] ||= { name: i.name, code: i.code, q: 0 }).q += Number(i.netQuantity ?? i.quantity) || 0; }));
     const favs = Object.values(fav).sort((a, b) => b.q - a.q).slice(0, 5);
-    return head(Number(u.dealerStatus) === 1 ? 'Bayi' : 'Müşteri', esc(userName(u)), `${esc(u.code || '')}${u.createdAt ? ' · Kayıt ' + dt(u.createdAt) : ''}${u.lastLoginAt && !/^0000/.test(u.lastLoginAt) ? ' · Son giriş ' + dt(u.lastLoginAt) : ''}${pasif ? ' · Pasif üye' : ''}`, back) + `
-      <div class="ed"><div class="stack">
-        <div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
-        <div class="card"><div class="card-h"><div><h3>Siparişleri</h3><p class="sub">${os.length} sipariş</p></div></div>
-          ${os.length ? `<div class="olist">${os.map(o => `<button class="orow" data-order="${O.id(o)}"><div class="o1"><b>${esc(O.code(o))}</b><small>${dtt(O.date(o))} · ${O.items(o).length} kalem</small></div><div class="o2">${O.items(o).slice(0, 2).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}</div><div class="o3"><b class="num">${tl(O.total(o))}</b>${st(O.status(o))}</div></button>`).join('')}</div>` : '<p class="sub">Sipariş yok.</p>'}</div>
-        ${CLK.izin('cari') ? `<div class="card"><div class="card-h"><div><h3>Cari hareketler</h3><p class="sub">${bs.length} hareket</p></div></div>${ledger(bs, false)}</div>` : ''}
-      </div>
-      <aside class="summary"><div class="sum-card">
-        ${CLK.izin('cari') ? `<div><small style="color:#a99f90;letter-spacing:.16em;font-size:10px;font-weight:700">GÜNCEL BAKİYE</small><div class="big" style="color:${bal < 0 ? '#f0a39a' : 'var(--gold-2)'}">${tl2(bal)}</div><small style="color:#a99f90">${bal < 0 ? 'Müşterinin borcu' : bal > 0 ? 'Müşterinin alacağı' : 'Hesap kapalı'}</small>${sonOdeme(u)}</div>${notKutu(u)}` : ''}
-        <dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>E-posta</dt><dd style="word-break:break-all">${esc(u.email || '—')}</dd>
-          ${u.taxId ? `<dt>Vergi</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId)}</dd>` : ''}<dt>Fiyat grubu</dt><dd>${esc(prices[u.priceType] || 'Varsayılan')}</dd>
-          <dt>İskonto</dt><dd>%${num(u.discountRate)}</dd><dt>Açık hesap limiti</dt><dd>${Number(u.nBalanceStatus) === 1 ? (Number(u.nBalanceLimit) ? tl(u.nBalanceLimit) : 'Limitsiz') : 'Kapalı'}</dd>
-          ${u.customerGroup?.name ? `<dt>Grup</dt><dd>${esc(u.customerGroup.name)}</dd>` : ''}</dl>
-        <hr class="sep"><div style="font-size:12.5px;color:#cfc6b8"><b style="color:#fff;display:block;margin-bottom:4px">Fatura adresi</b>${esc([u.invoice?.address, u.invoice?.district, u.invoice?.city].filter(Boolean).join(', ') || '—')}</div>
-        ${favs.length ? `<hr class="sep"><div style="font-size:12.5px"><b style="color:#fff;display:block;margin-bottom:6px">En çok aldıkları</b>${favs.map(f => `<div class="favr"><span>${esc(f.name)}</span><b>${num(f.q)}</b></div>`).join('')}</div>` : ''}
-        ${u.phone ? `<div class="copyrow"><span>${esc(u.phone)}</span><button class="btn sm" data-act="copy" data-v="${esc(u.phone)}">Kopyala</button></div>` : ''}
-      </div></aside></div>`;
+    const adres = a => [a?.address, a?.district, a?.city].filter(Boolean).join(', ');
+    const ekstreBtn = hGor ? `<button class="btn mk-ek" data-act="mhEkstre" data-u="${u.id}" ${CLK.mHesap.hazir(u.id) ? '' : 'disabled'} title="Seçili dönemin hesap özeti resmi">Ekstre gönder</button>` : '';
+    // Paraşüt bakiyesi (artı = borç) site bakiyesiyle (eksi = borç) tutmuyorsa yazılır; eşitleme birkaç dakikada bir yansıtır
+    const pBak = cariGor ? CLK.mHesap?.bakiye(u.id) : null;
+    const fark = pBak !== null && pBak !== undefined && Math.abs(pBak + bal) > 0.5;
+    const yan = cariGor ? `<div class="sum-card mk-bak">
+        <div><small class="mk-et">GÜNCEL BAKİYE</small>
+          <div class="big" style="color:${bal < -0.005 ? '#f0a39a' : 'var(--gold-2)'}">${tl2(Math.abs(bal))}</div>
+          <small class="mk-dr">${bal < -0.005 ? 'Müşterinin borcu' : bal > 0.005 ? 'Müşterinin alacağı (fazla ödeme)' : 'Hesap kapalı'}</small>
+          ${fark ? `<small class="mk-fark">Paraşüt'te ${tl2(Math.abs(pBak))} ${pBak > 0.005 ? 'borç' : pBak < -0.005 ? 'alacak' : ''} görünüyor; eşitleme birkaç dakikada yansıtır.</small>` : ''}
+          ${sonOdeme(u)}</div>
+        ${pasif ? '<p class="mk-pasif">Pasif üye</p>' : `<div class="mk-dug"><button class="btn gold" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="para">Ödeme gir</button>${CLK.izin('senet') ? `<button class="btn mk-koyu" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="senet">Senet gir</button>` : ''}${ekstreBtn}</div>`}
+        ${notKutu(u)}
+      </div>` : `<div class="sum-card mk-bak"><dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>Sipariş</dt><dd>${num(s.n)}</dd></dl>${ekstreBtn ? `<div class="mk-dug">${ekstreBtn}</div>` : ''}</div>`;
+    const siparisHtml = `<div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
+      ${os.length ? `<div class="olist">${os.map(o => `<button class="orow" data-order="${O.id(o)}"><div class="o1"><b>${esc(O.code(o))}</b><small>${dtt(O.date(o))} · ${O.items(o).length} kalem</small></div><div class="o2">${O.items(o).slice(0, 2).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}</div><div class="o3"><b class="num">${tl(O.total(o))}</b>${st(O.status(o))}</div></button>`).join('')}</div>` : '<p class="sub">Sitede sipariş yok.</p>'}`;
+    const bilgiHtml = `<dl class="mk-dl"><dt>Telefon</dt><dd>${u.phone ? `${esc(u.phone)} <button class="btn sm" data-act="copy" data-v="${esc(u.phone)}">Kopyala</button>` : '—'}</dd>
+        <dt>E-posta</dt><dd style="word-break:break-all">${esc(u.email || '—')}</dd>
+        ${u.taxId ? `<dt>Vergi</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId)}</dd>` : ''}
+        <dt>Fiyat grubu</dt><dd>${esc(prices[u.priceType] || 'Varsayılan')}</dd><dt>İskonto</dt><dd>%${num(u.discountRate)}</dd>
+        <dt>Açık hesap limiti</dt><dd>${Number(u.nBalanceStatus) === 1 ? (Number(u.nBalanceLimit) ? tl(u.nBalanceLimit) : 'Limitsiz') : 'Kapalı'}</dd>
+        ${u.customerGroup?.name ? `<dt>Grup</dt><dd>${esc(u.customerGroup.name)}</dd>` : ''}
+        <dt>Fatura adresi</dt><dd>${esc(adres(u.invoice) || '—')}</dd>
+        ${adres(u.delivery) && adres(u.delivery) !== adres(u.invoice) ? `<dt>Teslimat adresi</dt><dd>${esc(adres(u.delivery))}</dd>` : ''}
+        <dt>Site kodu</dt><dd>${esc(u.code || '—')}</dd>${u.createdAt ? `<dt>Kayıt</dt><dd>${dt(u.createdAt)}</dd>` : ''}${u.lastLoginAt && !/^0000/.test(u.lastLoginAt) ? `<dt>Son giriş</dt><dd>${dt(u.lastLoginAt)}</dd>` : ''}</dl>
+      ${favs.length ? `<h3 class="mk-h3">En çok aldıkları</h3><ul class="mk-fav">${favs.map(f => `<li><div><b>${esc(f.name)}</b><small>${esc(f.code)}</small></div><b class="num">${num(f.q)} adet</b></li>`).join('')}</ul>` : ''}`;
+    const alt = [esc(u.title && u.title !== userName(u) ? u.title : ''), esc(u.invoice?.city || ''), esc(u.phone || ''), pasif ? 'Pasif üye' : ''].filter(Boolean).join(' · ');
+    return head(Number(u.dealerStatus) === 1 ? 'Bayi' : 'Müşteri', esc(userName(u)), alt, back) + (CLK.tahsilat?.kart('musteri', u.id) || '') + `
+      <div class="mk">
+        <aside class="mk-yan">${yan}</aside>
+        <div class="mk-ana">
+          <div class="mk-tabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" class="mk-tab" data-act="mTab" data-k="${k}" aria-selected="${MT.tab === k}">${t}${k === 'siparis' && os.length ? ` <b>${num(os.length)}</b>` : ''}</button>`).join('')}</div>
+          <div class="card mk-ic">${MT.tab === 'hareket' ? CLK.mHesap.html(u) : MT.tab === 'siparis' ? siparisHtml : bilgiHtml}</div>
+        </div>
+      </div>${CLK.mHesap?.ekstreHtml() || ''}`;
   };
 
   /* ---------- cari ---------- */
-  function ledger(list, withUser) {
-    if (!list.length) return '<p class="sub">Hareket yok.</p>';
-    return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Tarih</th>${withUser ? '<th>Müşteri</th>' : ''}<th>İşlem</th><th>Ödeme</th><th class="r">Tutar</th></tr></thead><tbody>${list.map(b => {
-      const [lab] = BAL_TYPE[b.type] || ['Hareket']; const sg = sign(b), u = withUser ? userById(b.userId) : null;
-      return `<tr class="${withUser && u ? 'row' : ''}" ${withUser && u ? `data-user="${u.id}"` : ''}><td>${dtt(b.createdAt)}</td>${withUser ? `<td>${esc(u ? userName(u) : b.userCode || '#' + b.userId)}</td>` : ''}<td>${esc(lab)}</td><td>${esc(b.paymentFirmName || '—')}${Number(b.installments) > 1 ? ' · ' + b.installments + ' taksit' : ''}</td><td class="r"><b class="${sg > 0 ? 'pos' : 'neg'}">${sg > 0 ? '+' : '−'}${tl2(Math.abs(Number(b.price) || 0))}</b></td></tr>`;
-    }).join('')}</tbody></table></div>`;
-  }
   /* ---------- cari: müşteri carileri (celik 02.11.2026: "cari hesaplarda hareketler gözükmesin müşteri carileri gözüksün.
      en son ödeme yaptığı zamana yazalım. son hareket zamanı olarak") ----------
      Her müşteri bir satır: site bakiyesi, Paraşüt'teki son ödemesi (tahsilat, çek ya da senet) ve son hareketi (satış, iade, ödeme).
@@ -227,7 +244,7 @@
       el?.addEventListener('change', () => { if (NT.ed) NT.ed[k] = el.value; });
     }
   };
-  views.bind_musteri = () => notBagla();
+  views.bind_musteri = () => { notBagla(); CLK.tahsilat?.bagla?.(); };
   // ana panel: ödeme günü gelen (yarın dahil) ve geçen notlar
   CLK.cariNot = {
     panel: () => {
@@ -396,6 +413,7 @@
     else if (act === 'oIptal' || act === 'oDuzelt') { const o = S.orders.find(x => String(O.id(x)) === el.dataset.id); if (o) (act === 'oIptal' ? siparisIptal : siparisDuzelt)(o); }
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'czYenile') { CLK.loadUsers(true); CZ.tekrar = 0; cariOzetYukle(true); }
+    else if (act === 'mTab') { MT.tab = el.dataset.k; S.keepScroll = true; render(); }
     else if (act === 'ntAc') notAc(el.dataset.id);
     else if (act === 'ntKapat') { NT.ed = null; S.keepScroll = true; render(); }
     else if (act === 'ntKaydet') notKaydet(false);

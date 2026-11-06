@@ -156,6 +156,9 @@
     return new Promise(res => c.toBlob(res, 'image/png'));
   }
 
+  // müşteri sayfası da aynı resmi çizer (celik 06.11: "ekstre ve satış sayfalarını orda toplayalım")
+  CLK.ekstre = { ciz, hesapla };
+
   // Paraşüt'te aynı adın büyük/küçük harfli iki kaydı olabiliyor: önce birebir eşleşen seçilir
   const secili = () => D.musteriler?.find(m => m.ad === D.ad.trim()) || D.musteriler?.find(m => m.ad.toLocaleUpperCase('tr') === D.ad.trim().toLocaleUpperCase('tr'));
   const dosyaAdi = () => `ekstre-${(D.veri?.ad || 'musteri').toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]+/gi, '-').replace(/^-|-$/g, '')}-${D.son}.png`;

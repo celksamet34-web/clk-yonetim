@@ -26,7 +26,8 @@
   // senetle ödeme yalnız Senet gir yetkisi olana açılır
   const senetVar = () => !!CLK.senetGom && CLK.izin('senet');
   const senetMi = () => T.f.sekil === 'senet' && senetVar();
-  const T = (S.ui.th ||= { acik: false, k: null, yuk: false, hata: '', f: yeniForm(), onay: false, kaydediyor: false, sonuc: null, uyari: '', siteSec: 0, istek: '' });
+  // yer: form Cari hesap sayfasında mı, müşteri sayfasında mı (uye = o sayfanın site üyesi) açık (celik 06.11: müşteri sayfasından "ödeme gir senet gir")
+  const T = (S.ui.th ||= { acik: false, yer: 'cari', uye: 0, k: null, yuk: false, hata: '', f: yeniForm(), onay: false, kaydediyor: false, sonuc: null, uyari: '', siteSec: 0, istek: '' });
 
   async function sor(govde) {
     const { data } = await sb.auth.getSession();
@@ -123,19 +124,24 @@
     const sekil = senetVar() ? `<div class="gd-seg odm-sekil" role="group" aria-label="Nasıl ödedi">
         <button data-act="thSekil" data-o="para" aria-pressed="${!senetMi()}">Nakit, havale, kart</button>
         <button data-act="thSekil" data-o="senet" aria-pressed="${senetMi()}">Senet</button></div>` : '';
+    // müşteri sayfasında müşteri bellidir, arama kutusu çıkmaz (Paraşüt'te eşleşmemişse aranır)
+    const kisiHtml = ne => {
+      const ipucu = f.kisi ? `<small class="hint">${u ? `Site carisi ${tl2(bal)}${bal < 0 ? ' (borç)' : bal > 0 ? ' (alacak)' : ''}` : `Bu müşteri sitede üye olarak eşleşmemiş; ${ne} yalnız Paraşüt'e yazılır.`}</small>` : '';
+      if (T.yer === 'musteri' && f.kisi) return `<div class="th-kisi"><b>${esc(f.kisi.ad)}</b>${ipucu}</div>`;
+      return `<div class="f ara-alan">${araKutu('thKisi', k.musteriler, f.kisi?.ad || '', 'thKisi', { yer: `Paraşüt müşterisi ara (${num(k.musteriler.length)})` })}
+        ${T.yer === 'musteri' && !f.kisi ? '<small class="hint">Bu üye Paraşüt\'te bir müşteriyle eşleşmemiş; Paraşüt müşterisini seçin.</small>' : ipucu}</div>`;
+    };
     if (senetMi()) return `<div class="card gd-form">
       ${sonucHtml()}
       <div class="gd-adim"><span>1</span><h3>Kimden, nasıl?</h3></div>
-      <div class="f ara-alan">${araKutu('thKisi', k.musteriler, f.kisi?.ad || '', 'thKisi', { yer: `Paraşüt müşterisi ara (${num(k.musteriler.length)})` })}
-        ${f.kisi ? `<small class="hint">${u ? `Site carisi ${tl2(bal)}${bal < 0 ? ' (borç)' : bal > 0 ? ' (alacak)' : ''}` : 'Bu müşteri sitede üye olarak eşleşmemiş; senet yalnız Paraşüt\'e yazılır.'}</small>` : ''}</div>
+      ${kisiHtml('senet')}
       ${sekil}
       ${CLK.senetGom.html(f.kisi, 2)}
     </div>`;
     return `<div class="card gd-form">
       ${sonucHtml()}
       <div class="gd-adim"><span>1</span><h3>${sekil ? 'Kimden, nasıl?' : 'Kimden?'}</h3></div>
-      <div class="f ara-alan">${araKutu('thKisi', k.musteriler, f.kisi?.ad || '', 'thKisi', { yer: `Paraşüt müşterisi ara (${num(k.musteriler.length)})` })}
-        ${f.kisi ? `<small class="hint">${u ? `Site carisi ${tl2(bal)}${bal < 0 ? ' (borç)' : bal > 0 ? ' (alacak)' : ''}` : 'Bu müşteri sitede üye olarak eşleşmemiş; yalnız Paraşüt\'e yazılır.'}</small>` : ''}</div>
+      ${kisiHtml('ödeme')}
       ${sekil}
 
       <div class="gd-adim"><span>2</span><h3>Ne kadar?</h3></div>
@@ -161,20 +167,24 @@
       <ul class="odm-l">${l.map(g => `<li><div><b>${esc(g.kisi)}</b><small>${dt(g.tarih)} · ${esc(g.hesap)}${g.aciklama ? ' · ' + esc(g.aciklama) : ''}${g.kim ? ' · ' + esc(String(g.kim).split('@')[0]) : ''}${g.site?.durum === 'hata' ? ' · <span class="gd-kirmizi">siteye yazılamadı</span>' : ''}</small></div><b class="num pos">+${tl2(g.tutar)}</b></li>`).join('')}</ul></div>`;
   }
 
-  // Cari hesap sayfasının üstünde açılan form
-  function kart() {
-    if (!T.acik) return '';
+  // Cari hesap sayfasının ya da müşteri sayfasının üstünde açılan form
+  function kart(yer = 'cari', uye = 0) {
+    if (!T.acik || T.yer !== yer || (yer === 'musteri' && String(T.uye) !== String(uye))) return '';
     if (!T.k && !T.yuk && !T.hata) setTimeout(() => yukle(false), 0);
     return `<section class="odm" id="thKart">
-      <div class="odm-h"><div><h2>Ödeme gir</h2><p class="sub">Müşteriden tahsilat: nakit, havale, kart${senetVar() ? ' ya da senet' : ''}. Paraşüt'te müşterinin carisine tahsilat olarak girer, kasa ve bankalar Paraşüt'ten gelir.</p></div>
+      <div class="odm-h"><div><h2>${senetMi() ? 'Senet gir' : 'Ödeme gir'}</h2><p class="sub">Müşteriden tahsilat: nakit, havale, kart${senetVar() ? ' ya da senet' : ''}. Paraşüt'te müşterinin carisine tahsilat olarak girer, kasa ve bankalar Paraşüt'ten gelir.</p></div>
         <button class="btn sm ghost" data-act="thKapat">Kapat</button></div>
       <div class="gd-ust">${formHtml()}<div class="gd-sag">${senetMi() && T.k ? `<div class="card gd-ozet" id="snOzet">${CLK.senetGom.ozet()}</div>` : `<div class="card gd-ozet" id="thOzet">${ozetHtml()}</div>`}${gecmisHtml()}</div></div>
     </section>`;
   }
-  function ac(siteId) {
-    T.acik = true; T.sonuc = null; T.uyari = ''; T.onay = false;
-    if (siteId) { T.f = yeniForm(); delete ARA.thKisi; T.siteSec = Number(siteId); siteSecUygula(); }
-    if (S.route !== 'cari') CLK.go('cari'); else ciz();
+  // o.yer 'musteri': form müşteri sayfasında açılır (sayfa değişmez); o.sekil 'senet': Senet seçili gelir
+  function ac(siteId, o = {}) {
+    const yer = o.yer === 'musteri' && siteId ? 'musteri' : 'cari';
+    const ayni = T.acik && T.yer === yer && String(T.uye) === String(siteId || 0);
+    T.acik = true; T.sonuc = null; T.uyari = ''; T.onay = false; T.yer = yer; T.uye = Number(siteId) || 0;
+    if (siteId && !ayni) { T.f = yeniForm(); delete ARA.thKisi; T.siteSec = Number(siteId); siteSecUygula(); }
+    if (o.sekil) T.f.sekil = o.sekil === 'senet' && senetVar() ? 'senet' : 'para';
+    if (yer === 'cari' && S.route !== 'cari') CLK.go('cari'); else ciz();
     setTimeout(() => $('#thKart')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   }
   // Cari hesap sayfası çizilince: senet seçiliyse senet alanlarının olayları bağlanır
@@ -194,6 +204,9 @@
       T.sonuc = r; T.istek = '';
       try { localStorage.setItem(SON_HESAP, f.hesap); } catch { }
       T.f = yeniForm(); delete ARA.thKisi;
+      // müşteri sayfasında aynı müşteri seçili kalır
+      if (T.yer === 'musteri' && T.uye) { T.siteSec = T.uye; siteSecUygula(); }
+      document.dispatchEvent(new CustomEvent('clk:cari', { detail: { musteri: f.kisi.id } }));
       toast(`${r.kisi}: ${tl2(r.tutar)} tahsilat Paraşüt'e girildi`);
       T.kaydediyor = false; ciz();
       $('#thKart')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -218,7 +231,7 @@
 
   const prevAct = views.onAct;
   views.onAct = (act, el, ev) => {
-    if (act === 'thAc') ac(el.dataset.u);
+    if (act === 'thAc') ac(el.dataset.u, { yer: el.dataset.yer, sekil: el.dataset.sekil });
     else if (act === 'thKapat') { T.acik = false; T.onay = false; ciz(); }
     else if (act === 'thYenile') yukle(true);
     else if (act === 'thHesap') { T.f.hesap = el.dataset.id; T.onay = false; T.uyari = ''; ciz(); }

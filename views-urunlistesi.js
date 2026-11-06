@@ -60,22 +60,28 @@
         D.okunan[id] = await sor({ islem: 'satis', id });
         if (D.secili.join() !== secim.join()) return;
       }
-      // numarası olmayan faturaya CLK-SF numarası hemen Paraşüt'e yazılır; numarası olan (ör. CLK-WEST) kendi numarasıyla kalır
-      const yeni = secim.filter(id => !D.okunan[id].no);
-      if (yeni.length) {
-        D.durum = 'Fatura numarası Paraşüt\'e yazılıyor…'; render();
-        try { for (const x of await sor({ islem: 'sf_no', idler: yeni })) if (x.no && !x.hata) D.okunan[x.id].no = x.no; }
-        catch (e) { toast('Numara Paraşüt\'e yazılamadı: ' + e.message); }
-        if (D.secili.join() !== secim.join()) return;
-      }
+      if (secim.some(id => !D.okunan[id].no)) { D.durum = 'Fatura numarası Paraşüt\'e yazılıyor…'; render(); }
+      await numaraVer(secim.map(id => D.okunan[id]));
+      if (D.secili.join() !== secim.join()) return;
       const fat = secim.map(id => D.okunan[id]).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
-      D.gruplar = fat.map(v => ({ no: v.no || sfNo(v.id), tarih: v.tarih || '' }));
-      D.kalemler = fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar, renk]) => ({ urun, miktar, fiyat, tutar, renk: renk || '', g })));
-      D.bilgi = { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no || sfNo(v.id)).join(', '), tarih: fat.at(-1)?.tarih || '' };
+      Object.assign(D, listeKur(fat));
       D.durum = fat.length ? `${fat.length} satış, ${D.kalemler.length} kalem${fat.length > 1 ? ' (her satış tarihiyle ayrı bölümde)' : fat[0].aciklama ? ' (' + fat[0].aciklama + ')' : ''}. Kontrol edip "Yazdır"a basın.` : '';
     } catch (e) { D.durum = 'Satış okunamadı: ' + e.message; }
     finally { if (D.secili.join() === secim.join()) { D.yukleniyor = ''; render(); } }
   }
+  // numarası olmayan faturaya CLK-SF numarası hemen Paraşüt'e yazılır; numarası olan (ör. CLK-WEST) kendi numarasıyla kalır
+  async function numaraVer(fat) {
+    const yeni = fat.filter(v => !v.no);
+    if (!yeni.length) return;
+    try { for (const x of await sor({ islem: 'sf_no', idler: yeni.map(v => v.id) })) { const v = yeni.find(y => String(y.id) === String(x.id)); if (v && x.no && !x.hata) v.no = x.no; } }
+    catch (e) { toast('Numara Paraşüt\'e yazılamadı: ' + e.message); }
+  }
+  // okunan faturalar (eski tarihten yeniye) → kontrol listesinin bölümleri, kalemleri ve üst bilgisi
+  const listeKur = fat => ({
+    gruplar: fat.map(v => ({ no: v.no || sfNo(v.id), tarih: v.tarih || '' })),
+    kalemler: fat.flatMap((v, g) => v.kalemler.map(([urun, miktar, fiyat, tutar, renk]) => ({ urun, miktar, fiyat, tutar, renk: renk || '', g }))),
+    bilgi: { musteri: fat[0]?.musteri || '', no: fat.map(v => v.no || sfNo(v.id)).join(', '), tarih: fat.at(-1)?.tarih || '' }
+  });
   function sec(ids) {
     D.secili = ids; D.kalemler = []; D.gruplar = [];
     if (ids.length) secimiOku(); else { D.durum = ''; render(); }
@@ -149,15 +155,24 @@
     f.onload = () => { setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300); };
   }
   CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler, []));
+  /* müşteri sayfası (celik 06.11: "ekstre ve satış sayfalarını orda toplayalım"): Paraşüt satışı (satis işleminin yanıtı) buradaki
+     kontrol listesiyle yazdırılır ya da PDF olur; numarası yoksa Satış faturası sayfasındaki gibi CLK-SF numarası Paraşüt'e yazılır */
+  CLK.satisBelge = async (v, pdf) => {
+    if (CLK.izin('urunlistesi')) await numaraVer([v]);
+    const l = listeKur([v]);
+    const html = sayfaHtml('Ürün Listesi', [['Müşteri', l.bilgi.musteri], ['Fatura no', l.bilgi.no], l.bilgi.tarih && ['Tarih', trT(l.bilgi.tarih)]].filter(Boolean), l.kalemler, []);
+    if (pdf) { toast('PDF hazırlanıyor…'); await indir(html, dosyaAdi(l.bilgi)); toast('PDF indirildi'); } else yazdir(html);
+    return v.no || l.bilgi.no;
+  };
   // PDF: liste gizli bir çerçevede çizilir, html2pdf ile A4 PDF olarak indirilir
   // dosya adı yalnız fatura numarası (celik isteği 29.10.2026); birden çok faturada numaralar alt çizgiyle
-  const dosyaAdi = () => (D.bilgi.no ? D.bilgi.no.split(',').map(x => x.replace(/\s+/g, '')).filter(Boolean).join('_') : 'CLKCANTA-' + D.bilgi.tarih.split('-').reverse().join('.')) + '.pdf';
-  function indir() {
+  const dosyaAdi = (b = D.bilgi) => (b.no ? b.no.split(',').map(x => x.replace(/\s+/g, '')).filter(Boolean).join('_') : 'CLKCANTA-' + b.tarih.split('-').reverse().join('.')) + '.pdf';
+  function indir(html = sayfaHtml(), ad = dosyaAdi()) {
     return new Promise((tamam, hata) => {
       const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0' });
       document.body.append(f);
-      const ad = JSON.stringify(dosyaAdi());
-      f.srcdoc = sayfaHtml().replace('</body>', `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></` + `script><script>
+      ad = JSON.stringify(ad);
+      f.srcdoc = html.replace('</body>', `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></` + `script><script>
         document.querySelectorAll('.sayfa>thead td,.sayfa>tfoot td').forEach(t => t.style.height = '0');
         html2pdf().set({ margin: [12, 0, 12, 0], filename: ${ad}, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.alt', '.imza', '.not', '.son'] } })
           .from(document.body).save().then(() => parent.postMessage('ulPdfTamam', '*'), e => parent.postMessage('ulPdfHata', '*'));
