@@ -81,8 +81,10 @@
   // olmayana site üyeleri listesi (bakiyesiz)
   const cariAcik = () => S.route === 'musteriler' && CLK.izin('cari');
   views.musteriler = () => CLK.izin('cari') ? views.cari() : uyeListesi();
+  // yeni müşteri Paraşüt'te ve sitede birlikte açılır (views-yenimusteri.js)
+  const yeniMusteriBtn = () => CLK.izin('yenimusteri') && CLK.yeniMusteri ? '<button class="btn sm gold" data-go="yenimusteri">+ Yeni müşteri</button>' : '';
   const uyeListesi = () => {
-    const acts = `<button class="btn sm" data-act="reloadU" ${S.uLoading ? 'disabled' : ''}>${S.uLoading ? 'Yükleniyor' : 'Yenile'}</button>`;
+    const acts = `${yeniMusteriBtn()}<button class="btn sm" data-act="reloadU" ${S.uLoading ? 'disabled' : ''}>${S.uLoading ? 'Yükleniyor' : 'Yenile'}</button>`;
     if (S.uErr && !S.users.length) return head('İlişkiler', 'Müşteriler', '', acts) + errBox(S.uErr, 'reloadU');
     if (!S.users.length) return head('İlişkiler', 'Müşteriler', 'Alınıyor…', acts) + skel();
     const q = M.q.trim().toLocaleLowerCase('tr');
@@ -227,7 +229,8 @@
           ${sonOdeme(u)}</div>
         ${pasif ? '<p class="mk-pasif">Pasif üye</p>' : `<div class="mk-dug"><button class="btn gold" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="para">Ödeme gir</button>${CLK.izin('senet') ? `<button class="btn mk-koyu" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="senet">Senet gir</button>` : ''}${ekstreBtn}${sipBtn}${waBtn}</div>`}
         ${notKutu(u)}
-      </div>` : `<div class="sum-card mk-bak"><dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>Sipariş</dt><dd>${num(s.n)}</dd></dl>${ekstreBtn || sipBtn ? `<div class="mk-dug">${ekstreBtn}${sipBtn}</div>` : ''}</div>`;
+        ${CLK.siteGiris?.html(u, pasif) || ''}
+      </div>` : `<div class="sum-card mk-bak"><dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>Sipariş</dt><dd>${num(s.n)}</dd></dl>${ekstreBtn || sipBtn ? `<div class="mk-dug">${ekstreBtn}${sipBtn}</div>` : ''}${CLK.siteGiris?.html(u, pasif) || ''}</div>`;
     const siparisHtml = `<div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
       ${os.length ? `<div class="olist">${os.map(o => `<button class="orow" data-order="${O.id(o)}"><div class="o1"><b>${esc(O.code(o))}</b><small>${dtt(O.date(o))} · ${O.items(o).length} kalem</small></div><div class="o2">${O.items(o).slice(0, 2).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}</div><div class="o3"><b class="num">${tl(O.total(o))}</b>${st(O.status(o))}</div></button>`).join('')}</div>` : '<p class="sub">Sitede sipariş yok.</p>'}`;
     const favHtml = favs.length ? `<h3 class="mk-h3">En çok aldıkları <small>site siparişleri</small></h3><ul class="mk-fav">${favs.map(f => `<li><div><b>${esc(f.name)}</b><small>${esc(f.code)}</small></div><b class="num">${num(f.q)} adet</b></li>`).join('')}</ul>` : '';
@@ -381,7 +384,7 @@
   views.cari = () => {
     // Ödeme gir (views-tahsilat.js): müşteriden alınan ödeme Paraşüt'e tahsilat olarak girilir, site carisine de yazılır
     cariOzetGerekirse();
-    const acts = `${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="czYenile" ${S.uLoading || CZ.yuk ? 'disabled' : ''}>${S.uLoading || CZ.yuk ? 'Yükleniyor' : 'Yenile'}</button>`;
+    const acts = `${yeniMusteriBtn()}${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="czYenile" ${S.uLoading || CZ.yuk ? 'disabled' : ''}>${S.uLoading || CZ.yuk ? 'Yükleniyor' : 'Yenile'}</button>`;
     const odeme = CLK.tahsilat?.kart() || '';
     if (S.uErr && !S.users.length) return head('Satış', 'Müşteriler', '', acts) + odeme + errBox(S.uErr, 'reloadU');
     if (!S.uLoaded && !S.users.length) return head('Satış', 'Müşteriler', 'Alınıyor…', acts) + odeme + skel();

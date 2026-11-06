@@ -198,7 +198,7 @@ window.CLK = (() => {
      Yönetici her şeyi görür; personel yalnız işaretlenen sayfaları. Sunucu da aynı listeyi panel_yetki() ile denetler. */
   const EK_YETKI = [['cari', 'Müşteri borçları, ödeme gir ve ödeme takibi'], ['ekstre', 'Müşteri hesap hareketleri ve ekstre'], ['urunlistesi', 'Satış faturası yazdırma (birkaç satış tek listede)'],
     ['esitle', 'Şimdi eşitle düğmesi'], ['ciro', 'Panelde ciro, kâr ve stok değeri']];
-  const ALT_SAYFA = { siparis: 'siparisler', musteri: ['musteriler', 'cari', 'ekstre'], musteriler: ['musteriler', 'cari'], duzenle: ['urunler', 'yeni', 'stok'] };
+  const ALT_SAYFA = { siparis: 'siparisler', musteri: ['musteriler', 'cari', 'ekstre'], musteriler: ['musteriler', 'cari'], yenimusteri: ['musteriler', 'cari'], duzenle: ['urunler', 'yeni', 'stok'] };
   // eski adresler: Cari hesap artık Müşteriler sayfasında
   const ESKI_ADRES = { cari: 'musteriler' };
   const yonlen = r => ESKI_ADRES[r] || r;

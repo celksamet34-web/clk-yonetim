@@ -1571,3 +1571,41 @@ button.mh-sb:hover{background:var(--bg)}
 .od-bildirim .msg{margin:8px 0 0}
 .nb-uyari{display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;border-color:var(--bad)}
 .nb-uyari b{display:block;color:var(--bad)}.nb-uyari small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+
+/* müşteri adına siteye giriş (views-sitegiris.js; celik 06.11.2026: "müşterinin yanına tablet ile gidiyoruz… onun kullanıcı adıyla web sitesine girmemiz lazım") */
+.sgi{display:grid;gap:8px;border-top:1px solid rgba(214,189,143,.22);padding-top:12px;margin-top:4px;color:#ddd5c8;font-size:13px}
+.sgi dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;align-items:center}
+.sgi dt{color:#a99f90;font-size:12px}.sgi dd{margin:0;color:#fff;word-break:break-all}
+.sgi .sgi-s{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.sgi .sgi-n{display:block;color:#a99f90;font-size:12px;line-height:1.45}
+.sgi .sgi-k{color:#f3c58a}
+.sgi .sgi-yon{display:flex;flex-wrap:wrap;gap:6px}
+.sgi .sgi-wa{color:#5fd08a}
+.sgi-form{display:grid;gap:8px}
+.sgi-form label{display:grid;gap:4px;color:#a99f90;font-size:12px}
+.sgi-form .sgi-sat{display:flex;gap:6px}
+.sgi-form input{flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid rgba(214,189,143,.35);color:#fff;border-radius:10px;padding:9px 10px;font:600 15px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.sgi-form ol{margin:0;padding-left:18px;display:grid;gap:6px;color:#ddd5c8;font-size:12.5px;line-height:1.45}
+.sgi-form a{color:var(--gold-2)}
+.sgi .sgi-eks{display:grid;gap:8px}
+.sgi .sgi-eksik{margin:0;padding-left:16px;display:grid;gap:3px;color:#f3c58a;font-size:12px;line-height:1.4}
+.sgi .sgi-cari{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sgi .sgi-cari input{flex:1 1 110px;min-width:0;min-height:36px;background:rgba(255,255,255,.08);border:1px solid rgba(214,189,143,.35);color:#fff;border-radius:10px;padding:7px 10px;font:600 14px/1.2 inherit}
+.sgi .sgi-ok{color:#8fe0a8}
+
+/* yeni müşteri (views-yenimusteri.js; celik 06.11.2026: "yeni müşteri ekleme de yap", "adres ıvır zıvır girelim hepsini kaydı kuydu oluştur") */
+.ym{display:grid;gap:12px}
+.card .ym-h,.ym-h{margin:8px 0 0;font:700 12.5px/1.3 var(--f-b);letter-spacing:.14em;text-transform:uppercase;color:var(--gold-ink);border-bottom:1px solid var(--line-2);padding-bottom:6px}
+.ym-sonuc .msg{margin:0}
+.ym-h:first-child{margin-top:0}
+.ym .bd-a i{color:var(--bad);font-style:normal}
+.ym-n{color:var(--muted);font-size:12px;line-height:1.4}
+.ym-sat{display:flex;gap:6px;align-items:center}.ym-sat input{flex:1}.ym-sat .btn{flex:0 0 auto}
+.ym-s{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.ym-ozet,.ym-benzer,.ym-sonuc{display:grid;gap:12px;margin-top:14px}
+.ym-benzer{border-color:var(--gold);margin:0 0 14px}
+.ym-l{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ym-l li{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line-2);border-radius:12px;padding:10px 12px}
+.ym-l li div{display:grid;gap:2px;min-width:0}.ym-l li small{color:var(--muted);font-size:12px}
+.ym-adim{display:grid;gap:8px;background:var(--gold-soft);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.5}.ym-adim p{margin:0}.ym-adim .btn{justify-self:start}
+@media (max-width:600px){.ym-l li{flex-direction:column;align-items:stretch}.ym-sonuc .bd-d .btn,.ym-ozet .bd-d .btn{flex:1 1 100%}}
