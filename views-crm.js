@@ -182,7 +182,8 @@
   }
   function bdHtml(u) {
     const f = BD.form, kapali = BD.yuk || BD.kay ? 'disabled' : '', fiyatYetki = CLK.izin('cari');
-    const pDeger = (pk, k) => { const v = String(BD.p?.[pk] ?? '').trim(); return v && v.replace(/\s+/g, ' ').toLocaleUpperCase('tr') !== String(BD.ilk?.[k] ?? '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('tr') ? v : ''; };
+    // Paraşüt'teki değer formdakinden farklıysa gösterilir (vergi no yalnız 10/11 haneyse: "bunu yaz" geçersiz numarayla siteyi boşaltmasın)
+    const pDeger = (pk, k) => { const v = String(BD.p?.[pk] ?? '').trim(); if (k === 'vergi' && !/^\d{10,11}$/.test(v)) return ''; return v && v.replace(/\s+/g, ' ').toLocaleUpperCase('tr') !== String(BD.ilk?.[k] ?? '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('tr') ? v : ''; };
     const alan = ([k, ad, tip, pk]) => { const pv = pDeger(pk, k);
       return `<label class="bd-a${k === 'address' ? ' bd-genis' : ''}"><span>${ad}</span><input id="bd-${k}" data-bd="${k}" value="${esc(f[k])}" ${tip === 'tel' ? 'type="tel" inputmode="tel" autocomplete="off"' : tip === 'numeric' ? 'type="text" inputmode="numeric" autocomplete="off"' : 'type="text"'} ${kapali}>
         ${pv ? `<small class="bd-p">Paraşüt'te: ${esc(pv)} <button class="link" data-act="bdAl" data-k="${k}" data-v="${esc(pv)}">bunu yaz</button></small>` : ''}</label>`; };
