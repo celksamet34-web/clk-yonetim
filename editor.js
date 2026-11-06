@@ -713,7 +713,7 @@
   async function aiImage(du, action) {
     const img = action === 'model' ? await modelImage(du) : await siteImage({ action, image: du });
     if (img) return img;
-    const j = await call('ai-product-image', { method: 'POST', body: { action, image: du } });
+    const j = await call('ai-gorsel', { method: 'POST', body: { action, image: du } }); // eski Supabase ai-product-image durdurulan clkcanta Netlify'a köprüydü (06.11)
     if (!j.image) throw new Error('Görsel hazırlanamadı.'); return j.image;
   }
   async function processShot(k, raw) {
