@@ -1,0 +1,318 @@
+// @ts-nocheck
+// ÜRETİLMİŞ DOSYA: netlify/functions/ai-product-image.js kopyası (supabase/netlify-kopya.py). Elle değiştirme; Netlify dosyasını değiştirip yeniden üret.
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
+// CLK Yönetim — ürün görseli: dekupe ve mankenli görsel (OpenAI görüntü düzenleme)
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://prkzzaqinfeptmmbkqsd.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_0sbTUikCycbokrRbzxtBAg_JGTfJtr4';
+
+// Manken seçimi: panelde seçilen kitleye göre görseldeki kişi ve ölçek için boyu (cm). Mankenler açık tenli (celik isteği 31.10.2026)
+const TEN = 'with a fair, light skin tone';
+const AUDIENCE = {
+  kadin: [`one adult Turkish female fashion model ${TEN}`, 170],
+  erkek: [`one adult Turkish male fashion model ${TEN}`, 182],
+  'kiz-cocuk': [`one Turkish girl child model ${TEN}, around 8 to 10 years old, in modest age-appropriate casual clothing`, 135],
+  'erkek-cocuk': [`one Turkish boy child model ${TEN}, around 8 to 10 years old, in modest age-appropriate casual clothing`, 138]
+};
+const cm = v => { const n = Number(v); return n > 0 && n < 300 ? Math.round(n) : 0; };
+// Taşıma şekli: panelde seçilir, mankenin çantayı nasıl taşıdığı
+const CARRY = {
+  capraz: 'worn crossbody on the chest, with its shoulder strap running diagonally over the opposite shoulder',
+  omuz: 'hanging at the hip from its strap over the near shoulder',
+  el: 'held by its handle in one hand, arm hanging relaxed at the side, so the bag hangs beside the thigh',
+  // Sırtta: logo kameraya baksın diye manken arkadan çekilir (önden çekimde çanta göğse geliyordu)
+  sirt: 'worn as a backpack on the back with both shoulder straps over the shoulders. The model is photographed from behind (rear view, back to the camera, head may turn slightly to the side), so the backpack sits on the upper back and its front panel with the logo faces the camera. Never show the model from the front and never place the bag on the chest'
+};
+// Ölçek rehberinde poz tarifi: taşıma şekline göre
+const GUIDE_POSE = {
+  sirt: 'Show the model from behind so the backpack is worn on the back exactly there, both shoulder straps over the shoulders',
+  capraz: 'Pose the person so the bag sits naturally there, worn with its strap across the body',
+  omuz: 'Pose the person so the bag sits naturally there, hanging from its strap over the shoulder',
+  el: 'Pose the person in a relaxed, slightly three-quarter stance holding the bag by its handle in one hand, arm hanging naturally, so the bag hangs exactly there beside the thigh'
+};
+// Kadraj: elde orta mesafe (celik isteği 31.10.2026: ne uzak ne yakın), göğüsten baldır ortasına; diğerleri baştan uyluk ortasına.
+// Panelin ölçek rehberi aynı kadrajla çizer (editor.js scaleRef): kadrajın kapladığı boy oranı ve tarifi
+const FRAME = {
+  el: [0.5, 'shows the model from the chest (top edge; head and shoulders are outside the frame) down to mid-calf (bottom edge)', 'a medium shot from the chest down to mid-calf (head and shoulders outside the frame), so the hand, the bag and the legs show the real size'],
+  diger: [null, 'shows the model from the top of the head (near the top edge) down to mid-thigh (bottom edge)', 'a full body or three-quarter framing that makes the size comparison obvious']
+};
+// Görüntü modelleri santimetreyi zayıf anlar; ölçüyü mankenin baş boyu ve gövdesi cinsinden de tarif ederiz.
+// scaled: ikinci görsel ölçek rehberi (panel çantayı kadraja göre gerçek boyunda yerleştirdi)
+function scaleText(size, height, child, scaled, carry) {
+  const w = cm(size?.w), h = cm(size?.h), d = cm(size?.d);
+  if (!w && !h) return `Keep the bag at a realistic real-world size relative to a person about ${height} cm tall.${carry === 'el' ? ` Use ${FRAME.el[2]}.` : ''}`;
+  const head = height / (child ? 6.5 : 7.5), torso = height * 0.3, shoulders = height * (child ? 0.22 : 0.25);
+  const r = v => Math.round(v * 10) / 10;
+  const dims = [w && `${w} cm wide`, h && `${h} cm tall`, d && `${d} cm deep`].filter(Boolean).join(', ');
+  const rel = [
+    h && `its height is about ${r(h / head)} times the model's head height and about ${Math.round(h / torso * 100)}% of the torso length (shoulder to hip)`,
+    w && `its width is about ${r(w / head)} head heights, about ${Math.round(w / shoulders * 100)}% of the shoulder width`
+  ].filter(Boolean).join('; ');
+  // Kadraj baştan uyluk ortasına (boyun ~%62'si) olduğunda çantanın karede kaplaması gereken oran
+  const kadraj = FRAME[carry] || FRAME.diger;
+  const frame = height * (kadraj[0] || (child ? 0.66 : 0.62)) / 0.93;
+  const pct = [h && `its height must be about ${Math.round(h / frame * 100)}% of the image height`, w && `its width about ${Math.round(w / frame * 100)}% of the image width`].filter(Boolean).join(' and ');
+  const share = scaled && pct ? ` In the final image ${pct}; the bag must look small relative to the body, never dominant.` : '';
+  // Panel çantayı kadraja göre gerçek boyunda yerleştirdiyse (scaled), girdi görseli bir ölçek rehberidir.
+  const guide = scaled
+    ? ` Two input images are given. Image 1 is the exact product: copy it faithfully, same color, logo, lettering and details. Image 2 is only a scale and layout guide: it shows the same bag already drawn at its exact real-world size and position for the final framing, which ${kadraj[1]}. Use this framing and keep the bag at exactly the size and roughly the position shown in image 2, front-facing and upright, not tilted. ${GUIDE_POSE[carry] || 'Pose the person so the bag sits naturally there (worn with its strap across the body or over the shoulder, or held by its handle)'}; hands, hair and straps must not cover the bag.`
+    : ` Use ${kadraj[2]}.`;
+  return `True scale is critical: the bag is ${dims} and the model is about ${height} cm tall (head about ${Math.round(head)} cm, shoulders about ${Math.round(shoulders)} cm wide). So ${rel}. Render the bag at exactly this real size relative to the body; never enlarge or shrink it for styling.${guide}${share}`;
+}
+
+function reply(statusCode, payload) {
+  return { statusCode, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, body: JSON.stringify(payload) };
+}
+function header(headers, name) {
+  const key = Object.keys(headers || {}).find(item => item.toLowerCase() === name.toLowerCase());
+  return key ? headers[key] : '';
+}
+
+// Mankenli görsel için Google Gemini (Nano Banana Pro): ürün tutarlılığında daha iyi. GEMINI_API_KEY yoksa ya da hata verirse OpenAI kullanılır.
+const GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image';
+async function gemini(key, prompt, images) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 70000); // OpenAI yedeğine süre kalsın
+  try {
+    const parts = [{ text: prompt }, ...images.map(([mime, b]) => ({ inlineData: { mimeType: mime, data: b.toString('base64') } }))];
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, signal: controller.signal,
+      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } } })
+    });
+    const j = await r.json().catch(() => ({}));
+    const out = (j?.candidates?.[0]?.content?.parts || []).map(p => p.inlineData || p.inline_data).find(d => d?.data);
+    if (!r.ok || !out) throw new Error(j?.error?.message || j?.candidates?.[0]?.finishReason || 'Gemini görsel döndürmedi.');
+    return `data:${out.mimeType || out.mime_type || 'image/png'};base64,${out.data}`;
+  } finally { clearTimeout(timeout); }
+}
+
+// Mankenli görsel için fal.ai (varsayılan Seedream 4.5 düzenleme modeli; FAL_IMAGE_MODEL ile değiştirilebilir).
+// Üretim Netlify fonksiyon süresini aştığı için kuyruk kullanılır: istek bırakılır, panel sonucu ayrı çağrılarla sorar.
+const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/bytedance/seedream/v4.5/edit';
+const falError = j => { const d = j?.detail; return (Array.isArray(d) ? d[0]?.msg : d) || j?.error || j?.message; };
+async function falSubmit(key, prompt, images, size = { width: 1920, height: 1920 }) {
+  const r = await fetch(`https://queue.fal.run/${FAL_MODEL}`, {
+    method: 'POST', headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20000),
+    body: JSON.stringify({ prompt, image_urls: images.map(([mime, b]) => `data:${mime};base64,${b.toString('base64')}`), image_size: size, num_images: 1 })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.status_url || !j.response_url) throw new Error(falError(j) || `fal.ai ${r.status}`);
+  return { status: j.status_url, result: j.response_url };
+}
+const isFalQueue = u => typeof u === 'string' && u.startsWith('https://queue.fal.run/'); // anahtarı yalnızca fal kuyruğuna gönder
+async function falPoll(key, job) {
+  if (!isFalQueue(job?.status) || !isFalQueue(job?.result)) throw new Error('Geçersiz iş bilgisi.');
+  const H = { Authorization: `Key ${key}` };
+  const s = await fetch(job.status, { headers: H, signal: AbortSignal.timeout(10000) }).then(r => r.json()).catch(() => ({}));
+  if (s.status !== 'COMPLETED') return { pending: true, state: s.status || 'BİLİNMİYOR' };
+  if (s.error) throw new Error(s.error);
+  const j = await fetch(job.result, { headers: H, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => ({}));
+  const url = j?.images?.[0]?.url; if (!url) throw new Error(falError(j) || 'fal.ai görsel döndürmedi.');
+  // Küçükse veriyi biz taşırız; Netlify yanıt sınırını (6 MB) aşacaksa panel görseli doğrudan fal CDN'inden alır.
+  const img = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const buf = Buffer.from(await img.arrayBuffer());
+  return { image: buf.length < 4 * 1024 * 1024 ? `data:${img.headers.get('content-type') || 'image/png'};base64,${buf.toString('base64')}` : url };
+}
+
+// Dekupe için Photoroom: ürünün piksellerine dokunmadan yalnızca arka planı siler (şeffaf PNG döner).
+async function photoroom(key, mime, bytes) {
+  const form = new FormData();
+  form.append('image_file', new Blob([bytes], { type: mime }), 'product.jpg');
+  form.append('format', 'png');
+  const r = await fetch('https://sdk.photoroom.com/v1/segment', { method: 'POST', headers: { 'x-api-key': key }, body: form, signal: AbortSignal.timeout(30000) });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j?.detail || j?.message || j?.error?.message || `Photoroom ${r.status}`); }
+  return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
+}
+
+// Anasayfa banner'ı için Photoroom AI arka plan (Plus planı, görsel başı ~0,10 $): ürün dekupe edilir, arkasına istemdeki sahne üretilir.
+// Çıktı tema banner'ı oranında (3:4, 1248×1664). AI arka planda padding/hizalama yok sayılıyor (sandbox'ta denendi); bu yüzden panel
+// ürünü 1248×1664 beyaz tuvalde üst kısma kendisi yerleştirir, referenceBox=originalImage ile Photoroom ürünü yerinde bırakır.
+// Alt kısım sahneye (ör. kaide) kalır; Qukasoft başlık/düğme kutularını oraya yazar.
+// sandbox: anahtarın başına "sandbox_" eklenir, ücretsiz ve filigranlıdır (parametre denemesi için).
+const BANNER_SIZE = '1248x1664';
+const BANNER_LAYOUT = { referenceBox: 'originalImage', 'shadow.mode': 'ai.soft' };
+// Yerleşim denemesi için izinli alanlar (panel `layout` ile geçersiz kılabilir); değerler kısa düz metin olmalı
+const LAYOUT_KEYS = ['padding', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
+  'verticalAlignment', 'horizontalAlignment', 'referenceBox', 'scaling', 'shadow.mode', 'background.expandPrompt.mode', 'background.seed'];
+async function photoroomBanner(key, mime, bytes, prompt, sandbox, layout, model, size = BANNER_SIZE) {
+  const form = new FormData();
+  form.append('imageFile', new Blob([bytes], { type: mime }), 'product.jpg');
+  form.append('background.prompt', prompt);
+  form.append('outputSize', size);
+  const L = { ...BANNER_LAYOUT };
+  Object.entries(layout && typeof layout === 'object' ? layout : {}).forEach(([k, v]) => { if (LAYOUT_KEYS.includes(k)) { if (v === null || v === '') delete L[k]; else if (/^[\w.%-]{1,40}$/.test(String(v))) L[k] = String(v); } });
+  Object.entries(L).forEach(([k, v]) => form.append(k, v));
+  form.append('export.format', 'jpeg');
+  const ver = ['3', 'background-studio-beta-2025-03-17'].includes(model) ? model : '3';
+  const r = await fetch('https://image-api.photoroom.com/v2/edit', {
+    method: 'POST', headers: { 'x-api-key': (sandbox ? 'sandbox_' : '') + key, 'pr-ai-background-model-version': ver }, body: form, signal: AbortSignal.timeout(50000)
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    const msg = j?.detail || j?.message || j?.error?.message || '';
+    throw new Error(`Photoroom ${r.status}${msg ? ': ' + msg : ''}${r.status === 402 || r.status === 403 ? ' (kredi yok ya da plan AI arka planı kapsamıyor)' : ''}`);
+  }
+  return `data:image/jpeg;base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`;
+}
+// Banner biçimleri: Photoroom çıktı boyutu, Seedream istek boyutu (~4 MP, aynı oran; panel küçültür) ve Qukasoft yazılarının duracağı boş alan tarifi
+const BANNER_FORMATS = {
+  banner: { out: '1248x1664', fal: { width: 1728, height: 2304 }, shape: 'vertical 3:4', zone: 'Keep the lower third of the image calm and uncluttered (the surface or pedestal under the bag), because text will be placed there.' },
+  slider: { out: '1920x850', fal: { width: 3008, height: 1332 }, shape: 'wide panoramic 1920x850 hero banner', zone: 'The bag is on the right side; keep the left half of the image calm, softly lit and uncluttered with only the soft background, because a headline and button will be placed there.' },
+  'slider-m': { out: '1080x1440', fal: { width: 1728, height: 2304 }, shape: 'vertical 3:4 mobile hero banner', zone: 'Keep the lower 40% of the image calm and uncluttered (the surface under the bag), because a headline and button will be placed there.' },
+  kategori: { out: '800x1000', fal: { width: 1792, height: 2240 }, shape: 'vertical 4:5 category tile', zone: 'Keep the composition centered and minimal with generous even space around the bag.' },
+  // Instagram kapağı (celik 01.11.2026 "photoroomdan dene"): üstte logo, altta ad ve fiyat yazılır
+  ig: { out: '1080x1350', fal: { width: 1728, height: 2160 }, shape: 'vertical 4:5 Instagram post', zone: 'Keep the top fifth and the bottom quarter of the image calm and uncluttered (plain backdrop and surface), because a logo and text will be placed there.' },
+  'ig-hikaye': { out: '1080x1920', fal: { width: 1440, height: 2560 }, shape: 'vertical 9:16 Instagram story', zone: 'Keep the top quarter and the bottom third of the image calm and uncluttered (plain backdrop and surface), because a logo and text will be placed there.' }
+};
+// fal.ai banner istemi: ürün yerinde ve aynen kalır, yalnızca beyaz zemin sahneyle değişir, biçime göre yazı alanı sakin kalır
+// Yalnızca sahne: model ürünü yeniden çizince logoyu değiştiriyor (DADA → DACA, YEFA → VIP) ve açısını bozuyordu (doğrulandı).
+// Bu yüzden model ürünü hiç çizmez; ürünün durduğu yerde boş bir yüzey bırakır, panel ürün fotoğrafını oraya birebir yerleştirir.
+const sceneOnlyPrompt = (scene, f = BANNER_FORMATS.banner) => `Use this image only as a layout reference for framing. Create a photorealistic ${f.shape} scene: ${scene} Keep the same camera framing and perspective. Remove the product completely: do not draw any bag, backpack, suitcase or other product anywhere in the image. Exactly where the product stands in the reference, leave an empty, clean, flat surface (floor, table top or pedestal top) at the same height, naturally lit, with nothing on it, because the real product photo will be placed there afterwards. ${f.zone.replace('The bag is on the right side', 'The empty product spot is on the right side')} Photorealistic high-end campaign photography, no people, no text, no letters, no logos.`;
+// Silme adımı: ilk adımda ürünle üretilen sahneden ürün silinir, gerisi aynı kalır. Panel iki görselin farkından ürünün yerini bulur
+// ve ürün fotoğrafını oraya birebir koyar ("yalnızca sahne" istemi boş yüzeyi yanlış yere koyuyordu).
+const removeProductPrompt = () => 'Remove the bag, backpack, suitcase or other product (all pieces) completely from this image and fill that area with the background, surface or pedestal that would naturally be visible behind and under it. Remove its shadow too. Do not change anything else: keep the same framing, lighting, colors, surfaces and objects exactly as they are. No text, no people.';
+// Ürün tek çanta ya da çok parçalı set (ör. 3'lü valiz) olabilir: "tek çanta" demek seti teke indiriyordu (doğrulandı), parça sayısı korunur
+const bannerEditPrompt = (scene, f = BANNER_FORMATS.banner) => `Edit this image into a premium ecommerce homepage image. The product may be a single bag or a set of several pieces (for example a set of suitcases); keep every piece exactly as it is in the image: same number of pieces, same position, same size, same angle, same colors, logo, lettering, zippers, wheels, handles, straps and details. Do not add, remove, merge, move, resize, redraw, restyle or crop any piece. Replace only the plain white background with this scene: ${scene} The product stands naturally on a surface in the scene with a soft realistic contact shadow. ${f.zone} Photorealistic high-end campaign photography, ${f.shape} composition, no people, no extra products beyond those in the image, no text or letters except what is printed on the product.`;
+
+// Ürün açıklaması: paneldeki bilgilerden Türkçe, şık bir HTML metin. Bilgi uydurmaması için yalnızca verilen alanlar kullanılır.
+const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
+async function describe(key, facts) {
+  const f = Object.fromEntries(Object.entries(facts || {}).filter(([, v]) => v !== '' && v != null && !(Array.isArray(v) && !v.length)).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 300) : v]));
+  const sys = 'Sen premium bir Türk çanta markası (CLK Çanta) için e-ticaret metin yazarısın. Akıcı, zarif ve güven veren bir Türkçeyle yazarsın; abartılı reklam dili, ünlem ve emoji kullanmazsın. YALNIZCA verilen bilgileri kullanırsın: bölme sayısı, fermuar türü, garanti, iade, kargo gibi verilmeyen hiçbir özellik uydurmazsın; "kaliteli", "birinci sınıf", "hakiki", "dayanıklı" gibi ürün hakkında doğrulanmamış övgü sıfatları kullanmazsın. Yanıtı JSON olarak verirsin: {"long": "...", "short": "..."}.';
+  const user = `Ürün bilgileri (JSON): ${JSON.stringify(f)}
+
+"long" için yalnızca şu HTML etiketlerini kullan: <p>, <h3>, <ul>, <li>, <strong>. Yapı:
+1) Ürünün kimliğini ve kullanım alanını anlatan 2 kısa paragraf (ilk paragrafta marka ve ürün adı <strong> ile).
+2) <h3>Öne çıkan özellikler</h3> ve verilen bilgilere dayanan 3-5 madde.
+3) <h3>Ürün bilgileri</h3> ve "<strong>Alan:</strong> değer" biçiminde maddeler: alan adlarını verildiği gibi yaz; yalnızca Marka, Ürün kodu, Kategori, Malzeme, Ölçüler, Renk ve Su geçirmez alanlarından verilmiş olanları listele.
+4) <h3>Bakım önerisi</h3> ve malzemeye uygun tek paragraf.
+Toplam 120-200 kelime. "short" için listelerde görünecek, 90 karakteri geçmeyen tek cümle yaz.`;
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25000),
+    body: JSON.stringify({ model: TEXT_MODEL, temperature: 0.7, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.message || `OpenAI ${r.status}`);
+  const out = JSON.parse(j?.choices?.[0]?.message?.content || '{}');
+  if (!out.long) throw new Error('Boş yanıt');
+  return { long: String(out.long), short: String(out.short || '').slice(0, 120) };
+}
+
+const handler = async event => {
+  if (event.httpMethod !== 'POST') return reply(405, { success: false, message: 'Yalnızca POST kabul edilir.' });
+  const bearer = /^Bearer\s+(.+)$/i.exec(header(event.headers, 'authorization'));
+  if (!bearer) return reply(401, { success: false, message: 'Önce uygulamadaki hesabında oturum aç.' });
+  const apiKey = process.env.OPENAI_API_KEY, geminiKey = process.env.GEMINI_API_KEY, falKey = process.env.FAL_KEY, photoroomKey = process.env.PHOTOROOM_API_KEY;
+  try {
+    const user = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}` } });
+    if (!user.ok) return reply(401, { success: false, message: 'Oturum geçersiz veya süresi dolmuş.' });
+    // personel yetkisi (celik 01.11.2026): yalnız yönetici ya da bu sayfalardan birine izni olan personel
+    const yetki = await fetch(`${SUPABASE_URL}/rest/v1/rpc/panel_yetki`, { method: 'POST', headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${bearer[1]}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ istenen: ['yeni', 'urunler', 'stok', 'banner', 'instagram'] }) });
+    if (yetki.status !== 404 && !(yetki.ok && (await yetki.json().catch(() => false)) === true)) return reply(403, { success: false, message: 'Bu işlem için yetkiniz yok.' });
+    const body = JSON.parse(event.body || '{}');
+    if (body.action === 'falResult') {
+      if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
+      try { return reply(200, { success: true, action: 'model', engine: 'fal', ...(await falPoll(falKey, body.job)) }); }
+      catch (e) { return reply(422, { success: false, message: 'fal: ' + String(e?.message || e) }); }
+    }
+    if (body.action === 'describe') {
+      if (!apiKey) return reply(503, { success: false, message: 'OPENAI_API_KEY eksik.' });
+      try { return reply(200, { success: true, ...(await describe(apiKey, body.facts)) }); }
+      catch (e) { return reply(422, { success: false, message: 'Açıklama yazılamadı: ' + String(e?.message || e) }); }
+    }
+    if (body.action === 'banner') {
+      if (body.engine !== 'fal' && !photoroomKey) return reply(503, { success: false, message: 'PHOTOROOM_API_KEY eksik.' });
+      const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
+      if (!m) return reply(422, { success: false, message: 'Ürün fotoğrafı okunamadı.' });
+      const b = Buffer.from(m[2], 'base64');
+      if (b.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük.' });
+      const p = String(body.prompt || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
+      if (p.length < 10) return reply(422, { success: false, message: 'Sahne tarifi çok kısa.' });
+      const bf = BANNER_FORMATS[body.format] || BANNER_FORMATS.banner;
+      // fal.ai Seedream: panelin yerleştirdiği girdiyi düzenler (yalnızca beyaz zemini sahneyle değiştir). Kuyruk işi döner, panel falResult ile sorar.
+      // Seedream küçük boyutu kabul etmediği için 3:4 ~4 MP (1728×2304) istenir; panel 1248×1664'e küçültür.
+      if (body.engine === 'fal') {
+        if (!falKey) return reply(503, { success: false, message: 'FAL_KEY eksik.' });
+        try { return reply(200, { success: true, action: 'banner', engine: 'fal', pending: true, job: await falSubmit(falKey, body.mode === 'remove' ? removeProductPrompt() : body.mode === 'scene' ? sceneOnlyPrompt(p, bf) : bannerEditPrompt(p, bf), [[m[1], b]], bf.fal) }); }
+        catch (e) { return reply(422, { success: false, message: 'fal: ' + (e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)) }); }
+      }
+      try { return reply(200, { success: true, action: 'banner', engine: 'photoroom', sandbox: body.sandbox === true, image: await photoroomBanner(photoroomKey, m[1], b, p, body.sandbox === true, body.layout, body.model, bf.out) }); }
+      catch (e) { return reply(422, { success: false, message: e?.name === 'TimeoutError' ? 'Photoroom zaman aşımı.' : String(e?.message || e) }); }
+    }
+    const action = ['model', 'original'].includes(body.action) ? body.action : 'cutout';
+    const [person, audienceHeight] = AUDIENCE[body.audience] || AUDIENCE.kadin;
+    const height = Number(body.height) >= 80 && Number(body.height) <= 220 ? Math.round(Number(body.height)) : audienceHeight; // paneldeki manken boyu
+    const carryText = CARRY[body.carry] || 'naturally wearing or holding the product according to its real use';
+    const kind = String(body.kind || '').replace(/[^\p{L}\p{N} ›/-]/gu, '').slice(0, 120);
+    if (action !== 'original' && !apiKey && !(action === 'model' && (geminiKey || falKey)) && !(action === 'cutout' && photoroomKey)) return reply(503, { success: false, message: 'Mankenli görsel servisi için OPENAI_API_KEY Netlify ortam değişkeni eksik.' });
+    const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
+    if (!match) return reply(422, { success: false, message: 'Ürün fotoğrafı okunamadı.' });
+    const bytes = Buffer.from(match[2], 'base64');
+    if (bytes.length > 6 * 1024 * 1024) return reply(413, { success: false, message: 'Fotoğraf çok büyük. Daha küçük bir görsel seç.' });
+    if (action === 'original') return reply(200, { success: true, action, image: body.image });
+    // Ölçek rehberi ikinci görsel olarak gider; ilk görsel (ürün) en yüksek sadakatle korunur
+    const guideMatch = action === 'model' && body.scaled === true ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.guide || '')) : null;
+    const guideBytes = guideMatch ? Buffer.from(guideMatch[2], 'base64') : null;
+    if (guideBytes && guideBytes.length > 4 * 1024 * 1024) return reply(413, { success: false, message: 'Ölçek görseli çok büyük.' });
+    const prompt = action === 'cutout'
+      ? 'Edit this exact product photo into a professional ecommerce cutout. Treat the entire bag as a protected foreground: preserve its original pixels and visible viewing angle as closely as possible. Change only the background. Do not redraw, redesign, beautify, reshape, recolor or retouch the bag. Preserve the exact logo, all lettering, brand marks, label placement, typography, hardware, seams, texture and proportions. Never invent, replace or correct logo letters; keep even unclear markings exactly as photographed. Remove the entire original background, center the product, add a natural soft grounding shadow, and use a pure white seamless background. No text, no props, no people, square composition.'
+      : `Create a photorealistic premium ecommerce lifestyle image using the exact product in the reference photo. Use the reference bag as a protected product foreground. Preserve its exact logo and lettering, brand marks, typography, label position, shape, color, material, hardware, stitching and proportions. Never redraw, reinterpret, replace, correct or invent a logo or text. Keep the reference viewing angle and product details; adapt the person and pose around the bag. Prioritize product and logo fidelity over styling. Show ${person}, about ${height} cm tall, with the bag ${carryText}${kind ? ` (product type: ${kind})` : ''}. ${scaleText(body.size, height, /cocuk$/.test(body.audience || ''), body.scaled === true && !!guideBytes, body.carry)} Keep the logo side facing the camera, flat, sharp and unobstructed by hands, hair or straps. Minimal bright studio, white to very light gray background, soft shadow, full product clearly visible, tasteful modern catalog styling, square composition, no text and no extra products.`;
+    // Sıra: dekupede Photoroom; mankende fal.ai, sonra Gemini. Hepsi yoksa ya da hata verirse OpenAI.
+    const refs = [[match[1], bytes], ...(guideBytes ? [[guideMatch[1], guideBytes]] : [])];
+    const errors = [];
+    if (action === 'model' && falKey && body.skipFal !== true) {
+      try { return reply(200, { success: true, action, engine: 'fal', pending: true, job: await falSubmit(falKey, prompt, refs) }); }
+      catch (e) { errors.push(`fal: ${e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)}`); }
+    }
+    const engines = action === 'cutout' ? [['photoroom', photoroomKey, () => photoroom(photoroomKey, match[1], bytes)]]
+      : [['gemini', geminiKey, () => gemini(geminiKey, prompt, refs)]];
+    for (const [engine, key, run] of engines) {
+      if (!key) continue;
+      try { return reply(200, { success: true, action, engine, image: await run() }); }
+      catch (e) { errors.push(`${engine}: ${e?.name === 'AbortError' || e?.name === 'TimeoutError' ? 'zaman aşımı' : String(e?.message || e)}`); }
+    }
+    const engineError = errors.join(' | ');
+    if (errors.length && !apiKey) return reply(422, { success: false, message: engineError });
+    // Dekupe OpenAI'ye düşmez: OpenAI çantayı yeniden çiziyor (logo bozulur, 1024 kare). Panel kendi dekupesini kullanır (celik 04.11.2026).
+    if (action === 'cutout') return reply(422, { success: false, message: engineError || 'Photoroom anahtarı yok.' });
+    // Logo ve yazıların korunması için yüksek girdi sadakati; model reddederse ayarsız tekrar dener.
+    const edit = async fidelity => {
+      const form = new FormData();
+      form.append('model', 'gpt-image-1.5');
+      form.append('prompt', prompt);
+      form.append('size', '1024x1024');
+      form.append('quality', 'medium');
+      form.append('output_format', 'jpeg');
+      if (fidelity) form.append('input_fidelity', 'high');
+      form.append('image[]', new Blob([bytes], { type: match[1] }), 'product.jpg');
+      if (guideBytes) form.append('image[]', new Blob([guideBytes], { type: guideMatch[1] }), 'scale-guide.jpg');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 110000);
+      try {
+        const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, body: form, signal: controller.signal });
+        return [r, await r.json().catch(() => ({}))];
+      } finally { clearTimeout(timeout); }
+    };
+    let [response, result] = await edit(true);
+    if (!response.ok && /input_fidelity/i.test(result?.error?.message || '')) [response, result] = await edit(false);
+    const image = result?.data?.[0]?.b64_json;
+    if (!response.ok || !image) return reply(422, { success: false, message: result?.error?.message || 'Görsel üretilemedi.' });
+    return reply(200, { success: true, action, engine: 'openai', engineError: engineError || undefined, image: `data:image/jpeg;base64,${image}` });
+  } catch (error) {
+    return reply(502, { success: false, message: error?.name === 'AbortError' ? 'Görsel üretimi zaman aşımına uğradı.' : 'Görsel servisine bağlanılamadı.' });
+  }
+};
+
+// ---- Supabase sarmalayıcısı: Netlify olayını taklit eder ----
+const IZINLI = /^https:\/\/([a-z0-9-]+(--[a-z0-9-]+)?\.netlify\.app|celksamet34-web\.github\.io)$/i;
+Deno.serve(async (req) => {
+  const origin = req.headers.get('origin') || '';
+  const izin = !origin || IZINLI.test(origin);
+  const cors = izin && origin ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Max-Age': '600' } : {};
+  if (req.method === 'OPTIONS') return new Response(null, { status: izin ? 204 : 403, headers: cors });
+  if (!izin) return new Response(JSON.stringify({ success: false, message: 'Bu istek uygulamanın yayın adresinden gelmeli.' }), { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+  const headers = {}; req.headers.forEach((v, k) => { headers[k] = v; });
+  const event = { httpMethod: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) ? '' : await req.text(), queryStringParameters: Object.fromEntries(new URL(req.url).searchParams) };
+  const r = await handler(event);
+  return new Response(r?.body ?? '', { status: r?.statusCode || 200, headers: { ...(r?.headers || {}), ...cors } });
+});
