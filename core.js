@@ -8,6 +8,17 @@ window.CLK = (() => {
   const NETLIFY = /\.netlify\.app$/i.test(location.hostname);
   const NF_SB = { 'ai-product-image': 'ai-gorsel', 'qukasoft': 'qukasoft-ek', 'fis-oku-background': 'fis-oku' };
   const nf = name => NETLIFY ? '/.netlify/functions/' + name : FN + (NF_SB[name] || name);
+  /* Supabase bir istekte en çok 1000 satır verir, fazlasını sessizce keser (06.11: sp_urun_eslesme 2.085 satıra çıkınca müşteri bakiyesi tuttu tutmadı).
+     Büyüyebilecek bir tabloyu bütün okumak için: CLK.hepsi(() => sb.from('t').select('a,b').order('a')) — sıralama şart, yoksa sayfalar karışır. */
+  async function hepsi(sorgu) {
+    const t = [];
+    for (let i = 0; ; i += 1000) {
+      const { data, error } = await sorgu().range(i, i + 999);
+      if (error) return { data: t.length ? t : null, error };
+      t.push(...(data || []));
+      if (!data || data.length < 1000) return { data: t, error: null };
+    }
+  }
 
   const RULES = { market: 3, retail: 2.5, quick: 25, d1: 25, d2: 20, d3: 15, stock: 10, critical: 3, desi: 5, desiValiz: 40, kdv: 10 };
   const S = {
@@ -392,5 +403,5 @@ window.CLK = (() => {
   const VERI = { siparis: ['siparisler', 'siparisgir', 'musteriler', 'cari', 'ciro'], musteri: ['musteriler', 'cari', 'siparisgir', 'siparisler', 'ekstre'], bakiye: ['cari', 'ekstre'] };
   function prefetch() { loadProducts(); if (herhangi(VERI.siparis)) loadOrders(); if (herhangi(VERI.musteri)) loadUsers(); if (herhangi(VERI.bakiye)) loadBalance(); }
 
-  return { end4999, kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, nf, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
+  return { end4999, hepsi, kullaniciAdi, girisEposta, MENU, izin, yonetici, EK_YETKI, VERI, herhangi, yetkiOku, araKutu, araSec, ARA, sb, S, RULES, $, $$, esc, tl, tl2, tlc, num, dt, dtt, toast, P, O, ORDER_STATUS, BAL_TYPE, prices, hex12, call, nf, loadProducts, loadOrders, loadUsers, loadBalance, loadCategories, head, skel, errBox, ICONS, views, go, render, boot };
 })();

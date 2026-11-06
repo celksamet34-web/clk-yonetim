@@ -30,18 +30,18 @@
     return j;
   }
   const bpSor = govde => sor(govde, BPFN);
+  // sayfa sayfa okurken birincil anahtara göre sıralanır (sırasız sayfalar satır atlayabilir ya da iki kez verebilir)
+  const ANAHTAR = { ug_firma: ['id'], ug_urun_eslesme: ['firma', 'fis_adi'], ug_musteri_eslesme: ['grup'] };
   async function hepsi(tablo, alanlar) {
-    const out = [];
-    for (let i = 0; ; i += 1000) {
-      const { data, error } = await sb.from(tablo).select(alanlar).range(i, i + 999);
-      if (error) throw new Error(error.message);
-      out.push(...data); if (data.length < 1000) return out;
-    }
+    const sira = ANAHTAR[tablo] || [alanlar.split(',')[0]];
+    const { data, error } = await CLK.hepsi(() => sira.reduce((q, k) => q.order(k), sb.from(tablo).select(alanlar)));
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   // --- veri ---
   async function fisleriAl() {
-    const { data, error } = await sb.from('ug_fis').select('*').order('gonderilme', { ascending: false });
+    const { data, error } = await CLK.hepsi(() => sb.from('ug_fis').select('*').order('gonderilme', { ascending: false }).order('id'));
     if (error) throw new Error(error.message);
     D.fisler = data;
     await urlleriAl();

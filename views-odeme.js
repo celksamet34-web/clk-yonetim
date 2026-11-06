@@ -225,12 +225,13 @@
     OD.is = false; S.keepScroll = true; render();
   }
   /* telefon bildirimleri (06.11: ntfy.sh ücretsiz kotayı internet adresine göre sayıyor; Supabase'in ortak çıkış adresinde 19:00'da doldu, sipariş bildirimleri dahil
-     hiçbiri gitmedi). Hesap anahtarı (sp_ayar.ntfy_token) girilince kota yalnız bize ait olur. Her bildirim bildirim_kayit'a yazılır, ulaşmayan 15 dk'da bir yeniden
+     hiçbiri gitmedi). Hesap anahtarı (sp_ayar.ntfy_token) ücretli planda (Supporter, 2.500/gün; celik 06.11 20:58 aldı) kotayı bize ayırır; ücretsiz hesap da
+     IP'ye göre sayılır (ntfy /v1/account limits.basis "ip"). Her bildirim bildirim_kayit'a yazılır, ulaşmayan 15 dk'da bir yeniden
      gönderilir (cron bildirim-kontrol). Veritabanı fonksiyonları (yalnız yönetici): bildirim_durum, bildirim_hesap, bildirim_deneme, bildirim_sonuc; kurulum
      /mnt/project-files/sunucu/bildirim.sql. Kurulmamışsa eski deneme (odeme-takvim) kullanılır. */
   const NB = (OD.nb ||= { d: null, yuk: false, zaman: 0, hata: '', kurulu: true, a: '', kay: false, den: '', denHata: '' });
   const nbCiz = () => { S.keepScroll = true; render(); };
-  const nbHataYazi = h => !h ? '' : h.kod === 429 ? 'ntfy.sh günlük ücretsiz kotası doldu (429). Ulaşmayan bildirimler bekletilir, kota açılınca gönderilir; hesap anahtarı girilirse bu olmaz.'
+  const nbHataYazi = h => !h ? '' : h.kod === 429 ? 'ntfy.sh günlük ücretsiz kotası doldu (429). Ulaşmayan bildirimler bekletilir, kota açılınca gönderilir. ntfy hesabının Supporter planı sürüyor mu bakın (ücretsiz hesap da ortak kotayı kullanır).'
     : h.kod === 401 || h.kod === 403 ? `ntfy.sh anahtarı kabul etmedi (${h.kod}). Anahtarı yeniden kopyalayıp kaydedin.` : 'ntfy.sh hatası' + (h.kod ? ` (${h.kod})` : '') + (h.hata ? ': ' + String(h.hata).slice(0, 120) : '');
   async function nbYukle(zorla) {
     if (NB.yuk || (!zorla && Date.now() - NB.zaman < 60000)) return;
@@ -279,7 +280,7 @@
         </ul>`;
     const form = NB.kurulu ? `<label class="nb-a"><span>ntfy hesap anahtarı</span><input id="nbAnahtar" type="password" autocomplete="off" spellcheck="false" placeholder="${d?.hesap ? 'Kayıtlı · değiştirmek için yenisini yapıştırın' : 'tk_…'}" value="${esc(NB.a)}"></label>
         <div class="nb-btn"><button class="btn dark sm" data-act="odNbKaydet" ${NB.kay ? 'disabled' : ''}>${NB.kay ? 'Kaydediliyor…' : 'Anahtarı kaydet'}</button>${d?.hesap ? '<button class="btn sm ghost" data-act="odNbSil">Anahtarı kaldır</button>' : ''}</div>
-        <p class="hint">ntfy.sh/signup ile ücretsiz hesap açın, ntfy.sh/account › Access tokens › Create access token (süre: never). Anahtar yalnız sunucuda saklanır, burada geri gösterilmez. Telefondaki uygulamada değişiklik gerekmez.</p>` : '';
+        <p class="hint">Kota yalnız ücretli (Supporter) ntfy hesabında bize ait olur; ücretsiz hesap da ortak adres kotasını kullanır (06.11'de Supporter alındı). Anahtar: ntfy.sh/account › Access tokens › Create access token (süre: never). Anahtar yalnız sunucuda saklanır, burada geri gösterilmez. Telefondaki uygulamada değişiklik gerekmez.</p>` : '';
     return `${durum}${NB.hata ? `<p class="msg err">${esc(NB.hata)}</p>` : ''}${form}
       <div class="nb-btn"><button class="btn gold sm" data-act="odDeneme" ${OD.is || NB.den === 'gidiyor' ? 'disabled' : ''}>${NB.den === 'gidiyor' ? 'Gönderiliyor…' : 'Deneme bildirimi gönder'}</button></div>
       ${NB.den === 'tamam' ? '<p class="msg ok">ntfy.sh bildirimi aldı; telefonunuza gelmiş olmalı.</p>' : NB.den === 'hata' ? `<p class="msg err">${esc(NB.denHata)}</p>` : ''}`;

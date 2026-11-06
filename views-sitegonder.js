@@ -55,7 +55,7 @@
   };
   // Paraşüt ürünleri (arşivdekiler hariç), fiyat kuralları ve kategori eşleştirmesi
   async function oku() {
-    const [v, k, a, g] = await Promise.all([sor({ islem: 'urunler' }), sb.from('fiyat_kural').select('*'), sb.from('fiyat_ayar').select('ad,deger'), sb.from('urun_gorsel').select('parasut_id,urls,site_eklendi').limit(5000)]);
+    const [v, k, a, g] = await Promise.all([sor({ islem: 'urunler' }), sb.from('fiyat_kural').select('*'), sb.from('fiyat_ayar').select('ad,deger'), CLK.hepsi(() => sb.from('urun_gorsel').select('parasut_id,urls,site_eklendi').order('parasut_id'))]);
     if (k.error) throw new Error(k.error.message);
     // panelde saklanan ürün fotoğrafları (urun_gorsel; tablo yoksa ya da yetki yoksa boş)
     if (!g.error) D.gorsel = Object.fromEntries((g.data || []).map(r => [String(r.parasut_id), { n: (r.urls || []).length, eklendi: r.site_eklendi }]));

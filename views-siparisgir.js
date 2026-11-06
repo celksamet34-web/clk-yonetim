@@ -44,7 +44,7 @@
   CLK.siparisAc = uid => { yeniForm(); T.musteri = Number(uid) || null; CLK.go('siparisgir'); };
   // müşteriler: Paraşüt'le eşleşmiş site üyeleri; fiyat tanımı, iskonto ve bakiye sitedeki üye kartından
   async function musterileriAl() {
-    const [{ data: es, error }] = await Promise.all([sb.from('sp_musteri_eslesme').select('site_ad,parasut_id,parasut_ad').not('parasut_id', 'is', null), CLK.loadUsers()]);
+    const [{ data: es, error }] = await Promise.all([CLK.hepsi(() => sb.from('sp_musteri_eslesme').select('site_ad,parasut_id,parasut_ad').not('parasut_id', 'is', null).order('site_ad')), CLK.loadUsers()]);
     if (error) throw new Error(error.message);
     for (let i = 0; i < 150 && !S.uLoaded && !S.uErr; i++) await new Promise(r => setTimeout(r, 200));
     if (!S.uLoaded) throw new Error(S.uErr || 'Site üyeleri alınamadı.');

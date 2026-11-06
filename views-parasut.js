@@ -6,13 +6,11 @@
   const GERI = { gonderildi: ['Siteye geçti', 'ok'], gonderiliyor: ['Gönderiliyor', 'info'], eslesme_yok: ['Ürün eşleşmemiş', 'warn'], hata: ['Hata', 'bad'], atla: ['Atlandı', 'off'], iptal: ['Sitede iptal edildi', 'off'] };
   const DURUM = { aktarildi: ['Paraşüt\'te', 'ok'], aktariliyor: ['Aktarılıyor', 'info'], kargo_bekliyor: ['Kargo bekliyor', 'off'], eslesme_yok: ['Ürün seçilmemiş', 'warn'], musteri_yok: ['Müşteri seçilmemiş', 'warn'], hata: ['Hata', 'bad'], iptal: ['İptal', 'off'], iptal_kontrol: ['İptal, faturayı kontrol et', 'bad'] };
 
+  // sayfa sayfa, ilk sütuna (birincil anahtar) göre sıralı: sp_parasut_urun 2.122 satır ve sık güncelleniyor, sırasız sayfalar satır atlayabilir
   async function hepsi(tablo, sutun) {
-    const out = [];
-    for (let i = 0; ; i += 1000) {
-      const { data, error } = await sb.from(tablo).select(sutun).range(i, i + 999);
-      if (error) throw new Error(error.message);
-      out.push(...data); if (data.length < 1000) return out;
-    }
+    const { data, error } = await CLK.hepsi(() => sb.from(tablo).select(sutun).order(sutun.split(',')[0]));
+    if (error) throw new Error(error.message);
+    return data;
   }
   async function yukle() {
     D.yukleniyor = true; D.hata = ''; render();

@@ -23,7 +23,7 @@
     try {
       const out = [];
       for (let i = 0; ; i += 1000) {
-        const { data, error } = await sb.from('sp_parasut_musteri').select('id,ad').range(i, i + 999);
+        const { data, error } = await sb.from('sp_parasut_musteri').select('id,ad').order('id').range(i, i + 999);
         if (error) throw new Error(error.message);
         out.push(...data); if (data.length < 1000) break;
       }
