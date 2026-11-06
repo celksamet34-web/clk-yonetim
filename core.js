@@ -72,21 +72,28 @@ window.CLK = (() => {
   }
   async function loadProducts(force) {
     if (S.pLoading || (S.pLoaded && !force)) return; S.pLoading = true; S.pErr = ''; render();
+    // ilk sayfadan toplam öğrenilir, kalan sayfalar 3'er 3'er birlikte istenir (celik 06.11: "ana sayfada stok değeri arkadan yükleniyor"; 42 sayfa tek tek ~25 sn sürüyordu)
+    const BOY = 50, sayfaAl = async page => { for (let i = 0; ; i++) { try { return await call('qukasoft-product-list', { query: { page, pageSize: BOY, field: 'name', search: '' } }); } catch (e) { if (i >= 2) throw e; await new Promise(r => setTimeout(r, 1500 * (i + 1))); } } };
     try {
-      const all = []; let page = 0, total = Infinity;
-      while (all.length < total && page < 80) {
-        const j = await call('qukasoft-product-list', { query: { page, pageSize: 50, field: 'name', search: '' } });
-        const rows = j.products || []; all.push(...rows); total = Number(j.total) || all.length;
-        S.products = all.slice(); S.pProg = `${num(all.length)} / ${isFinite(total) ? num(total) : '…'}`; render();
-        if (rows.length < 50) break; page++;
-      }
+      const ilk = await sayfaAl(0), sayfalar = [ilk.products || []];
+      const total = Number(ilk.total) || sayfalar[0].length, adet = Math.min(80, Math.ceil(total / BOY));
+      // "Yenile"de eski tam liste yeni liste bitene kadar kalır (yarım listeyle stok değeri düşüp yeniden büyümesin)
+      const goster = () => { const l = sayfalar.flat(); S.pProg = `${num(l.length)} / ${num(total)}`; if (!S.pLoaded) S.products = l; render(); };
+      goster();
+      let sira = 1;
+      const isci = async () => { while (sira < adet) { const page = sira++; sayfalar[page] = (await sayfaAl(page)).products || []; goster(); } };
+      if ((sayfalar[0].length >= BOY)) await Promise.all([isci(), isci(), isci()]);
+      // toplam bu arada değiştiyse (yeni ürün) eksik kalan son sayfalar tek tek alınır
+      let all = sayfalar.flat();
+      for (let page = adet; all.length < total && page < 80; page++) { const rows = (await sayfaAl(page)).products || []; all = all.concat(rows); if (rows.length < BOY) break; }
+      const gorulen = new Set(); all = all.filter(p => { const k = p.id ?? p.code; if (gorulen.has(k)) return false; gorulen.add(k); return true; });
       S.products = all; S.pLoaded = true; S.pAt = new Date();
     } catch (e) { S.pErr = e.message; }
     S.pLoading = false; render();
   }
   async function loadOrders(force) {
     if (S.oLoading || (S.oLoaded && !force)) return; S.oLoading = true; S.oErr = ''; render();
-    try { S.orders = await pagedData('orders', 20, a => { S.orders = a.slice(); render(); }); S.oLoaded = true; } catch (e) { S.oErr = e.message; }
+    try { S.orders = await pagedData('orders', 20, a => { if (!S.oLoaded) { S.orders = a.slice(); render(); } }); S.oLoaded = true; } catch (e) { S.oErr = e.message; }
     S.oLoading = false; render();
   }
   async function loadUsers(force) {

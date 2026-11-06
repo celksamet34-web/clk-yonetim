@@ -47,6 +47,12 @@
   const thumb = p => p && P.img(p) ? `<img class="th" src="${esc(P.img(p))}" alt="" loading="lazy">` : '<span class="th"></span>';
 
   /* ---------- panel ---------- */
+  // panel rakamlarının son tam hali bu cihazda saklanır: veriler arkada yüklenirken rakam sıfırdan büyüyerek gelmesin, son değer "yenileniyor" notuyla görünsün (celik 06.11)
+  const OZET_K = 'clk-panel-ozet';
+  const ozetOku = () => { try { return JSON.parse(localStorage.getItem(OZET_K) || '{}') || {}; } catch { return {}; } };
+  const ozetYaz = o => { try { localStorage.setItem(OZET_K, JSON.stringify(o)); } catch {} };
+  const saat = t => new Date(t).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const yenileniyor = t => `<span class="kpi-eski">${new Date(t).toDateString() === new Date().toDateString() ? saat(t) : new Date(t).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }) + ' ' + saat(t)} değeri · ${S.pErr || S.oErr ? 'yenilenemedi' : 'yenileniyor'}</span>`;
   views.panel = () => {
     const acts = `<button class="btn sm" data-act="reloadAll">Yenile</button>${CLK.izin('yeni') ? '<button class="btn dark sm" data-go="yeni">+ Yeni ürün</button>' : ''}`;
     // personel yalnız yetkili olduğu rakamları görür (ciro/kâr/stok değeri, sipariş, cari, çek-senet)
@@ -60,13 +66,25 @@
     const debt = S.users.reduce((a, u) => a + Math.min(0, Number(u.balance) || 0), 0);
     const pm = prodByCode();
     const top = (s30.top.length ? s30.top : sAll.top).slice(0, 6);
+    // tam yüklenince saklanır; yüklenirken saklanan gösterilir
+    const oz = ozetOku(), uid = S.user?.id || '';
+    if (oz.uid !== uid) { oz.uid = uid; delete oz.stok; delete oz.ciro; }
+    let degisti = false;
+    if (S.pLoaded) { oz.stok = { cost: gor.ciro ? cost : null, n: PR.length, on: on.length, out: out.length, t: Date.now() }; degisti = true; }
+    if (S.oLoaded && S.pLoaded) { oz.ciro = { per, rev: gor.ciro ? s30.rev : null, cnt: s30.cnt, profit: gor.ciro ? s30.profit : null, pend: pend.length, t: Date.now() }; degisti = true; }
+    if (degisti) ozetYaz(oz);
+    const st = !S.pLoaded && oz.stok, ci = !(S.oLoaded && S.pLoaded) && oz.ciro;
+    const kStok = st ? { v: st.cost != null ? tlc(st.cost) : '…', s: `${num(st.n)} ürün · ${yenileniyor(st.t)}` } : !S.pLoaded ? { v: '…', s: `ürünler yükleniyor ${esc(S.pProg || '')}` } : { v: tlc(cost), s: `${num(PR.length)} ürün · alış fiyatıyla` };
+    const kUrun = st ? { v: num(st.n), s: `${num(st.on)} yayında · ${num(st.out)} tükenen · ${yenileniyor(st.t)}` } : { v: num(PR.length), s: `${num(on.length)} yayında · ${num(out.length)} tükenen` };
+    const kCiro = ci && ci.rev != null ? { k: `Son ${ci.per === 365 ? '12 ay' : ci.per + ' gün'} ciro`, v: tlc(ci.rev), s: `${num(ci.cnt)} sipariş · ${yenileniyor(ci.t)}` } : { k: `Son ${per === 365 ? '12 ay' : per + ' gün'} ciro`, v: tlc(s30.rev), s: `${num(s30.cnt)} sipariş · tahmini brüt kâr ${tlc(s30.profit)}` };
+    const kBekle = ci && !S.oLoaded ? ci.pend : pend.length;
     const alerts = [...out, ...low].slice(0, 6);
     return head('Genel bakış', 'Panel', `Son güncelleme ${CLK.S.pAt ? CLK.S.pAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—'}`, acts) + `
     <div class="stack">
       <div class="kpis">
-        ${gor.ciro ? `<div class="kpi hero"><div class="k">Son ${per === 365 ? '12 ay' : per + ' gün'} ciro</div><div class="v">${tlc(s30.rev)}</div><div class="s">${num(s30.cnt)} sipariş · tahmini brüt kâr ${tlc(s30.profit)}</div></div>` : ''}
-        ${gor.sip ? `<div class="kpi tikla" data-act="bekleyenGit" role="link" tabindex="0" title="Bekleyen siparişleri aç"><div class="k">Bekleyen sipariş</div><div class="v">${num(pend.length)}</div><div class="s">yeni ve hazırlanan</div></div>` : ''}
-        ${gor.ciro ? `<div class="kpi"><div class="k">Stok değeri</div><div class="v">${tlc(cost)}</div><div class="s">${num(PR.length)} ürün · alış fiyatıyla</div></div>` : `<div class="kpi"><div class="k">Ürün</div><div class="v">${num(PR.length)}</div><div class="s">${num(on.length)} yayında · ${num(out.length)} tükenen</div></div>`}
+        ${gor.ciro ? `<div class="kpi hero"><div class="k">${kCiro.k}</div><div class="v">${kCiro.v}</div><div class="s">${kCiro.s}</div></div>` : ''}
+        ${gor.sip ? `<div class="kpi tikla" data-act="bekleyenGit" role="link" tabindex="0" title="Bekleyen siparişleri aç"><div class="k">Bekleyen sipariş</div><div class="v">${num(kBekle)}</div><div class="s">yeni ve hazırlanan${ci && !S.oLoaded ? ' · ' + yenileniyor(ci.t) : ''}</div></div>` : ''}
+        ${gor.ciro ? `<div class="kpi"><div class="k">Stok değeri</div><div class="v">${kStok.v}</div><div class="s">${kStok.s}</div></div>` : `<div class="kpi"><div class="k">Ürün</div><div class="v">${kUrun.v}</div><div class="s">${kUrun.s}</div></div>`}
         ${gor.cari ? `<div class="kpi ${debt < 0 ? 'bad' : ''}"><div class="k">Açık cari</div><div class="v">${tlc(Math.abs(debt))}</div><div class="s">${num(S.users.filter(u => (Number(u.balance) || 0) < 0).length)} müşteri borçlu</div></div>` : ''}
       </div>
       ${CLK.senetPanel && gor.cek ? CLK.senetPanel.kisa() : ''}
