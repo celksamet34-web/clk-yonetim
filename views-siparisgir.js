@@ -3,6 +3,7 @@
   const { sb, S, $, esc, toast, head, views, render, araKutu, araSec, ARA } = CLK;
   const FN = 'https://prkzzaqinfeptmmbkqsd.supabase.co/functions/v1/siparis-parasut';
   const TIP = [[0, 'Site fiyatı', 'site'], [2, 'Bayi fiyatı 1', 'b1'], [3, 'Bayi fiyatı 2', 'b2'], [4, 'Bayi fiyatı 3', 'b3'], [5, 'Bayi fiyatı 4', 'b4']];
+  const HIZLI = [2, 3, 5, 10];
   const SIK_RENK = ['SİYAH', 'KAHVE', 'TABA', 'LACİVERT', 'GRİ', 'BEJ', 'VİZON', 'BORDO', 'KIRMIZI', 'YEŞİL', 'HAKİ', 'MAVİ', 'PEMBE', 'BEYAZ'];
   const D = (S.ui.sg ||= { musteriler: null, urunler: null, kurallar: {}, yuvarla: 1, renkler: {}, hata: '', ara: '', durum: '', sonuc: null, odak: '' });
   // form her açılışta boş gelir (celik isteği 29.10.2026); taslak saklanmaz
@@ -142,7 +143,9 @@
     const u = urun(s.pid), o = otoFiyat(u), b = birim(s);
     const site = siteRenk(s.pid), stok = Object.fromEntries(site.map(x => [x[0], x[1]]));
     const renkNot = r => !site.length ? '' : !(r.renk in stok) ? '<small class="sg-uyar">sitede yok</small>' : `<small class="${Number(r.adet) > stok[r.renk] ? 'sg-uyar' : ''}">stok ${stok[r.renk]}</small>`;
-    const renkler = s.renkler.map((r, i) => `<div class="sg-renk"><span class="sg-renk-ad">${r.renk ? esc(r.renk) : 'Renk yok'}${renkNot(r)}</span>
+    // hızlı adet (celik 06.11: "+2 +3 +5 +10 renklerin yanına"): yazılı adede eklenir
+    const hizli = i => `<span class="sg-hizli">${HIZLI.map(n => `<button type="button" data-act="sgHizli" data-pid="${s.pid}" data-i="${i}" data-n="${n}" aria-label="${n} adet ekle">+${n}</button>`).join('')}</span>`;
+    const renkler = s.renkler.map((r, i) => `<div class="sg-renk"><span class="sg-renk-ad">${r.renk ? esc(r.renk) : 'Renk yok'}${renkNot(r)}</span>${hizli(i)}
       <input id="sgAdet-${s.pid}-${i}" class="sg-adet" data-pid="${s.pid}" data-i="${i}" inputmode="numeric" value="${esc(r.adet)}" placeholder="0" aria-label="${esc(r.renk || 'Adet')} adedi">
       ${s.renkler.length > 1 || r.renk ? `<button type="button" class="sg-x" data-act="sgRenkSil" data-pid="${s.pid}" data-i="${i}" aria-label="${esc(r.renk || 'Satırı')} kaldır">×</button>` : ''}</div>`).join('');
     const oneri = SIK_RENK.filter(r => !s.renkler.some(x => x.renk === r) && !(D.renkler[s.pid] || []).includes(r)).slice(0, 8);
@@ -201,7 +204,7 @@
         <label>Fiyat tanımı (★ müşterinin) <select id="sgTip">${TIP.map(([k, l]) => `<option value="${k}" ${tip() === k ? 'selected' : ''}>${l}${k === m.tip ? ' ★' : ''}</option>`).join('')}</select></label>
         <div><small>İskonto</small><b>%${m.iskonto}</b></div></div>` : ''}` : ''}
     </div>`;
-    const urunKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">2</span><h3>Ürünler</h3><span class="sg-soluk">${n ? `${n} ürün · ${ta} adet` : ''}</span></div>
+    const urunKutu = `<div class="card sg-kart"><div class="sg-baslik"><span class="sg-no">2</span><h3>Ürünler</h3><span class="sg-soluk" id="sgUrunSay">${n ? `${n} ürün · ${ta} adet` : ''}</span></div>
       <div class="sg-ara"><input id="sgAra" type="search" autocomplete="off" placeholder="${D.urunler ? 'Ürün adı ya da kodu yazın (örn. 4924)' : 'Ürünler yükleniyor…'}" value="${esc(D.ara)}" ${m ? '' : 'disabled'} aria-label="Ürün ara">
         ${m ? `<div id="sgSonuc">${sonucHtml()}</div>` : '<p class="sg-soluk">Önce müşteriyi seçin; fiyatlar müşteriye göre hesaplanır.</p>'}</div>
       <div class="sg-satirlar">${n ? T.satirlar.map(satirHtml).join('') : m ? '<p class="sg-bos">Henüz ürün eklenmedi. Yukarıda arayıp tıklayın.</p>' : ''}</div>
@@ -213,10 +216,16 @@
   araSec.sgMus = mus => { D.gizli = false; T.musteri = mus.id; T.tip = null; D.durum = ''; sakla(); D.odak = 'sgAra'; };
 
   // adet yazılınca yalnız ürünün başlığı ve özet yenilenir; odaktaki kutu yerinde kalır
+  // sitedeki stoktan fazla yazılınca stok yazısı kırmızı olur
+  function stokUyar(s, i) {
+    const r = s.renkler[i], st = siteRenk(s.pid).find(x => x[0] === r?.renk), not = document.getElementById(`sgAdet-${s.pid}-${i}`)?.parentElement.querySelector('.sg-renk-ad small');
+    if (st && not) not.classList.toggle('sg-uyar', Number(r.adet) > st[1]);
+  }
   function parcaYenile(s) {
     const ust = document.querySelector(`.sg-satir-ust[data-pid="${s.pid}"]`); if (ust) ust.innerHTML = satirUst(s);
     const oz = $('#sgOzet'); if (oz && !oz.contains(document.activeElement)) oz.innerHTML = ozetHtml();
     const mb = $('#sgMbar'); if (mb) mb.innerHTML = mbarHtml();
+    const say = $('#sgUrunSay'); if (say) say.textContent = `${T.satirlar.length} ürün · ${toplamAdet()} adet`;
   }
 
   views.bind_siparisgir = () => {
@@ -233,10 +242,7 @@
     sat?.addEventListener('input', e => {
       const el = e.target, s = T.satirlar.find(x => x.pid === el.dataset.pid); if (!s) return;
       if (el.classList.contains('sg-adet')) {
-        const r = s.renkler[+el.dataset.i]; r.adet = el.value.replace(/\D/g, ''); sakla(); parcaYenile(s);
-        // sitedeki stoktan fazla yazılınca stok yazısı kırmızı olur
-        const st = siteRenk(s.pid).find(x => x[0] === r.renk), not = el.parentElement.querySelector('.sg-renk-ad small');
-        if (st && not) not.classList.toggle('sg-uyar', Number(r.adet) > st[1]);
+        const r = s.renkler[+el.dataset.i]; r.adet = el.value.replace(/\D/g, ''); sakla(); parcaYenile(s); stokUyar(s, +el.dataset.i);
       }
     });
     sat?.addEventListener('change', e => {
@@ -292,6 +298,12 @@
     else if (act === 'sgKapat' && s) { s.acik = false; sakla(); S.keepScroll = true; render(); }
     else if (act === 'sgSil' && s) { T.satirlar = T.satirlar.filter(x => x !== s); sakla(); S.keepScroll = true; render(); }
     else if (act === 'sgRenkEkle' && s) renkEkle(s, el.dataset.renk);
+    else if (act === 'sgHizli' && s) {
+      const i = +el.dataset.i, r = s.renkler[i]; if (!r) return;
+      r.adet = String((Number(r.adet) || 0) + Number(el.dataset.n)); sakla();
+      const k = document.getElementById(`sgAdet-${s.pid}-${i}`); if (k) k.value = r.adet;
+      parcaYenile(s); stokUyar(s, i);
+    }
     else if (act === 'sgRenkSil' && s) { s.renkler.splice(+el.dataset.i, 1); if (!s.renkler.length) s.renkler.push({ renk: '', adet: '' }); sakla(); S.keepScroll = true; render(); }
     else if (act === 'sgOto' && s) { s.fiyat = null; sakla(); S.keepScroll = true; render(); }
     else if (act === 'sgOnay') { D.durum = 'onay'; S.keepScroll = true; render(); }

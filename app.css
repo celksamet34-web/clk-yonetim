@@ -571,10 +571,15 @@ body{font-size:15px;letter-spacing:0}
 .sg-satir-ad small b{color:var(--ink)}
 .sg-satir-adet,.sg-satir-tutar{text-align:right;font-variant-numeric:tabular-nums}
 .sg-satir-alt{padding:4px 14px 14px;display:grid;gap:12px;border-top:1px solid var(--line-2);background:#fcfcfd}
-.sg-renkler{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding-top:10px}
-.sg-renk{display:flex;align-items:center;gap:6px;border:1px solid var(--line-2);border-radius:12px;padding:6px 6px 6px 12px;background:#fff}
-.sg-renk-ad{flex:1;font-weight:700;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sg-renk input.sg-adet{width:64px;min-height:40px;padding:6px 8px;text-align:center;font-size:17px;font-weight:700;border-radius:9px}
+.sg-renkler{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:8px;padding-top:10px}
+/* renk kartı: solda renk adı ve altında +2 +3 +5 +10, sağda adet ve × */
+.sg-renk{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"ad adet x" "hiz adet x";column-gap:6px;row-gap:6px;align-items:center;border:1px solid var(--line-2);border-radius:12px;padding:8px 6px 8px 12px;background:#fff}
+.sg-renk-ad{grid-area:ad;font-weight:700;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg-hizli{grid-area:hiz;display:flex;gap:5px;min-width:0}
+.sg-hizli button{all:unset;cursor:pointer;box-sizing:border-box;min-width:40px;height:32px;padding:0 6px;display:grid;place-items:center;border:1px solid var(--line-2);border-radius:9px;background:var(--sunk);font:700 13px var(--f-b);color:var(--ink);font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.sg-hizli button:active{background:var(--gold-soft);border-color:var(--gold)}
+.sg-renk input.sg-adet{grid-area:adet;width:64px;min-height:40px;padding:6px 8px;text-align:center;font-size:17px;font-weight:700;border-radius:9px}
+.sg-renk .sg-x{grid-area:x}
 .sg-x{all:unset;cursor:pointer;width:28px;height:28px;display:grid;place-items:center;border-radius:8px;color:var(--muted);font-size:18px}
 .sg-x:hover{background:var(--sunk);color:var(--bad)}
 .sg-renk-ekle{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -610,7 +615,7 @@ body{font-size:15px;letter-spacing:0}
 @media (max-width:560px){.sg-satir-ust{grid-template-columns:minmax(0,1fr) auto}.sg-satir-adet{display:none!important}.sg-renkler{grid-template-columns:1fr 1fr}}
 .side{overflow-y:auto}
 .sg-satir-alt>*{min-width:0}
-.sg-renkler{grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr))}
+.sg-renkler{grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr))}
 @media (max-width:560px){.sg-renkler{grid-template-columns:minmax(0,1fr)}.sg-renk{padding-left:10px}.sg-renk input.sg-adet{width:52px}.sg-renk-ekle input{max-width:none}}
 
 /* Sipariş gir: telefonda toplam alt çubukta */
@@ -620,6 +625,12 @@ body{font-size:15px;letter-spacing:0}
   .sg-mbar span{display:grid;gap:1px}.sg-mbar small{font-size:12px;color:var(--muted)}.sg-mbar b{font-size:18px;font-variant-numeric:tabular-nums}
   .sg-duzen{padding-bottom:64px}
   #sgOzet{scroll-margin-top:76px}
+  /* Sipariş gir'de alt menü yok (celik 06.11: "sipariş yazarken alt menü kalksın, sayfa çok bozuluyor"); toplam çubuğu en altta, sayfalar üstteki MENÜ'den */
+  .shell[data-sayfa=siparisgir] .mnav{display:none}
+  .shell[data-sayfa=siparisgir] .main{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  .shell[data-sayfa=siparisgir] .sg-mbar:not([hidden]){bottom:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  /* klavye açıkken alttaki sabit çubuklar klavyenin üstüne binmesin */
+  html.klavye .mnav,html.klavye .sg-mbar:not([hidden]){display:none}
 }
 .sg-gizli-dug{all:unset;cursor:pointer;margin-top:10px;font-size:12px;font-weight:600;color:var(--muted);padding:4px 0}
 .sg-gizli-dug:hover{color:var(--ink)}

@@ -215,11 +215,11 @@ window.CLK = (() => {
       const ic = k === 'siparisgir' ? `<span class="ic">${ICONS.plus}</span>` : k === 'daha' ? ICONS.more : ICONS[k];
       return `<button data-go="${k}" class="${k === 'siparisgir' ? 'add' : ''}" ${cur ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`;
     }).join('');
-    return `<div class="shell">
+    return `<div class="shell" data-sayfa="${esc(S.route)}">
       <aside class="side"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK<small>ÇANTA · YÖNETİM</small></div>
         <nav class="nav">${nav}${esitleBtn()}</nav>
         <div class="foot"><b>${esc(S.yetki?.ad || S.yetki?.kullanici || S.user?.email || '')}</b>${S.yetki && S.yetki.rol !== 'yonetici' ? '<small>Personel</small>' : ''}<button class="link" data-act="logout">Çıkış yap</button></div></aside>
-      <header class="mtop"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK</div><div class="mtop-acts">${izin('esitle') ? `<button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button>` : ''}<button data-act="logout">Çıkış</button></div></header>
+      <header class="mtop"><div class="logo" data-act="yenile" role="link" tabindex="0" title="Ana sayfa (sayfayı yenile)">CLK</div><div class="mtop-acts">${S.route === 'siparisgir' ? '<button data-go="daha">MENÜ</button>' : ''}${izin('esitle') ? `<button data-act="esitle" ${S.esitleniyor ? 'disabled' : ''}>${S.esitleniyor ? 'EŞİTLENİYOR…' : 'EŞİTLE'}</button>` : ''}<button data-act="logout">Çıkış</button></div></header>
       <main class="main" id="main">${content}</main>
       <nav class="mnav">${mob}</nav>
       <div class="sheet-more" id="more" data-act="moreKapat" ${S.more ? '' : 'hidden'}><div class="sheet-in">${MENU.filter(([g]) => g).map(([g, l]) => `<div class="sheet-g">${g}</div>` + l.map(([k, t]) => `<button data-go="${k}">${k === 'yeni' ? ICONS.plus : ICONS[k]}<span>${t}</span></button>`).join('')).join('')}${esitleBtn()}</div></div></div>`;
@@ -301,6 +301,19 @@ window.CLK = (() => {
   const yaziAlani = el => !!el && !el.readOnly && !el.disabled && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !YAZI_DISI.test(el.type)));
   document.addEventListener('input', e => { if (yaziAlani(e.target)) sonYazi = performance.now(); }, true);
   document.addEventListener('focusin', e => { if (yaziAlani(e.target)) sonYazi = performance.now(); }, true);
+  // klavye açıkken alttaki sabit çubuklar (menü, sipariş toplamı) gizlenir (html.klavye). Android'de geri tuşuyla klavye kapanınca kutu odakta kalır: görünen alan yeniden tam boysa çubuklar döner
+  let vvEn = 0, vvGen = 0, odakAn = 0;
+  function klavye(e) {
+    const vv = window.visualViewport;
+    if (e?.type === 'focusin') odakAn = performance.now();
+    if (vv) { if (innerWidth !== vvGen) { vvGen = innerWidth; vvEn = 0; } vvEn = Math.max(vvEn, vv.height); }
+    // odaklanınca klavye açılırken (ilk ~1 sn) görünen alan henüz küçülmemiş olabilir
+    const acik = dokunmatik() && yaziAlani(document.activeElement) && (!vv || performance.now() - odakAn < 1000 || vv.height < vvEn - 120);
+    document.documentElement.classList.toggle('klavye', acik);
+  }
+  document.addEventListener('focusin', klavye, true);
+  document.addEventListener('focusout', () => setTimeout(klavye, 60), true);
+  window.visualViewport?.addEventListener('resize', () => klavye());
   function draw() {
     const app = $('#app'), ae = document.activeElement, kullanici = kullaniciIstedi;
     kullaniciIstedi = false;
