@@ -1,7 +1,9 @@
 /* CLK Yönetim — CLK Perakende: mağazadaki BenimPOS kasasının stoğu ve satışları (celik 06.11.2026: "orda ki stoğu da görsek iyi olur",
    "form üzerinde clk perakende mi yapsak", "mağaza bayan çantaları ve cüzdanlar var", "diğer ürünler west valiz seventeen dağcı sırt vs toptan bölümünden veriyoruz").
    Mağazaya özel bayan çanta ve cüzdanlar yalnız BenimPOS'ta kalır (celik 06.11 karar kartında "Hayır, BenimPOS'ta kalsın"); toptandan gelen ürünler
-   Paraşüt ürünüyle eşleştirilir. Bu sürüm yalnız okur; BenimPOS'a ve Paraşüt'e yazma sonra, tek üründe denenerek açılacak.
+   Paraşüt ürünüyle eşleştirilir. BenimPOS'a yazmaz. Paraşüt sekmesi (yalnız yönetici): toptandan verilen ürünün mağaza satışı Paraşüt'e
+   CLK PERAKENDE satış faturası + tahsilat olur (celik 06.11: nakit Kasa Hesabı, kart GARANTİ POS, IBAN KUVEYTTÜRK; "eski satışları girme,
+   yarından itibaren girersin": 07.11.2026 öncesi yazılmaz). Kapalı başlar, ilk fiş elle yazılır, sonra otomatik.
    Sunucu: Supabase edge fonksiyonu `benimpos` (kaynak proje dosyalarında sunucu/benimpos). */
 (() => {
   const { sb, S, $, esc, tl, num, dtt, toast, head, views, render, yonetici } = CLK;
@@ -62,7 +64,7 @@
       <ol class="pk-adim">
         <li>BenimPOS'ta <b>Entegrasyonlar › API Entegrasyonu</b> modülünü açın (yıllık 1.500 ₺ + KDV).</li>
         <li>Aynı sayfadaki <b>Şube ID</b>, <b>Api Key</b> ve <b>Secret Key</b> değerlerini aşağıya yapıştırın.</li>
-        <li>Panel önce yalnız okur: mağaza stoğu, satışlar ve Paraşüt eşleşmesi. BenimPOS'a ve Paraşüt'e bir şey yazılmaz.</li>
+        <li>Panel mağaza stoğunu, satışları ve Paraşüt eşleşmesini okur, BenimPOS'a bir şey yazmaz. Toptandan verilen ürünlerin satışı, Paraşüt sekmesinden açılınca Paraşüt'e yazılır.</li>
       </ol>
       ${y ? `<div class="pk-form">
         <label class="f"><span>Şube ID (Branch-ID)</span><input id="pkSube" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="${esc(f.sube)}"></label>
@@ -183,11 +185,125 @@
     const katlar = Object.entries(kat).sort((a, b) => b[1].bekleyen - a[1].bekleyen || a[0].localeCompare(b[0], 'tr'));
     return `<div class="pk-kartlar"><div class="card"><h3 class="pk-h">Kategoriye göre</h3><p class="pk-not">Bayan çanta ve cüzdan gibi bütün kategori mağazaya özelse tek dokunuşla işaretleyin; içindeki ürünler Paraşüt'e gitmez. Tek tek eşleştirilen ürün önce gelir.</p>
       <div class="pk-katlar">${katlar.map(([k, v]) => `<button class="chip" data-act="pkKat" data-k="${esc(k)}" aria-pressed="${v.magaza > 0}" ${D.isleniyor === 'kat:' + k ? 'disabled' : ''}>${esc(k)} <b>${num(v.n)}${v.bekleyen ? ' · ' + num(v.bekleyen) + ' bekliyor' : ''}</b></button>`).join('') || '<span class="pk-not">BenimPOS ürünlerinde kategori yok.</span>'}</div></div>
-      <div class="card"><h3 class="pk-h">Eşleşmeyenler (${num(bekleyen.length)})</h3><p class="pk-not">Toptandan verilen ürünü Paraşüt ürünüyle eşleştirin; mağazada satılınca Paraşüt'e o ürün gidecek (yazma henüz kapalı).</p>
+      <div class="card"><h3 class="pk-h">Eşleşmeyenler (${num(bekleyen.length)})</h3><p class="pk-not">Toptandan verilen ürünü Paraşüt ürünüyle eşleştirin; mağazada satılınca Paraşüt'e o ürün satış olarak yazılır (Paraşüt sekmesi).</p>
       <div class="pk-liste">${bekleyen.slice(0, D.goster).map(esleSatir).join('') || '<p class="pk-not">Eşleşmeyen ürün yok.</p>'}</div>
       ${bekleyen.length > D.goster ? `<div class="ek-dug"><button class="btn" data-act="pkDaha">Daha fazla göster (${num(bekleyen.length - D.goster)} kaldı)</button></div>` : ''}</div>
       ${adla.length ? `<div class="card"><h3 class="pk-h">Adından eşleşenler (${num(adla.length)})</h3><p class="pk-not">BenimPOS'taki adı Paraşüt'teki adıyla birebir aynı olanlar kendiliğinden eşleşti; yanlışsa değiştirin.</p><div class="pk-liste">${adla.slice(0, 40).map(esleSatir).join('')}</div></div>` : ''}
       ${elle.length ? `<div class="card"><h3 class="pk-h">Elle eşleştirilenler (${num(elle.length)})</h3><div class="pk-liste">${elle.slice(0, 60).map(esleSatir).join('')}</div></div>` : ''}</div>`;
+  };
+
+  // ---------- Paraşüt aktarımı (yalnız yönetici) ----------
+  const ILK = '2026-11-07'; // celik 06.11: "eski satışları girme, yarından itibaren girersin" (sunucuda da sabit)
+  const A = (D.ak ||= { aralik: 'bugun', veri: null, yuk: false, hata: '', kaynak: null, kYuk: false, kHata: '', onay: '', yaziyor: '', acik: null, ayarliyor: false });
+  const AKD = {
+    hazir: ['Yazılacak', 'gold'], yazildi: ['Paraşüt\'e yazıldı', 'ok'], yaziliyor: ['Yazılıyor', 'gold'], magaza: ['Mağazaya özel', 'off'],
+    eslesme: ['Ürün eşleşmemiş', 'warn'], hesap: ['Hesap seçilmemiş', 'warn'], elle: ['Elle girilmeli', 'warn'], once: ['Başlangıçtan önce', 'off'],
+    hata: ['Paraşüt kabul etmedi', 'warn'], odeme_hata: ['Tahsilat yazılamadı', 'warn'], belirsiz: ['Yanıt gelmedi', 'warn'],
+    iptal_sonra: ['Yazıldıktan sonra iptal', 'warn'], iptal: ['İptal', 'off']
+  };
+  const AK_SIRA = ['iptal_sonra', 'hata', 'odeme_hata', 'belirsiz', 'yaziliyor', 'hesap', 'eslesme', 'elle', 'hazir', 'yazildi', 'magaza', 'once', 'iptal'];
+  const YAZILIR = ['hazir', 'hata', 'odeme_hata', 'belirsiz', 'yaziliyor'];
+  const akRozet = d => `<span class="pill ${AKD[d]?.[1] || 'off'}">${AKD[d]?.[0] || esc(d)}</span>`;
+  const gunTR = g => String(g || '').split('-').reverse().join('.');
+  async function akKaynak() {
+    if (A.kYuk) return;
+    A.kYuk = true; A.kHata = ''; render();
+    try { A.kaynak = await sor({ islem: 'aktarim_kaynak' }); } catch (e) { A.kHata = e.message; }
+    A.kYuk = false; S.keepScroll = true; render();
+  }
+  let akSira = 0;
+  async function akListe() {
+    const [bas, son] = ARALIK[A.aralik][1](), tur = ++akSira;
+    A.yuk = true; A.hata = ''; render();
+    try { const r = await sor({ islem: 'aktarim_liste', bas, son }); if (tur === akSira) { A.veri = r; if (A.kaynak && r.ay) A.kaynak.ay = r.ay; } }
+    catch (e) { if (tur === akSira) A.hata = e.message; }
+    if (tur === akSira) { A.yuk = false; S.keepScroll = true; render(); }
+  }
+  async function akAyar(govde, mesaj) {
+    A.ayarliyor = true; A.onay = ''; render();
+    try { const r = await sor({ islem: 'aktarim_ayar', ...govde }); if (A.kaynak) A.kaynak.ay = r.ay; if (mesaj) toast(mesaj); }
+    catch (e) { toast(e.message); A.kaynak = null; akKaynak(); }
+    A.ayarliyor = false; S.keepScroll = true; render(); akListe();
+  }
+  async function akYaz(kod) {
+    if (A.onay !== 'f:' + kod) { A.onay = 'f:' + kod; S.keepScroll = true; render(); return; }
+    if (!A.veri) return;
+    A.onay = ''; A.yaziyor = kod; S.keepScroll = true; render();
+    try {
+      const x = (await sor({ islem: 'aktarim_yaz', kodlar: [kod], bas: A.veri.bas, son: A.veri.son })).sonuc?.[0] || {};
+      toast(x.durum === 'yazildi' ? `Fiş ${kod} Paraşüt'e yazıldı${x.no ? ' (' + x.no + ')' : ''}.${x.uyari?.length ? ' Uyarı: ' + x.uyari.join(' ') : ''}`
+        : `Fiş ${kod}: ${AKD[x.durum]?.[0] || x.durum || 'yazılmadı'}${x.not ? ' · ' + x.not : ''}`);
+    } catch (e) { toast(e.message); }
+    A.yaziyor = ''; akListe();
+  }
+  const hesapAd = id => A.kaynak?.hesaplar?.find(h => h.id === String(id))?.ad || (id ? 'hesap ' + id : '');
+  // BenimPOS'un özel ödeme tipi için kendiliğinden seçilen hesap (sunucudaki hesapBul ile aynı sıra)
+  const kendiHesap = (ay, t) => { const a = t.ad || ''; return (/HAVALE|EFT|IBAN|TRANSFER/i.test(a) ? ay.hesap.Havale : '') || (t.ana && ay.hesap[t.ana]) || (/KART|POS|KREDİ|KREDI/i.test(a) ? ay.hesap.Pos : '') || (/NAKİT|NAKIT/i.test(a) ? ay.hesap.Nakit : '') || ''; };
+  const hesapSec = (anahtar, deger, bos) => {
+    const l = A.kaynak?.hesaplar || [], var_ = l.some(h => h.id === deger);
+    return `<select data-ak-hesap="${esc(anahtar)}" ${A.ayarliyor ? 'disabled' : ''}>${bos !== undefined ? `<option value="">${esc(bos)}</option>` : ''}${deger && !var_ ? `<option value="${esc(deger)}" selected>Hesap ${esc(deger)} (listede yok)</option>` : ''}${l.map(h => `<option value="${esc(h.id)}" ${h.id === deger ? 'selected' : ''}>${esc(h.ad)} · ${esc(h.tur)}</option>`).join('')}</select>`;
+  };
+  const akAyarHtml = () => {
+    if (!A.kaynak) return A.kHata ? `<div class="card empty"><h3>Paraşüt ayarları okunamadı</h3><p>${esc(A.kHata)}</p><button class="btn dark" data-act="akKaynak">Tekrar dene</button></div>` : '<div class="card"><p class="pk-not">Paraşüt ayarları okunuyor…</p></div>';
+    const ay = A.kaynak.ay, kilit = A.ayarliyor ? 'disabled' : '';
+    const ozel = (A.kaynak.tipler || []).filter(t => !['Nakit', 'Pos', 'Açık Hesap', 'Parçalı', 'Etkisiz'].includes(t.id));
+    const d = !ay.acik ? ['Kapalı', 'off'] : ay.otomatik ? ['Açık · otomatik', 'ok'] : ['Açık · fişler elle yazılır', 'gold'];
+    const dug = !ay.acik
+      ? (A.onay === '_ac' ? `<button class="btn dark" data-act="akAc" ${kilit}>Eminim, aç</button><button class="btn" data-act="akVazgec">Vazgeç</button>` : `<button class="btn dark" data-act="akAc" ${kilit}>Aktarımı aç</button>`)
+      : `<button class="btn" data-act="akKapat" ${kilit}>Aktarımı kapat</button>${ay.otomatik ? `<button class="btn" data-act="akOto" data-k="0" ${kilit}>Otomatiği kapat</button>` : `<button class="btn${ay.ilk ? ' dark' : ''}" data-act="akOto" data-k="1" ${ay.ilk ? kilit : 'disabled'}>Otomatik yaz</button>`}`;
+    const not = !ay.acik ? (A.onay === '_ac' ? 'Açınca Paraşüt\'te CLK PERAKENDE müşterisi açılır (sitede üye açılmaz). Fişler yine siz "Paraşüt\'e yaz"a basınca tek tek yazılır.' : '')
+      : ay.otomatik ? '10 dakikada bir son 3 günün hazır fişleri yazılır; yazılamayan fiş telefona bir kez bildirilir.'
+      : ay.ilk ? 'İlk fiş yazıldı. Paraşüt\'te kontrol ettikten sonra otomatik yazmayı açabilirsiniz.' : 'Otomatik yazma, ilk fiş elle yazılıp Paraşüt\'te kontrol edildikten sonra açılır.';
+    return `<div class="card pk-ak">
+      <div class="pk-ak-ust"><h3 class="pk-h">Mağaza satışı → Paraşüt</h3><span class="pill ${d[1]}">${d[0]}</span></div>
+      <p class="pk-not">Toptandan verilen ürünün satıldığı fiş Paraşüt'e <b>CLK PERAKENDE</b> müşterisine satış faturası olarak yazılır (KDV 0, Paraşüt stoğu düşer); gelen para seçilen kasa/banka hesabına tahsilat olur. Mağazaya özel ürünler yazılmaz. Her fiş bir kez yazılır, Paraşüt'te hiçbir şey silinmez.</p>
+      <div class="pk-ak-gr">
+        <label class="f"><span>Başlangıç günü</span><input id="akBas" type="date" min="${ILK}" value="${esc(ay.bas || ILK)}" ${kilit}></label>
+        <div class="f"><span>Paraşüt müşterisi</span><b>${ay.musteri ? esc(ay.musteri.ad) : 'Aktarım açılınca açılır'}</b></div>
+      </div>
+      <p class="pk-not">Eski satışlar girilmez: en erken ${gunTR(ILK)}. Daha önceki fişler listede "Başlangıçtan önce" görünür.</p>
+      <h4 class="pk-h4">Para hangi hesaba girsin</h4>
+      <div class="pk-ak-gr">
+        ${[['Nakit', 'Nakit'], ['Pos', 'Kredi kartı (POS)'], ['Havale', 'Havale / IBAN']].map(([k, ad]) => `<label class="f"><span>${ad}</span>${hesapSec(k, ay.hesap[k] || '')}</label>`).join('')}
+        ${ozel.map(t => `<label class="f"><span>${esc(t.ad || t.id)} (BenimPOS)</span>${hesapSec(t.id, ay.hesap[t.id] || '', 'Kendiliğinden: ' + (hesapAd(kendiHesap(ay, t)) || 'seçilmedi'))}</label>`).join('')}
+      </div>
+      <p class="pk-not">Parçalı ödemede her parça kendi hesabına yazılır. Açık hesap satışında tahsilat yazılmaz, tutar CLK PERAKENDE'nin borcu olarak kalır.</p>
+      <div class="pk-ak-dug">${dug}</div>${not ? `<p class="pk-not">${not}</p>` : ''}
+    </div>`;
+  };
+  const akFis = f => {
+    const ay = A.veri?.ay || A.kaynak?.ay || {}, acik = A.acik === f.kod, p = f.plan || {}, k = f.kayit;
+    const urunler = (p.satirlar || []).map(s => s.ad || s.b).filter(Boolean);
+    const odeme = f.parcali?.length > 1 ? f.parcali.map(x => `${esc(x.ad)} ${tl(x.tutar)}`).join(' + ') : esc(f.odeme);
+    const zaman = A.aralik === 'bugun' || A.aralik === 'dun' ? String(f.saat).slice(0, 5) : gunTR(f.tarih).slice(0, 5) + ' ' + String(f.saat).slice(0, 5);
+    const yazilir = YAZILIR.includes(f.durum) && ay.acik && ay.musteri, onay = A.onay === 'f:' + f.kod, yaz = A.yaziyor === f.kod;
+    const ayr = !acik ? '' : `<div class="pk-ak-ay">
+        ${(p.satirlar || []).length ? `<ul class="pk-fis-l">${p.satirlar.map(s => `<li><span>${esc(s.ad || s.b)}<small>${s.p ? 'Paraşüt: ' + esc(s.p.ad) : esc(s.b)}</small></span><span class="pk-fis-a">${fmt(s.adet)} adet</span><b>${tl(s.tutar)}</b>${rozet(s.d)}</li>`).join('')}</ul>` : ''}
+        ${p.odemeler?.length ? `<p class="pk-not">Paraşüt'e ${tl(p.toplam)} fatura; ${p.odemeler.map(o => o.acik ? `${esc(o.ad)} ${tl(o.tutar)} açık hesap (tahsilat yok)` : `${esc(o.ad)} ${tl(o.tutar)} → ${esc(hesapAd(o.hesap) || 'hesap seçilmedi')}`).join(', ')}.</p>` : ''}
+        ${p.not ? `<p class="pk-not">${esc(p.not)}</p>` : ''}
+        ${k ? `<p class="pk-not">${k.fatura ? `Paraşüt faturası ${esc(k.no || k.fatura)} · <a href="https://uygulama.parasut.com/778698/satislar/${esc(k.fatura)}" target="_blank" rel="noopener">Paraşüt'te aç</a>` : 'Paraşüt\'te fatura yok'}${k.hata ? ' · ' + esc(k.hata) : ''}${k.uyari?.length ? ' · Uyarı: ' + esc(k.uyari.join(' ')) : ''}</p>` : ''}
+        ${f.durum === 'iptal_sonra' ? '<p class="pk-hata">Fiş Paraşüt\'e yazıldıktan sonra BenimPOS\'ta iptal edildi ya da tutarı değişti. Paraşüt faturasını elle düzeltin; panel Paraşüt\'te silmez.</p>' : ''}
+        ${f.durum === 'eslesme' ? '<button class="btn sm" data-act="pkSekme" data-k="esle">Eşleştir →</button>' : ''}
+        <p class="pk-not">Fiş ${esc(f.kod)} · ${gunTR(f.tarih)} ${esc(String(f.saat).slice(0, 5))}</p></div>`;
+    const dug = !yazilir ? '' : `<div class="pk-ak-yaz">${onay ? `<button class="btn dark sm" data-act="akYaz" data-k="${esc(f.kod)}">Eminim, ${tl(p.toplam || f.tutar)} Paraşüt'e yaz</button><button class="btn sm" data-act="akVazgec">Vazgeç</button>`
+      : `<button class="btn sm${f.durum === 'hazir' ? ' dark' : ''}" data-act="akYaz" data-k="${esc(f.kod)}" ${A.yaziyor ? 'disabled' : ''}>${yaz ? 'Yazılıyor…' : f.durum === 'hazir' ? 'Paraşüt\'e yaz' : 'Yeniden dene'}</button>`}</div>`;
+    return `<div class="pk-fis ${acik ? 'acik' : ''}">
+      <button class="pk-fis-h" data-act="akFis" data-k="${esc(f.kod)}" aria-expanded="${acik}">
+        <span class="pk-saat">${esc(zaman)}</span>
+        <span class="pk-fis-ad">${esc(urunler.slice(0, 2).join(', ') || 'Ürünsüz fiş')}${urunler.length > 2 ? ` +${urunler.length - 2}` : ''}<small>${odeme}</small></span>
+        <span class="pk-ak-sag"><b class="pk-tutar">${tl(f.tutar)}</b>${akRozet(f.durum)}</span></button>${ayr}${dug}</div>`;
+  };
+  const akHtml = () => {
+    if (!A.kaynak && !A.kYuk && !A.kHata) akKaynak();
+    if (!A.veri && !A.yuk && !A.hata) akListe();
+    const ara = `<div class="chips">${Object.entries(ARALIK).map(([k, [ad]]) => `<button class="chip" data-act="akAralik" data-k="${k}" aria-pressed="${A.aralik === k}">${ad}</button>`).join('')}</div>`;
+    if (!A.veri) return akAyarHtml() + ara + (A.hata ? `<div class="card empty"><h3>Fişler okunamadı</h3><p>${esc(A.hata)}</p><button class="btn dark" data-act="akListe">Tekrar dene</button></div>` : '<div class="card"><p class="pk-not">Fişler okunuyor…</p></div>');
+    const f = A.veri.fisler || [], say = {};
+    for (const x of f) say[x.durum] = (say[x.durum] || 0) + 1;
+    return `${akAyarHtml()}${ara}<div class="card">
+      <div class="pk-tip">${AK_SIRA.filter(d => say[d]).map(d => `<span><small>${AKD[d][0]}</small><b>${num(say[d])} fiş</b></span>`).join('') || '<span><small>Fiş yok</small><b>0</b></span>'}</div>
+      ${A.yuk ? '<p class="pk-not">Yenileniyor…</p>' : ''}
+      <div class="pk-fisler">${f.length ? f.map(akFis).join('') : '<p class="pk-not">Bu aralıkta fiş yok.</p>'}</div></div>`;
   };
 
   const hataKart = (m, act) => `<div class="card empty"><h3>BenimPOS okunamadı</h3><p>${esc(m)}</p><button class="btn dark" data-act="${act}">Tekrar dene</button></div>`;
@@ -202,10 +318,12 @@
     if (!D.durum.anahtar) return ust + kurulum();
     if (!bagli) return ust + `<div class="card empty"><h3>BenimPOS'a bağlanılamadı</h3><p>${esc(D.durum.hata || '')}</p><button class="btn dark" data-act="pkDurum">Tekrar dene</button>${D.durum.yonetici !== false && yonetici() ? ' <button class="btn" data-act="pkAnahtar">Anahtarları değiştir</button>' : ''}</div>` + (D.anahtarFormu ? kurulum() : '');
     const bekleyen = (D.urunler || []).filter(x => x.aktif && x.durum === 'eslesmedi').length;
-    const SEKME = [['stok', 'Stok'], ['satis', 'Satışlar'], ['esle', 'Eşleştirme' + (bekleyen ? ` (${num(bekleyen)})` : '')]];
+    const yon = D.durum.yonetici !== false && yonetici();
+    if (D.sekme === 'parasut' && !yon) D.sekme = 'stok';
+    const SEKME = [['stok', 'Stok'], ['satis', 'Satışlar'], ['esle', 'Eşleştirme' + (bekleyen ? ` (${num(bekleyen)})` : '')], ...(yon ? [['parasut', 'Paraşüt']] : [])];
     return `${ust}${ozet()}
       <div class="chips pk-sekmeler" role="tablist">${SEKME.map(([k, ad]) => `<button class="chip" role="tab" data-act="pkSekme" data-k="${k}" aria-pressed="${D.sekme === k}">${ad}</button>`).join('')}</div>
-      ${D.sekme === 'satis' ? satisHtml() : D.sekme === 'esle' ? esleHtml() : stokHtml()}`;
+      ${D.sekme === 'satis' ? satisHtml() : D.sekme === 'esle' ? esleHtml() : D.sekme === 'parasut' ? akHtml() : stokHtml()}`;
   };
 
   views.bind_perakende = () => {
@@ -214,6 +332,12 @@
     pa?.addEventListener('input', () => { D.pAra = pa.value; const x = (D.urunler || []).find(u => u.b === D.secim), k = $('#pkPSonuc'); if (x && k) k.innerHTML = pSonuc(x); });
     if (pa && D.odakla) { D.odakla = false; pa.focus({ preventScroll: true }); }
     for (const [id, k] of [['#pkSube', 'sube'], ['#pkApi', 'api'], ['#pkGizli', 'gizli']]) $(id)?.addEventListener('input', e => { D.form[k] = e.target.value; });
+    $('#akBas')?.addEventListener('change', e => {
+      const v = e.target.value;
+      if (!v || v < ILK) { toast('Eski satışlar girilmez: en erken ' + gunTR(ILK) + '.'); render(); return; }
+      akAyar({ bas: v }, 'Başlangıç ' + gunTR(v) + '.');
+    });
+    document.querySelectorAll('[data-ak-hesap]').forEach(s => s.addEventListener('change', () => akAyar({ hesap: { [s.dataset.akHesap]: s.value } }, 'Hesap kaydedildi.')));
   };
 
   async function anahtarKaydet() {
@@ -257,7 +381,7 @@
     if (act === 'pkDurum') { D.durum = null; D.hata = ''; durumAl(); }
     else if (act === 'pkKaydet') anahtarKaydet();
     else if (act === 'pkAnahtar') { D.anahtarFormu = true; render(); }
-    else if (act === 'pkYenile') { urunlerAl('yenile'); satisAl(); }
+    else if (act === 'pkYenile') { urunlerAl('yenile'); satisAl(); if (D.sekme === 'parasut') akListe(); }
     else if (act === 'pkUrunYenile') urunlerAl('yenile');
     else if (act === 'pkSatisYenile') satisAl();
     else if (act === 'pkSekme') { D.sekme = el.dataset.k; D.goster = 80; render(); }
@@ -272,6 +396,15 @@
     else if (act === 'pkEsle') esle(el.dataset.b, el.dataset.p);
     else if (act === 'pkKaldir') esle(el.dataset.b, null);
     else if (act === 'pkKat') katIsaretle(el.dataset.k);
+    else if (act === 'akKaynak') { A.kHata = ''; akKaynak(); }
+    else if (act === 'akListe') { A.hata = ''; akListe(); }
+    else if (act === 'akAralik') { A.aralik = el.dataset.k; A.veri = null; A.acik = null; A.onay = ''; akListe(); }
+    else if (act === 'akFis') { A.acik = A.acik === el.dataset.k ? null : el.dataset.k; S.keepScroll = true; render(); }
+    else if (act === 'akVazgec') { A.onay = ''; S.keepScroll = true; render(); }
+    else if (act === 'akAc') { if (A.onay !== '_ac') { A.onay = '_ac'; S.keepScroll = true; render(); } else akAyar({ acik: true }, 'Paraşüt aktarımı açıldı. Fişleri tek tek yazabilirsiniz.'); }
+    else if (act === 'akKapat') akAyar({ acik: false }, 'Paraşüt aktarımı kapatıldı.');
+    else if (act === 'akOto') akAyar({ otomatik: el.dataset.k === '1' }, el.dataset.k === '1' ? 'Otomatik yazma açıldı (10 dakikada bir).' : 'Otomatik yazma kapatıldı.');
+    else if (act === 'akYaz') akYaz(el.dataset.k);
     else prevAct?.(act, el, e);
   };
 })();
