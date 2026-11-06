@@ -5,20 +5,21 @@ CLK Çanta'nın yönetim paneli: Qukasoft e-ticaret altyapısındaki ürünleri 
 ## Çalışma kuralları
 
 - **Her kod değişikliğinden sonra kullanıcıya sormadan** değişen dosyaları ekle, ne değiştiğini anlatan kısa Türkçe bir mesajla commit et ve `git push origin main` ile gönder. Kullanıcı bunu açıkça istedi (24.10.2026). Gönderim başarısız olursa hatayı olduğu gibi bildir; `--force` kullanma.
-- Netlify `main`'e her gönderimde siteyi kendisi yayınlar (otomatik yayın açık, ~15–20 sn). Elle yayın yalnızca Netlify'a yeni ortam değişkeni eklenince gerekir.
+- Panel 06.11.2026'dan beri **GitHub Pages**'te: `main`'e her gönderimden ~1 dk sonra yayında, ücretsiz (depo açık). Netlify kredi bittiği için iki siteyi de durdurdu (Personal plan 1.000 kredi/ay, her yayın 15 kredi; 20.10–19.11 döneminde 225 yayın = 3.375 kredi, ek kredilerle 34 $). Netlify'a geri dönülmez; `netlify/functions/` yalnız Supabase kopyalarının kaynağı.
 - Büyük değişikliklerde göndermeden önce söz dizimini kontrol et: geçici `kontrol` dalına gönder, dosyayı `raw.githubusercontent.com/<sha>/...` adresinden alıp tarayıcıda `new Function(kaynak)` ile ayrıştır, sonra `main`'e gönderip geçici dalı sil.
 - Kredi harcayan denemeleri (manken üretimi vb.) en aza indir; kullanıcı bu konuda hassas. Önce sahte (mock) `fetch` ile ücretsiz doğrula, gerçek denemeyi tek seferde yap.
 - Gerçek Qukasoft kaydı denemeleri yalnızca **TEST ÜRÜN – SİLİNECEK** (kod `CLK-6AF8A8CCF01B`, id 463, pasif) ürününde yapılır; başka ürünlere dokunma.
-- Gizli anahtarlar Netlify ortam değişkenlerindedir; asla koda, commit'e ya da sohbete yazma. Kart/anahtar girişini kullanıcı yapar.
+- Gizli anahtarlar Supabase Edge Functions › Secrets'tadır (Netlify'dakiler eski kopya); asla koda, commit'e ya da sohbete yazma. Kart/anahtar girişini kullanıcı yapar.
 - Windows'ta Git PATH'te görünmezse: `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`
 
 ## Yapı
 
 - Statik site, derleme yok: `index.html`, `app.css`, `core.js` (çekirdek, `CLK` nesnesi, yönlendirme, veri yükleme), `views-main.js`, `views-crm.js`, `editor.js` (ürün ekleme/düzenleme formu ve görsel işlemleri), `views-banner.js` (Banner stüdyosu), `_headers` (no-cache).
-- Yayın: Netlify sitesi **celikcanta** → https://celikcanta.netlify.app, GitHub `celksamet34-web/clk-yonetim` deposundan.
+- Yayın: GitHub Pages → **https://celksamet34-web.github.io/clk-yonetim/** (Ayarlar › Pages: main dalı, kök; `.nojekyll` var, CLAUDE.md'deki Twig `{% %}` Jekyll'i bozardı). Eski adres celikcanta.netlify.app durduruldu. Adres alt klasörde: yollar göreli olmalı (`manifest` `./`). GitHub Pages ~10 dk önbellek tutar (`_headers` Netlify içindi, işlemez).
+- Supabase fonksiyonlarının CORS izin listesi (`IZINLI`/`ALLOWED`): `/^https:\/\/([a-z0-9-]+(--[a-z0-9-]+)?\.netlify\.app|celksamet34-web\.github\.io)$/i` (06.11'de 8 fonksiyonda güncellendi: siparis-parasut, gider-cek, ekstre-cek, odeme-takvim, personel, stok-esitle, west-gorsel, west-grup, clk-data). Yeni fonksiyon yazarken bu düzenli ifadeyi kullan; bildirim tıklama ve dönüş adresleri `https://celksamet34-web.github.io/clk-yonetim/#…`. `parasut-baglan` henüz yayınlanmadı: yayınlarken `PANEL`/`donusAdres` yeni adrese çevrilmeli (proje dosyalarındaki kaynakta hâlâ netlify).
 - Oturum: Supabase (proje `prkzzaqinfeptmmbkqsd`), yalnızca yayınlanabilir anahtar kodda.
-- Ürün listeleme/kaydetme/kategori çağrıları (`qukasoft-product-list`, `qukasoft-product-save`, `qukasoft-category-list`, `clk-data`) Supabase edge fonksiyonları üzerinden diğer Netlify sitesi **clkcanta**'daki fonksiyonlara gider (o sitenin kodu bu depoda değil; dokunma).
-- Bu depodaki Netlify fonksiyonları (`netlify/functions/`):
+- Ürün listeleme/kaydetme/kategori (`qukasoft-product-list`, `qukasoft-product-save`, `qukasoft-category-list`) 06.11'den beri Supabase'den **doğrudan Qukasoft**'a gider (kaynak `supabase/functions/`; önce durdurulan clkcanta Netlify sitesine köprüydü). `clk-data` zaten doğrudandı.
+- Netlify fonksiyonlarının Supabase kopyaları (`supabase/netlify-kopya.py` üretir, panel `CLK.nf(ad)` ile Netlify dışında bunlara gider): `ai-product-image` → `ai-gorsel`, `qukasoft` → `qukasoft-ek`, `fis-oku-background` → `fis-oku` (arka plan: 202 döner, `EdgeRuntime.waitUntil`). Netlify dosyası değişirse kopya yeniden üretilip Supabase'e yüklenir. Kaynaklar (`netlify/functions/`):
   - `ai-product-image.js`: dekupe (Photoroom, yedek OpenAI), manken görseli (fal.ai Seedream 4.5 kuyrukla, yedek Gemini/OpenAI), ürün açıklaması yazma (`action: 'describe'`, OpenAI metin modeli).
   - `qukasoft.js`: Qukasoft ek işlemleri için izin listeli köprü (benzer ürün, kombin, uyumluluk, birim listesi, kombin listesi). İstekler panelde sıraya alınır; Qukasoft aynı anda gelen istekleri reddedebiliyor.
 - celikcanta ortam değişkenleri (adlar): `OPENAI_API_KEY`, `FAL_KEY`, `PHOTOROOM_API_KEY`, `QUKASOFT_API_KEY`, `QUKASOFT_API_SECRET`; isteğe bağlı `GEMINI_API_KEY` (faturalandırma kapalı, kullanılmıyor), `FAL_IMAGE_MODEL`, `OPENAI_TEXT_MODEL`.
