@@ -211,7 +211,9 @@
   const grupHtml = g => { const b = D.gruplar[g] || {}, l = D.kalemler.filter(k => k.g === g);
     return `<tr class="ul-grup"><td colspan="5"><b>${g + 1}. satış</b> · ${esc(trT(b.tarih))}${b.no ? ' · ' + esc(b.no) : ''}<span>${l.length} kalem · ${adet(l)} adet · ${tlE(toplam(l))}</span></td></tr>`; };
 
-  const secilenAd = () => D.musteriler?.find(m => m.id === D.musteri)?.ad || '';
+  const secilenAd = () => D.musteriler?.find(m => String(m.id) === String(D.musteri))?.ad || '';
+  // müşteri sayfasından "Birkaç satışı tek listede": sayfa o müşteri seçili açılır
+  CLK.satisListesiAc = pid => { D.kalemler = []; D.gruplar = []; satislariAl(String(pid)); CLK.go('urunlistesi'); };
   views.urunlistesi = () => {
     if (!D.musteriler) musteriler().catch(e => { D.durum = 'Müşteri listesi alınamadı: ' + e.message; D.musteriler = []; render(); });
     const sat = D.satislar;

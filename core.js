@@ -174,7 +174,9 @@ window.CLK = (() => {
   // Menü grupları (celik 31.10: "menü sıralamasını düzeltelim"). Masaüstü yan menü ve mobil "Daha" sayfası aynı sırayı kullanır.
   const MENU = [
     ['', [['panel', 'Panel']]],
-    ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['urunlistesi', 'Satış faturası'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi'], ['perakende', 'CLK Perakende']]],
+    // Cari hesap, Müşteri ekstresi ve Satış faturası 06.11'de menüden kalktı (celik karar kartında "Menüden kaldır"): ödemeleri toplu takip listesi
+    // Müşteriler sayfasında (cari yetkisiyle), ekstre ve satış belgesi müşteri sayfasında. Sayfalar adresleriyle açılmaya devam eder, yetkileri "Ek yetkiler"de.
+    ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['musteriler', 'Müşteriler'], ['perakende', 'CLK Perakende']]],
     ['Site ürünleri', [['yeni', 'Yeni ürün'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['katalog', 'Katalog'], ['instagram', 'Instagram'], ['banner', 'Banner']]],
     ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['valizsiparis', 'Valiz sipariş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
     ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet'], ['odemeler', 'Ödeme takvimi']]],
@@ -183,8 +185,12 @@ window.CLK = (() => {
   ];
   /* Personel yetkileri (celik 01.11.2026: "personel giriş yapacak… bütün menüye girişleri olmasın bizim seçtiklerimiz olsun", "çek senet görmesin cari görmesin").
      Yönetici her şeyi görür; personel yalnız işaretlenen sayfaları. Sunucu da aynı listeyi panel_yetki() ile denetler. */
-  const EK_YETKI = [['esitle', 'Şimdi eşitle düğmesi'], ['ciro', 'Panelde ciro, kâr ve stok değeri']];
-  const ALT_SAYFA = { siparis: 'siparisler', musteri: 'musteriler', duzenle: ['urunler', 'yeni', 'stok'] };
+  const EK_YETKI = [['cari', 'Müşteri borçları, ödeme gir ve ödeme takibi'], ['ekstre', 'Müşteri hesap hareketleri ve ekstre'], ['urunlistesi', 'Satış faturası yazdırma (birkaç satış tek listede)'],
+    ['esitle', 'Şimdi eşitle düğmesi'], ['ciro', 'Panelde ciro, kâr ve stok değeri']];
+  const ALT_SAYFA = { siparis: 'siparisler', musteri: ['musteriler', 'cari', 'ekstre'], musteriler: ['musteriler', 'cari'], duzenle: ['urunler', 'yeni', 'stok'] };
+  // eski adresler: Cari hesap artık Müşteriler sayfasında
+  const ESKI_ADRES = { cari: 'musteriler' };
+  const yonlen = r => ESKI_ADRES[r] || r;
   const yonetici = () => !S.yetki || S.yetki.rol === 'yonetici';
   function izin(k) {
     if (k === 'panel') return true;
@@ -239,7 +245,7 @@ window.CLK = (() => {
   function go(r, arg) {
     // menünün açık olduğu S.more'da tutulur: arka plandaki yüklemeler sayfayı yeniden çizince menü kendiliğinden kapanmasın
     if (r === 'daha') { S.more = !S.more; S.keepScroll = true; render(); return; }
-    S.more = false;
+    S.more = false; r = yonlen(r);
     S.route = r; S.arg = arg; try { history.replaceState(null, '', '#' + r); } catch {}
     render(); window.scrollTo({ top: 0 });
   }
@@ -367,7 +373,7 @@ window.CLK = (() => {
     const { data } = await sb.auth.getSession();
     S.user = data.session?.user || null;
     if (S.user) { S.yetkiYukleniyor = true; await yetkiOku().catch(() => {}); S.yetkiYukleniyor = false; }
-    const h = location.hash.slice(1); if (h && (views[h] || h === 'yeni')) S.route = h;
+    const h = yonlen(location.hash.slice(1)); if (h && (views[h] || h === 'yeni')) S.route = h;
     sb.auth.onAuthStateChange((_e, session) => {
       const was = !!S.user; S.user = session?.user || null;
       if (!S.user) { S.yetki = null; S.yetkiHata = ''; }
@@ -378,7 +384,7 @@ window.CLK = (() => {
       }
       render();
     });
-    window.addEventListener('hashchange', () => { const r = location.hash.slice(1); if (r && r !== S.route && (views[r] || r === 'yeni')) { S.route = r; render(); } });
+    window.addEventListener('hashchange', () => { const r = yonlen(location.hash.slice(1)); if (r && r !== S.route && (views[r] || r === 'yeni')) { S.route = r; render(); } });
     render(); if (S.user && !S.yetkiHata) prefetch();
   }
   // personel yalnız yetkili olduğu verileri yükler (sunucu da yetkisizine vermez)

@@ -184,7 +184,7 @@
     T.acik = true; T.sonuc = null; T.uyari = ''; T.onay = false; T.yer = yer; T.uye = Number(siteId) || 0;
     if (siteId && !ayni) { T.f = yeniForm(); delete ARA.thKisi; T.siteSec = Number(siteId); siteSecUygula(); }
     if (o.sekil) T.f.sekil = o.sekil === 'senet' && senetVar() ? 'senet' : 'para';
-    if (yer === 'cari' && S.route !== 'cari') CLK.go('cari'); else ciz();
+    if (yer === 'cari' && S.route !== 'musteriler') CLK.go('musteriler'); else ciz();
     setTimeout(() => $('#thKart')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   }
   // Cari hesap sayfası çizilince: senet seçiliyse senet alanlarının olayları bağlanır

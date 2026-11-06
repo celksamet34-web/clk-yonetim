@@ -77,7 +77,11 @@
     const last = os.map(O.date).sort().pop();
     return { n: os.length, spend, last };
   }
-  views.musteriler = () => {
+  // Müşteriler: cari yetkisi olana ödemeleri toplu takip listesi (eski Cari hesap sayfası; celik 06.11: "müşteri carileri kısmında ki ödemeleri toplu takip etme listesini beğendim"),
+  // olmayana site üyeleri listesi (bakiyesiz)
+  const cariAcik = () => S.route === 'musteriler' && CLK.izin('cari');
+  views.musteriler = () => CLK.izin('cari') ? views.cari() : uyeListesi();
+  const uyeListesi = () => {
     const acts = `<button class="btn sm" data-act="reloadU" ${S.uLoading ? 'disabled' : ''}>${S.uLoading ? 'Yükleniyor' : 'Yenile'}</button>`;
     if (S.uErr && !S.users.length) return head('İlişkiler', 'Müşteriler', '', acts) + errBox(S.uErr, 'reloadU');
     if (!S.users.length) return head('İlişkiler', 'Müşteriler', 'Alınıyor…', acts) + skel();
@@ -105,6 +109,7 @@
           <div class="c3">${Number(u.dealerStatus) === 1 ? '<span class="pill gold">Bayi</span>' : Number(u.dealerStatus) === 2 ? '<span class="pill warn">Onay bekliyor</span>' : ''}${cariGor ? `<b class="num ${bal < 0 ? 'neg' : bal > 0 ? 'pos' : ''}">${tl2(bal)}</b>` : ''}</div></button>`; }).join('') || '<p class="empty">Müşteri bulunamadı.</p>'}</div></div>`;
   };
   views.bind_musteriler = () => {
+    if (CLK.izin('cari')) { views.bind_cari(); return; }
     const q = $('#uq'); q?.addEventListener('input', () => { M.q = q.value; clearTimeout(q.t); q.t = setTimeout(render.yazinca, 220); });
     $('#usort')?.addEventListener('change', e => { M.sort = e.target.value; render(); });
     $$('[data-uf]').forEach(b => b.addEventListener('click', () => { M.f = b.dataset.uf; render(); }));
@@ -259,7 +264,7 @@
       const L = (NT.l || []).filter(n => n.tarih && gecen(n.tarih) >= -1).map(n => ({ n, u: userById(n.site), d: notDurum(n, z[n.site]) }))
         .filter(x => x.u).sort((a, b) => a.n.tarih.localeCompare(b.n.tarih));
       if (!L.length) return '';
-      return `<div class="card"><div class="card-h"><div><h3>Ödeme sözleri</h3><p class="sub">Ödeme günü gelen ve geçen müşteri notları</p></div><button class="btn sm ghost" data-go="cari">Cari hesap</button></div>
+      return `<div class="card"><div class="card-h"><div><h3>Ödeme sözleri</h3><p class="sub">Ödeme günü gelen ve geçen müşteri notları</p></div><button class="btn sm ghost" data-go="musteriler">Müşteriler</button></div>
         <ul class="rows">${L.map(({ n, u, d }) => { const bal = Number(u.balance) || 0; return `<li data-user="${u.id}"><div class="t"><b>${esc(userName(u))}</b><small>${esc(n.metin || 'Ödeme günü')}${n.tutar ? ' · ' + tl(n.tutar) : ''} · ${dt(n.tarih)}</small></div>
           <span class="pill ${d.k === 'ok' ? 'ok' : d.k === 'bad' ? 'bad' : 'warn'}">${esc(d.k === 'ok' ? 'Ödeme geldi' : d.k === 'bad' ? 'Geçti' : d.t)}</span><b class="num ${bal < -0.5 ? 'neg' : ''}" style="margin-left:8px">${tl2(bal)}</b></li>`; }).join('')}</ul></div>`;
     }
@@ -268,15 +273,15 @@
   const cariOzetGerekirse = () => { if (!CZ.yuk && !CZ.hata && (!CZ.v || Date.now() - CZ.zaman > 20 * 60e3)) setTimeout(() => cariOzetYukle(false), 0); };
   async function cariOzetYukle(yenile) {
     if (CZ.yuk || !CLK.tahsilat?.sor) return;
-    CZ.yuk = true; CZ.hata = ''; if (S.route === 'cari') { S.keepScroll = true; render(); }
-    const ciz = () => { if (['cari', 'musteri', 'panel'].includes(S.route) && !(NT.ed && document.activeElement?.id?.startsWith('nt'))) { S.keepScroll = true; render(); } };
+    CZ.yuk = true; CZ.hata = ''; if (cariAcik()) { S.keepScroll = true; render(); }
+    const ciz = () => { if (cariAcik() || ['musteri', 'panel'].includes(S.route) && !(NT.ed && document.activeElement?.id?.startsWith('nt'))) { S.keepScroll = true; render(); } };
     try {
       const j = await CLK.tahsilat.sor({ islem: 'cari_ozet', yenile: !!yenile });
       if (j.musteriler?.length || !CZ.v) CZ.v = j;
       if (Array.isArray(j.notlar)) NT.l = j.notlar;
       CZ.zaman = Date.now();
       // sunucu eski listeyi verip yenisini arka planda hesaplıyorsa biraz sonra yeniden sorulur
-      if (j.eski && CZ.tekrar < 4) { CZ.tekrar++; setTimeout(() => { if (S.route === 'cari') cariOzetYukle(false); }, 40000); } else CZ.tekrar = 0;
+      if (j.eski && CZ.tekrar < 4) { CZ.tekrar++; setTimeout(() => { if (cariAcik()) cariOzetYukle(false); }, 40000); } else CZ.tekrar = 0;
     } catch (e) { CZ.hata = e.message; }
     CZ.yuk = false; ciz();
   }
@@ -297,8 +302,8 @@
     cariOzetGerekirse();
     const acts = `${CLK.tahsilat?.dugme() || ''}<button class="btn sm" data-act="czYenile" ${S.uLoading || CZ.yuk ? 'disabled' : ''}>${S.uLoading || CZ.yuk ? 'Yükleniyor' : 'Yenile'}</button>`;
     const odeme = CLK.tahsilat?.kart() || '';
-    if (S.uErr && !S.users.length) return head('Finans', 'Cari hesap', '', acts) + odeme + errBox(S.uErr, 'reloadU');
-    if (!S.uLoaded && !S.users.length) return head('Finans', 'Cari hesap', 'Alınıyor…', acts) + odeme + skel();
+    if (S.uErr && !S.users.length) return head('Satış', 'Müşteriler', '', acts) + odeme + errBox(S.uErr, 'reloadU');
+    if (!S.uLoaded && !S.users.length) return head('Satış', 'Müşteriler', 'Alınıyor…', acts) + odeme + skel();
     const R = cariSatirlar(), nm = notMap();
     const debtors = R.filter(r => r.bal < -0.5), creditors = R.filter(r => r.bal > 0.5), gec = R.filter(r => r.gec);
     const yedi = R.filter(r => r.son !== null && r.son <= 7).length;
@@ -308,7 +313,9 @@
       if (C.f === 'alacakli' && !(r.bal > 0.5)) return false;
       if (C.f === 'gec' && !r.gec) return false;
       if (C.f === 'not' && !nm[r.u.id]) return false;
-      return !q || [userName(r.u), r.u.phone, r.u.email, r.u.code, r.z?.ad].join(' ').toLocaleLowerCase('tr').includes(q);
+      if (C.f === 'bayi' && Number(r.u.dealerStatus) !== 1) return false;
+      if (C.f === 'onay' && Number(r.u.dealerStatus) !== 2) return false;
+      return !q || [userName(r.u), r.u.title, r.u.phone, r.u.email, r.u.code, r.u.taxId, r.u.invoice?.city, r.z?.ad].join(' ').toLocaleLowerCase('tr').includes(q);
     });
     const ad = (a, b) => userName(a.u).localeCompare(userName(b.u), 'tr');
     const tar = (r, k) => r.z?.[k]?.[0] || '';
@@ -332,7 +339,7 @@
     const notH = r => { const n = nm[r.u.id]; if (!n) return ''; const d = notDurum(n, r.z);
       return `<div class="n"><button class="nt-satir ${d.k}" data-act="ntAc" data-id="${r.u.id}" title="Ödeme notunu düzenle"><i>Not</i>${notYazi(n, d)}<small>${esc(kimAd(n.kim))} · ${dt(n.zaman)}</small></button></div>`; };
     const satir = r => `<li class="cz-tr${nm[r.u.id] ? ' notlu' : ''}" data-user="${r.u.id}">
-      <div class="k"><b>${esc(userName(r.u))}</b><small>${esc(r.u.phone || r.u.email || r.u.code || '')}</small></div>
+      <div class="k"><b>${esc(userName(r.u))}${Number(r.u.dealerStatus) === 2 ? ' <span class="pill warn">Bayilik onayı bekliyor</span>' : ''}</b><small>${Number(r.u.dealerStatus) === 1 ? 'Bayi · ' : ''}${esc(r.u.phone || r.u.email || r.u.code || '')}${r.u.invoice?.city ? ' · ' + esc(r.u.invoice.city) : ''}</small></div>
       <div class="b"><b class="num ${r.bal < -0.5 ? 'neg' : r.bal > 0.5 ? 'pos' : ''}">${tl2(r.bal)}</b><small>${durum(r)}${!nm[r.u.id] && NT.l ? ` · <button class="nt-arti" data-act="ntAc" data-id="${r.u.id}" title="Ödeme notu ekle">+ Not</button>` : ''}</small></div>
       <div class="o"><span class="m">Son ödeme</span>${odemeHucre(r)}</div>
       <div class="h"><span class="m">Son hareket</span>${hareketHucre(r)}</div>
@@ -341,7 +348,8 @@
     const zaman = CZ.v?.zaman ? new Date(CZ.v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
     const altYazi = CZ.hata ? `<span class="cz-gec">Son ödeme tarihleri alınamadı: ${esc(CZ.hata)}</span>`
       : CZ.yuk ? 'Son ödeme ve hareket tarihleri Paraşüt\'ten alınıyor…' : zaman ? `Ödeme ve hareket tarihleri Paraşüt'ten, ${zaman} itibarıyla. Satıra dokununca müşterinin hareketleri açılır.` : '';
-    return head('Finans', 'Cari hesap', `${num(R.length)} müşteri`, acts) + odeme + `
+    const onay = R.filter(r => Number(r.u.dealerStatus) === 2).length;
+    return head('Satış', 'Müşteriler', `${num(R.length)} müşteri · borç, son ödeme ve ödeme notları`, acts) + odeme + `
       <div class="kpis">
         <div class="kpi hero"><div class="k">Toplam alacak</div><div class="v">${tl(Math.abs(debtors.reduce((a, r) => a + r.bal, 0)))}</div><div class="s">${num(debtors.length)} müşterinin borcu</div></div>
         <div class="kpi"><div class="k">Müşteri alacağı</div><div class="v">${tlc(creditors.reduce((a, r) => a + r.bal, 0))}</div><div class="s">${num(creditors.length)} hesapta artı bakiye</div></div>
@@ -351,7 +359,7 @@
       <div class="card cz" style="margin-top:18px">
         <div class="card-h"><div><h3>Müşteri carileri</h3><p class="sub">${altYazi}</p></div></div>
         <div class="tools"><input type="search" id="cq" placeholder="Müşteri ara" value="${esc(C.q)}"></div>
-        <div class="chips">${[['hepsi', 'Hepsi', R.length], ['borclu', 'Borçlu', debtors.length], ['alacakli', 'Alacaklı', creditors.length], ['gec', GEC + ' gündür ödemeyen', CZ.v ? gec.length : ''], ['not', 'Ödeme notu olan', NT.l ? R.filter(r => nm[r.u.id]).length : '']].map(([k, l, n]) => `<button class="chip" data-cf="${k}" aria-pressed="${C.f === k}">${l}${n !== '' ? ` <b>${n}</b>` : ''}</button>`).join('')}</div>
+        <div class="chips">${[['hepsi', 'Hepsi', R.length], ['borclu', 'Borçlu', debtors.length], ['alacakli', 'Alacaklı', creditors.length], ['gec', GEC + ' gündür ödemeyen', CZ.v ? gec.length : ''], ['not', 'Ödeme notu olan', NT.l ? R.filter(r => nm[r.u.id]).length : ''], ['bayi', 'Bayiler', R.filter(r => Number(r.u.dealerStatus) === 1).length], ...(onay || C.f === 'onay' ? [['onay', 'Bayilik onayı bekleyen', onay]] : [])].map(([k, l, n]) => `<button class="chip" data-cf="${k}" aria-pressed="${C.f === k}">${l}${n !== '' ? ` <b>${n}</b>` : ''}</button>`).join('')}</div>
         <div class="cz-sira"><span>Sırala:</span>${[['borc', 'Borca göre'], ['odeme', 'Son ödemeye göre'], ['hareket', 'Son harekete göre'], ['ad', 'Ada göre']].map(([k, l]) => `<button class="chip sm" data-cs="${k}" aria-pressed="${C.s === k}">${l}</button>`).join('')}</div>
         ${L.length ? `<ul class="cz-tb"><li class="cz-th"><div>Müşteri</div><div>Bakiye</div><div>Son ödeme</div><div>Son hareket</div></li>${L.map(satir).join('')}</ul>` : '<p class="sub">Bu seçimde müşteri yok.</p>'}
       </div>`;

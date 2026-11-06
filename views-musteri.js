@@ -104,7 +104,7 @@
       <div class="mh-det-h"><b>${esc(d.no || x.no || 'Numarasız fatura')}</b><span>${d.kalemler.length} kalem · ${adet} adet · ${tl2(d.toplam)}</span></div>
       <ul class="mh-kal">${d.kalemler.map(([urun, miktar, fiyat, tutar, renk]) => `<li><div><b>${esc(urun)}</b>${renk ? `<small>${esc(renk)}</small>` : ''}</div><span class="num">${miktar} × ${tl2(fiyat)}</span><b class="num">${tl2(tutar)}</b></li>`).join('')}</ul>
       ${d.aciklama ? `<p class="hint">${esc(d.aciklama)}</p>` : ''}
-      <div class="mh-det-d"><button class="btn sm dark" data-act="mhYazdir" data-fid="${esc(x.fid)}" ${H.belge ? 'disabled' : ''}>${H.belge === 'y' ? 'Hazırlanıyor…' : 'Yazdır'}</button><button class="btn sm" data-act="mhPdf" data-fid="${esc(x.fid)}" ${H.belge ? 'disabled' : ''}>${H.belge === 'p' ? 'PDF hazırlanıyor…' : 'PDF indir'}</button><button class="btn sm ek-wa" data-act="mhWaPdf" data-fid="${esc(x.fid)}" ${H.belge ? 'disabled' : ''}>${H.belge === 'w' ? 'PDF hazırlanıyor…' : H.pdf?.fid === x.fid ? 'WhatsApp\'ta gönder' : 'WhatsApp'}</button>${CLK.izin('urunlistesi') ? '<small>Birkaç satışı tek listede yazdırmak için Satış faturası sayfası.</small>' : ''}</div>
+      <div class="mh-det-d"><button class="btn sm dark" data-act="mhYazdir" data-fid="${esc(x.fid)}" ${H.belge ? 'disabled' : ''}>${H.belge === 'y' ? 'Hazırlanıyor…' : 'Yazdır'}</button><button class="btn sm" data-act="mhPdf" data-fid="${esc(x.fid)}" ${H.belge ? 'disabled' : ''}>${H.belge === 'p' ? 'PDF hazırlanıyor…' : 'PDF indir'}</button><button class="btn sm ek-wa" data-act="mhWaPdf" data-fid="${esc(x.fid)}" ${H.belge ? 'disabled' : ''}>${H.belge === 'w' ? 'PDF hazırlanıyor…' : H.pdf?.fid === x.fid ? 'WhatsApp\'ta gönder' : 'WhatsApp'}</button></div>
     </div></li>`;
   }
 
@@ -157,7 +157,7 @@
         : `<p class="sub mh-yok">${yukleniyor ? 'Okunuyor…' : 'Bu dönemde hareket yok.'}</p>`}
       <div class="mh-alt">
         <small>${yukleniyor ? 'Eski hareketler Paraşüt\'ten okunuyor…' : v.hata ? `<span class="cz-gec">${esc(v.hata)}</span>` : `Paraşüt'ten, ${saat} itibarıyla · ${v.toplam || v.satirlar.length} hareket. Satışa dokununca ürünleri açılır.`}</small>
-        <span>${H.donem !== '0' && !yukleniyor && (v.sonraki || v.satirlar.some(x => bas && x.t < bas)) ? '<button class="btn sm" data-act="mhDaha">Daha eskisini göster</button>' : ''}<button class="btn sm ghost" data-act="mhYenile" data-pid="${esc(pid)}" ${v.yuk ? 'disabled' : ''}>Yenile</button></span>
+        <span>${H.donem !== '0' && !yukleniyor && (v.sonraki || v.satirlar.some(x => bas && x.t < bas)) ? '<button class="btn sm" data-act="mhDaha">Daha eskisini göster</button>' : ''}${CLK.izin('urunlistesi') && CLK.satisListesiAc ? `<button class="btn sm" data-act="mhSatisListe" data-pid="${esc(pid)}" title="Seçtiğiniz satışları tek kontrol listesinde yazdırın">Birkaç satışı tek listede</button>` : ''}<button class="btn sm ghost" data-act="mhYenile" data-pid="${esc(pid)}" ${v.yuk ? 'disabled' : ''}>Yenile</button></span>
       </div>`;
   }
 
@@ -400,6 +400,7 @@
     else if (act === 'mhYazdir') belge(el.dataset.fid, false);
     else if (act === 'mhPdf') belge(el.dataset.fid, true);
     else if (act === 'mhWaPdf') waPdf(el.dataset.fid);
+    else if (act === 'mhSatisListe') CLK.satisListesiAc?.(el.dataset.pid);
     else if (act === 'mhEkstre') { const pid = H.pid[String(el.dataset.u)]; if (pid) ekstreHazirla(pid); }
     else if (act === 'mhEkKapat') { if (el.classList.contains('mh-modal') && e.target !== el) return; ekstreKapat(); }
     else if (act === 'mhEkPaylas') { if (H.ek) CLK.belge?.paylas(H.ek.blob, H.ek.url, H.ek.dosya, 'Hesap özeti'); }

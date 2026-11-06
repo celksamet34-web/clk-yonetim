@@ -643,7 +643,7 @@
       D.kaydediyor = false; S.keepScroll = true; render();
       const kart = $('#thKart');
       if (kart) kart.scrollIntoView({ behavior: 'smooth', block: 'start' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
-      if (r.site?.durum === 'tamam' && ['cari', 'musteri'].includes(S.route)) { CLK.loadUsers?.(true); CLK.loadBalance?.(true); }
+      if (r.site?.durum === 'tamam' && ['musteriler', 'musteri'].includes(S.route)) { CLK.loadUsers?.(true); CLK.loadBalance?.(true); }
       // müşteri sayfası Paraşüt hareketlerini yeniden okur
       if (r.senetler?.length) document.dispatchEvent(new CustomEvent('clk:cari', { detail: { musteri: f.kisi?.id } }));
       if (r.site?.durum === 'bekle') siteBekle(istek);
