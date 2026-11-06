@@ -161,23 +161,41 @@
     if (CLK.izin('urunlistesi')) await numaraVer([v]);
     const l = listeKur([v]);
     const html = sayfaHtml('Ürün Listesi', [['Müşteri', l.bilgi.musteri], ['Fatura no', l.bilgi.no], l.bilgi.tarih && ['Tarih', trT(l.bilgi.tarih)]].filter(Boolean), l.kalemler, []);
+    // pdf: true = indir, 'blob' = WhatsApp'ta paylaşmak için dosya olarak döner
+    if (pdf === 'blob') return { no: v.no || l.bilgi.no, ad: dosyaAdi(l.bilgi), blob: await indir(html, dosyaAdi(l.bilgi), true) };
     if (pdf) { toast('PDF hazırlanıyor…'); await indir(html, dosyaAdi(l.bilgi)); toast('PDF indirildi'); } else yazdir(html);
     return v.no || l.bilgi.no;
+  };
+  /* PDF'i WhatsApp'a dosya olarak gönderme (celik 06.11.2026: "satış faturasını okurken pdf indir yazdır butonun yanına whatsapp ekle"):
+     telefonun paylaşma penceresi açılır, WhatsApp seçilir. PDF hazırlanırken basış izni süresi dolarsa (özellikle iPhone) PDF hazır tutulur,
+     ikinci basışta hemen paylaşılır ('tekrar'). Paylaşma yoksa (bilgisayarda bazı tarayıcılar) PDF indirilir. */
+  CLK.pdfPaylas = async (blob, ad, baslik) => {
+    const f = new File([blob], ad, { type: 'application/pdf' });
+    try {
+      if (navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f], title: baslik }); return 'tamam'; }
+    } catch (e) {
+      if (e.name === 'AbortError') return 'iptal';
+      if (e.name === 'NotAllowedError') return 'tekrar';
+    }
+    const u = URL.createObjectURL(blob), a = Object.assign(document.createElement('a'), { href: u, download: ad });
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
+    toast('Bu cihaz doğrudan paylaşmaya izin vermedi: PDF indirildi, WhatsApp\'ta ataçla ekleyin');
+    return 'indirildi';
   };
   // PDF: liste gizli bir çerçevede çizilir, html2pdf ile A4 PDF olarak indirilir
   // dosya adı yalnız fatura numarası (celik isteği 29.10.2026); birden çok faturada numaralar alt çizgiyle
   const dosyaAdi = (b = D.bilgi) => (b.no ? b.no.split(',').map(x => x.replace(/\s+/g, '')).filter(Boolean).join('_') : 'CLKCANTA-' + b.tarih.split('-').reverse().join('.')) + '.pdf';
-  function indir(html = sayfaHtml(), ad = dosyaAdi()) {
+  function indir(html = sayfaHtml(), ad = dosyaAdi(), blobIste = false) {
     return new Promise((tamam, hata) => {
       const f = Object.assign(document.createElement('iframe'), { style: 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0' });
       document.body.append(f);
       ad = JSON.stringify(ad);
-      f.srcdoc = html.replace('</body>', `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></` + `script><script>
+      f.srcdoc = html.replace('</body>', `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" onerror="parent.postMessage('ulPdfHata','*')"></` + `script><script>
         document.querySelectorAll('.sayfa>thead td,.sayfa>tfoot td').forEach(t => t.style.height = '0');
         html2pdf().set({ margin: [12, 0, 12, 0], filename: ${ad}, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.alt', '.imza', '.not', '.son'] } })
-          .from(document.body).save().then(() => parent.postMessage('ulPdfTamam', '*'), e => parent.postMessage('ulPdfHata', '*'));
+          .from(document.body)${blobIste ? ".outputPdf('blob').then(b => parent.postMessage({ ulPdf: b }, '*')" : ".save().then(() => parent.postMessage('ulPdfTamam', '*')"}, e => parent.postMessage('ulPdfHata', '*'));
       </` + `script></body>`);
-      const dinle = e => { if (e.source !== f.contentWindow) return; removeEventListener('message', dinle); setTimeout(() => f.remove(), 1000); e.data === 'ulPdfTamam' ? tamam() : hata(new Error('PDF oluşturulamadı')); };
+      const dinle = e => { if (e.source !== f.contentWindow) return; removeEventListener('message', dinle); setTimeout(() => f.remove(), 1000); e.data === 'ulPdfTamam' ? tamam() : e.data?.ulPdf ? tamam(e.data.ulPdf) : hata(new Error('PDF oluşturulamadı')); };
       addEventListener('message', dinle);
     });
   }
@@ -222,6 +240,7 @@
         <div class="ek-dug">
           <button class="btn dark" data-act="ulYazdir">Yazdır</button>
           <button class="btn" data-act="ulIndir">PDF indir</button>
+          <button class="btn ek-wa" data-act="ulWa" ${D.waYuk ? 'disabled' : ''}>${D.waYuk ? 'PDF hazırlanıyor…' : D.waPdf && D.waPdf.html === sayfaHtml() ? 'WhatsApp\'ta gönder' : 'WhatsApp'}</button>
           <button class="btn" data-act="ulEkle">Satır ekle</button>
           <button class="btn${D.bakiyeGoster ? ' dark' : ''}" data-act="ulBakiye" aria-pressed="${D.bakiyeGoster}">${D.bakiyeGoster ? '✓ Bakiye listede' : 'Bakiyeyi göster'}</button>
         </div>
@@ -245,11 +264,25 @@
     });
   };
 
+  // WhatsApp: PDF hazırlanır (liste değişmediyse yeniden hazırlanmaz) ve paylaşma penceresi açılır
+  async function waGonder() {
+    if (D.waYuk) return;
+    const html = sayfaHtml(), ad = dosyaAdi();
+    if (D.waPdf?.html !== html) {
+      D.waYuk = true; S.keepScroll = true; render();
+      try { D.waPdf = { html, ad, blob: await indir(html, ad, true) }; } catch (e) { toast(e.message); }
+      D.waYuk = false; S.keepScroll = true; render();
+      if (D.waPdf?.html !== html) return;
+    }
+    const r = await CLK.pdfPaylas(D.waPdf.blob, D.waPdf.ad, D.bilgi.musteri || 'Satış faturası');
+    if (r === 'tekrar') toast('PDF hazır: göndermek için WhatsApp\'ta gönder\'e bir daha basın');
+  }
   araSec.ulMus = m => { D.kalemler = []; satislariAl(m.id); };
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'ulYazdir') yazdir(sayfaHtml());
     else if (act === 'ulIndir') { toast('PDF hazırlanıyor…'); indir().then(() => toast('PDF indirildi'), e => toast(e.message)); }
+    else if (act === 'ulWa') waGonder();
     else if (act === 'ulSon') { S.keepScroll = true; sec(D.satislar.filter(x => x[5] === 'invoice').slice(0, +el.dataset.n).map(x => x[0])); }
     else if (act === 'ulTemizle') { S.keepScroll = true; sec([]); }
     else if (act === 'ulBakiye') { D.bakiyeGoster = !D.bakiyeGoster; S.keepScroll = true; if (D.bakiyeGoster && !D.bakiye && D.musteri) bakiyeAl(D.musteri).then(render); render(); }

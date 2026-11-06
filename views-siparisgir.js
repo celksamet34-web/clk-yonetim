@@ -40,6 +40,8 @@
     }
     CLK.go('siparisgir');
   };
+  // müşteri sayfasındaki "Sipariş gir": boş form o müşteri seçili açılır
+  CLK.siparisAc = uid => { yeniForm(); T.musteri = Number(uid) || null; CLK.go('siparisgir'); };
   // müşteriler: Paraşüt'le eşleşmiş site üyeleri; fiyat tanımı, iskonto ve bakiye sitedeki üye kartından
   async function musterileriAl() {
     const [{ data: es, error }] = await Promise.all([sb.from('sp_musteri_eslesme').select('site_ad,parasut_id,parasut_ad').not('parasut_id', 'is', null), CLK.loadUsers()]);

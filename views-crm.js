@@ -113,7 +113,9 @@
   /* müşteri sayfası (celik 06.11.2026: "müşterilerden x müşteriye girince paraşütten eski satışları yaz. hatta tarayıcıdan gir paraşüt gibi düzenle.
      ödeme gir senet gir cari hesabını borcu gör. daha farklı kolay yap onu. ekstre ve satış sayfalarını orda toplayalım"):
      Paraşüt'ün müşteri ekranı gibi: yanda bakiye, Ödeme gir / Senet gir / Ekstre gönder ve ödeme notu; ortada sekmeler: Paraşüt hesap hareketleri
-     (views-musteri.js, satışa dokununca ürünleri, yazdır/PDF), site siparişleri, bilgiler. Ödeme ve senet formu sayfanın üstünde açılır. */
+     (views-musteri.js, satışa dokununca ürünleri, yazdır/PDF), site siparişleri, bilgiler. Ödeme ve senet formu sayfanın üstünde açılır.
+     Özet sekmesi (celik 06.11: "paraşüte bağlı kalma ekstra kendinde bişeyler kat"): ödeme durumu, ortalama ödeme süresi, borç yaşı, aylık grafik,
+     alım düzeni, elimizdeki çek/senet ve risk (views-musteri.js ozetHtml); yanda Sipariş gir ve WhatsApp ile Borç hatırlat. */
   const MT = (S.ui.mt ||= { tab: '' });
   views.musteri = () => {
     const u = userById(S.arg), pasif = !!u && Number(u.status) === 0;
@@ -124,12 +126,14 @@
     if (u && cariGor) cariOzetGerekirse();
     if (!u) return head('Müşteri', 'Bulunamadı', '', back) + (S.uLoading ? skel() : '<div class="card empty"><h3>Müşteri bulunamadı</h3></div>');
     const s = custStats(u), os = ordersOf(u.id), bal = Number(u.balance) || 0;
-    const tabs = [hGor && ['hareket', 'Hesap hareketleri'], ['siparis', 'Site siparişleri'], ['bilgi', 'Bilgiler']].filter(Boolean);
+    const tabs = [hGor && ['ozet', 'Özet'], hGor && ['hareket', 'Hesap hareketleri'], ['siparis', 'Site siparişleri'], ['bilgi', 'Bilgiler']].filter(Boolean);
     if (!tabs.some(([k]) => k === MT.tab)) MT.tab = tabs[0][0];
     const prices = { 0: 'Varsayılan', 2: 'Bayi fiyatı 1', 3: 'Bayi fiyatı 2', 4: 'Bayi fiyatı 3', 5: 'Bayi fiyatı 4' };
     const fav = {}; os.filter(O.counts).forEach(o => O.items(o).forEach(i => { (fav[i.code] ||= { name: i.name, code: i.code, q: 0 }).q += Number(i.netQuantity ?? i.quantity) || 0; }));
     const favs = Object.values(fav).sort((a, b) => b.q - a.q).slice(0, 5);
     const adres = a => [a?.address, a?.district, a?.city].filter(Boolean).join(', ');
+    const sipBtn = CLK.izin('siparisgir') && CLK.siparisAc && !pasif ? `<button class="btn mk-koyu" data-act="mSiparis" data-u="${u.id}">Sipariş gir</button>` : '';
+    const waBtn = cariGor && bal < -0.5 && !pasif ? `<button class="btn mk-koyu mk-wa" data-act="mhWa" data-u="${u.id}" data-ad="${esc(userName(u))}" data-tel="${esc(u.phone || '')}" data-bal="${bal}"><span aria-hidden="true">✆</span> Borç hatırlat</button>` : '';
     const ekstreBtn = hGor ? `<button class="btn mk-ek" data-act="mhEkstre" data-u="${u.id}" ${CLK.mHesap.hazir(u.id) ? '' : 'disabled'} title="Seçili dönemin hesap özeti resmi">Ekstre gönder</button>` : '';
     // Paraşüt bakiyesi (artı = borç) site bakiyesiyle (eksi = borç) tutmuyorsa yazılır; eşitleme birkaç dakikada bir yansıtır
     const pBak = cariGor ? CLK.mHesap?.bakiye(u.id) : null;
@@ -140,11 +144,12 @@
           <small class="mk-dr">${bal < -0.005 ? 'Müşterinin borcu' : bal > 0.005 ? 'Müşterinin alacağı (fazla ödeme)' : 'Hesap kapalı'}</small>
           ${fark ? `<small class="mk-fark">Paraşüt'te ${tl2(Math.abs(pBak))} ${pBak > 0.005 ? 'borç' : pBak < -0.005 ? 'alacak' : ''} görünüyor; eşitleme birkaç dakikada yansıtır.</small>` : ''}
           ${sonOdeme(u)}</div>
-        ${pasif ? '<p class="mk-pasif">Pasif üye</p>' : `<div class="mk-dug"><button class="btn gold" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="para">Ödeme gir</button>${CLK.izin('senet') ? `<button class="btn mk-koyu" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="senet">Senet gir</button>` : ''}${ekstreBtn}</div>`}
+        ${pasif ? '<p class="mk-pasif">Pasif üye</p>' : `<div class="mk-dug"><button class="btn gold" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="para">Ödeme gir</button>${CLK.izin('senet') ? `<button class="btn mk-koyu" data-act="thAc" data-u="${u.id}" data-yer="musteri" data-sekil="senet">Senet gir</button>` : ''}${ekstreBtn}${sipBtn}${waBtn}</div>`}
         ${notKutu(u)}
-      </div>` : `<div class="sum-card mk-bak"><dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>Sipariş</dt><dd>${num(s.n)}</dd></dl>${ekstreBtn ? `<div class="mk-dug">${ekstreBtn}</div>` : ''}</div>`;
+      </div>` : `<div class="sum-card mk-bak"><dl><dt>Telefon</dt><dd>${esc(u.phone || '—')}</dd><dt>Sipariş</dt><dd>${num(s.n)}</dd></dl>${ekstreBtn || sipBtn ? `<div class="mk-dug">${ekstreBtn}${sipBtn}</div>` : ''}</div>`;
     const siparisHtml = `<div class="mini-kpis"><div><span>Sipariş</span><b>${num(s.n)}</b></div><div><span>Toplam alışveriş</span><b>${tl(s.spend)}</b></div><div><span>Ortalama sepet</span><b>${tl(s.n ? s.spend / s.n : 0)}</b></div><div><span>Son sipariş</span><b>${s.last ? dt(s.last) : '—'}</b></div></div>
       ${os.length ? `<div class="olist">${os.map(o => `<button class="orow" data-order="${O.id(o)}"><div class="o1"><b>${esc(O.code(o))}</b><small>${dtt(O.date(o))} · ${O.items(o).length} kalem</small></div><div class="o2">${O.items(o).slice(0, 2).map(i => `<span>${esc(i.name)} ×${num(i.quantity)}</span>`).join('')}</div><div class="o3"><b class="num">${tl(O.total(o))}</b>${st(O.status(o))}</div></button>`).join('')}</div>` : '<p class="sub">Sitede sipariş yok.</p>'}`;
+    const favHtml = favs.length ? `<h3 class="mk-h3">En çok aldıkları <small>site siparişleri</small></h3><ul class="mk-fav">${favs.map(f => `<li><div><b>${esc(f.name)}</b><small>${esc(f.code)}</small></div><b class="num">${num(f.q)} adet</b></li>`).join('')}</ul>` : '';
     const bilgiHtml = `<dl class="mk-dl"><dt>Telefon</dt><dd>${u.phone ? `${esc(u.phone)} <button class="btn sm" data-act="copy" data-v="${esc(u.phone)}">Kopyala</button>` : '—'}</dd>
         <dt>E-posta</dt><dd style="word-break:break-all">${esc(u.email || '—')}</dd>
         ${u.taxId ? `<dt>Vergi</dt><dd>${esc(u.taxBranch || '')} ${esc(u.taxId)}</dd>` : ''}
@@ -154,14 +159,14 @@
         <dt>Fatura adresi</dt><dd>${esc(adres(u.invoice) || '—')}</dd>
         ${adres(u.delivery) && adres(u.delivery) !== adres(u.invoice) ? `<dt>Teslimat adresi</dt><dd>${esc(adres(u.delivery))}</dd>` : ''}
         <dt>Site kodu</dt><dd>${esc(u.code || '—')}</dd>${u.createdAt ? `<dt>Kayıt</dt><dd>${dt(u.createdAt)}</dd>` : ''}${u.lastLoginAt && !/^0000/.test(u.lastLoginAt) ? `<dt>Son giriş</dt><dd>${dt(u.lastLoginAt)}</dd>` : ''}</dl>
-      ${favs.length ? `<h3 class="mk-h3">En çok aldıkları</h3><ul class="mk-fav">${favs.map(f => `<li><div><b>${esc(f.name)}</b><small>${esc(f.code)}</small></div><b class="num">${num(f.q)} adet</b></li>`).join('')}</ul>` : ''}`;
+      ${hGor ? '' : favHtml}`;
     const alt = [esc(u.title && u.title !== userName(u) ? u.title : ''), esc(u.invoice?.city || ''), esc(u.phone || ''), pasif ? 'Pasif üye' : ''].filter(Boolean).join(' · ');
     return head(Number(u.dealerStatus) === 1 ? 'Bayi' : 'Müşteri', esc(userName(u)), alt, back) + (CLK.tahsilat?.kart('musteri', u.id) || '') + `
       <div class="mk">
         <aside class="mk-yan">${yan}</aside>
         <div class="mk-ana">
           <div class="mk-tabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" class="mk-tab" data-act="mTab" data-k="${k}" aria-selected="${MT.tab === k}">${t}${k === 'siparis' && os.length ? ` <b>${num(os.length)}</b>` : ''}</button>`).join('')}</div>
-          <div class="card mk-ic">${MT.tab === 'hareket' ? CLK.mHesap.html(u) : MT.tab === 'siparis' ? siparisHtml : bilgiHtml}</div>
+          <div class="card mk-ic">${MT.tab === 'ozet' ? CLK.mHesap.ozetHtml(u, favHtml) : MT.tab === 'hareket' ? CLK.mHesap.html(u) : MT.tab === 'siparis' ? siparisHtml : bilgiHtml}</div>
         </div>
       </div>${CLK.mHesap?.ekstreHtml() || ''}`;
   };
@@ -414,6 +419,7 @@
     else if (act === 'oYazdir') siparisYazdir(S.orders.find(x => String(O.id(x)) === el.dataset.id));
     else if (act === 'czYenile') { CLK.loadUsers(true); CZ.tekrar = 0; cariOzetYukle(true); }
     else if (act === 'mTab') { MT.tab = el.dataset.k; S.keepScroll = true; render(); }
+    else if (act === 'mSiparis') CLK.siparisAc?.(el.dataset.u);
     else if (act === 'ntAc') notAc(el.dataset.id);
     else if (act === 'ntKapat') { NT.ed = null; S.keepScroll = true; render(); }
     else if (act === 'ntKaydet') notKaydet(false);

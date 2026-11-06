@@ -637,6 +637,16 @@
   };
   CLK.senetPanel = {
     html: panelSenet, kisa: panelKisa,
+    // müşteri sayfası özeti (views-musteri.js): müşterinin elimizdeki TL evrakı, portföyde kalanı olan ya da ciro edilip son günü geçmemiş.
+    // undefined = yetki yok ya da okunamadı, null = okunuyor
+    musteri(pid, ad) {
+      if (!CLK.izin('cek')) return undefined;
+      if (!D.v) { pnYukle(); return D.hata ? undefined : null; }
+      const A = x => String(x || '').trim().toLocaleUpperCase('tr');
+      return (D.v.cekler || []).filter(c => (pid && c.kimdenId ? String(c.kimdenId) === String(pid) : A(c.kimden) === A(ad)) && (!c.doviz || c.doviz === 'TRL')
+        && ((c.yon === 'alinan' && c.kalan > 0.009) || (c.yon === 'ciro' && sonGun(c) >= bugun())))
+        .sort((a, b) => (a.vade || '').localeCompare(b.vade || ''));
+    },
     // ilk açılışta ve 10 dakikadan eski veride Paraşüt listesi (sunucuda 10 dk saklanır) arka planda alınır
     bind() { pnYukle(); pnBagla(); }
   };
