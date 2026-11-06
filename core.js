@@ -168,12 +168,13 @@ window.CLK = (() => {
     odemeler: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/></svg>',
     personel: '<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 11-4.7"/><rect x="15" y="14" width="6" height="6" rx="1"/><path d="M16.5 14v-1.5a1.5 1.5 0 0 1 3 0V14"/></svg>',
     parasut: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
-    cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
+    cam: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    perakende: '<svg viewBox="0 0 24 24"><path d="M4 10v10h16V10"/><path d="M3 10l2-6h14l2 6c0 1.7-1.3 3-3 3s-3-1.3-3-3c0 1.7-1.3 3-3 3s-3-1.3-3-3c0 1.7-1.3 3-3 3s-3-1.3-3-3z"/><path d="M10 20v-5h4v5"/></svg>'
   };
   // Menü grupları (celik 31.10: "menü sıralamasını düzeltelim"). Masaüstü yan menü ve mobil "Daha" sayfası aynı sırayı kullanır.
   const MENU = [
     ['', [['panel', 'Panel']]],
-    ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['urunlistesi', 'Satış faturası'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi']]],
+    ['Satış', [['siparisgir', 'Sipariş gir'], ['siparisler', 'Siparişler'], ['urunlistesi', 'Satış faturası'], ['musteriler', 'Müşteriler'], ['cari', 'Cari hesap'], ['ekstre', 'Müşteri ekstresi'], ['perakende', 'CLK Perakende']]],
     ['Site ürünleri', [['yeni', 'Yeni ürün'], ['urunler', 'Ürünler'], ['stok', 'Stok'], ['fiyat', 'Fiyat kuralları'], ['sitegonder', 'Siteye gönder'], ['katalog', 'Katalog'], ['instagram', 'Instagram'], ['banner', 'Banner']]],
     ['Alış ve Paraşüt', [['urungiris', 'Ürün Giriş'], ['valizsiparis', 'Valiz sipariş'], ['westpolo', 'West Polo'], ['stokkart', 'Stok kartları']]],
     ['Finans', [['gider', 'Gider gir'], ['senet', 'Senet gir'], ['cek', 'Çek ve senet'], ['odemeler', 'Ödeme takvimi']]],

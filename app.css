@@ -1296,3 +1296,69 @@ button.sp-r:hover,.sp-r.acik{background:var(--bg)}
   .vs-alt span{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .vs-alt .btn{min-height:44px;padding:8px 16px}
 }
+
+/* CLK Perakende (views-perakende.js; BenimPOS mağaza stoğu ve satışları, 06.11.2026) */
+.pk-kpis>div small{display:block;font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-uyari{display:block;width:100%;text-align:left;font:inherit;cursor:pointer;border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn);padding:12px 16px;margin-bottom:14px}
+.pk-uyari b{white-space:nowrap}
+.pk-sekmeler{margin-bottom:14px}
+.pk-not{color:var(--muted);font-size:13px;margin:6px 0}
+.pk-hata{color:var(--bad);font-weight:600;margin:10px 0 0}
+.pk-h{margin:0 0 4px;font-size:16px}
+.pk-kur h3{margin-top:0}
+.pk-adim{margin:0 0 16px;padding-left:20px;line-height:1.6}
+.pk-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:10px;align-items:end}
+.pk-form input{font:inherit;padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;background:#fff;min-width:0}
+.pk-liste{display:grid}
+.pk-satir{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 130px;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line-2)}
+.pk-satir:last-child{border-bottom:0}
+.pk-ad{min-width:0}
+.pk-ad b{display:block;font-weight:600;overflow-wrap:anywhere}
+.pk-ad small{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.pk-ad .pk-par{color:var(--ok)}
+.pk-ad .pk-oneri{color:var(--gold-ink)}
+.pk-say{text-align:right;font-variant-numeric:tabular-nums}
+.pk-say span{display:none;font-size:11px;color:var(--muted)}
+.pk-say b{font-weight:700}
+.pk-say small{display:block;font-size:11px;color:var(--muted)}
+.pk-say.sifir b{color:var(--muted)}.pk-say.eksi b{color:var(--bad)}
+.pk-d{text-align:right}
+.pk-es{grid-template-columns:minmax(0,1fr) auto}
+.pk-es-d{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pk-psec{grid-column:1/-1;display:grid;gap:6px;padding:8px 0 4px}
+.pk-psec input{font:inherit;padding:9px 11px;border:1px solid var(--line-2);border-radius:10px;background:#fff}
+.pk-p{display:block;width:100%;text-align:left;font:inherit;background:#fff;border:1px solid var(--line-2);border-radius:10px;padding:8px 12px;cursor:pointer}
+.pk-p small{display:block;font-size:12px;color:var(--muted)}
+.pk-p:hover{border-color:var(--ink)}
+.pk-katlar{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pk-tip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.pk-tip span{background:var(--sunk);border-radius:12px;padding:8px 12px;min-width:110px}
+.pk-tip small{display:block;font-size:11px;color:var(--muted)}
+.pk-tip b{font-variant-numeric:tabular-nums}
+.pk-fisler{display:grid}
+.pk-fis{border-bottom:1px solid var(--line-2)}
+.pk-fis:last-child{border-bottom:0}
+.pk-fis-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;font:inherit;background:none;border:0;padding:10px 4px;cursor:pointer;color:inherit}
+.pk-saat{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;white-space:nowrap}
+.pk-fis-ad{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pk-fis-ad small{display:block;font-size:12px;color:var(--muted)}
+.pk-tutar{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pk-tutar.eksi{color:var(--bad)}
+.pk-fis-l{list-style:none;margin:0 0 6px;padding:0 4px 0 18px}
+.pk-fis-l li{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px;align-items:center;padding:6px 0;border-top:1px dashed var(--line-2);font-size:14px}
+.pk-fis-l li small{display:block;font-size:11px;color:var(--muted)}
+.pk-fis-a{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pk-fis-l b{font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(max-width:700px){
+  .pk-form{grid-template-columns:1fr}
+  .pk-satir{grid-template-columns:minmax(0,1fr) auto auto;row-gap:4px}
+  .pk-satir .pk-d{grid-column:1/-1;text-align:left}
+  .pk-say span{display:block}
+  .pk-es{grid-template-columns:1fr}
+  .pk-es-d{justify-content:flex-start}
+  .pk-fis-l{padding-left:4px}
+  .pk-fis-l li{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
+  .pk-fis-l li .pk-fis-a{grid-column:1}
+}
+.pk-kartlar{display:grid;gap:14px}
+.pk-fis-l li .pill{justify-self:start}
