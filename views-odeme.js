@@ -278,7 +278,7 @@
           ${d.sonHata && Date.now() - Date.parse(d.sonHata.zaman) < 864e5 ? `<li><span>Son hata</span><b class="bad">${saat(d.sonHata.zaman)} · ${esc(nbHataYazi(d.sonHata))}</b></li>` : ''}
         </ul>`;
     const form = NB.kurulu ? `<label class="nb-a"><span>ntfy hesap anahtarı</span><input id="nbAnahtar" type="password" autocomplete="off" spellcheck="false" placeholder="${d?.hesap ? 'Kayıtlı · değiştirmek için yenisini yapıştırın' : 'tk_…'}" value="${esc(NB.a)}"></label>
-        <div class="nb-btn"><button class="btn dark sm" data-act="nbKaydet" ${NB.kay ? 'disabled' : ''}>${NB.kay ? 'Kaydediliyor…' : 'Anahtarı kaydet'}</button>${d?.hesap ? '<button class="btn sm ghost" data-act="nbSil">Anahtarı kaldır</button>' : ''}</div>
+        <div class="nb-btn"><button class="btn dark sm" data-act="odNbKaydet" ${NB.kay ? 'disabled' : ''}>${NB.kay ? 'Kaydediliyor…' : 'Anahtarı kaydet'}</button>${d?.hesap ? '<button class="btn sm ghost" data-act="odNbSil">Anahtarı kaldır</button>' : ''}</div>
         <p class="hint">ntfy.sh/signup ile ücretsiz hesap açın, ntfy.sh/account › Access tokens › Create access token (süre: never). Anahtar yalnız sunucuda saklanır, burada geri gösterilmez. Telefondaki uygulamada değişiklik gerekmez.</p>` : '';
     return `${durum}${NB.hata ? `<p class="msg err">${esc(NB.hata)}</p>` : ''}${form}
       <div class="nb-btn"><button class="btn gold sm" data-act="odDeneme" ${OD.is || NB.den === 'gidiyor' ? 'disabled' : ''}>${NB.den === 'gidiyor' ? 'Gönderiliyor…' : 'Deneme bildirimi gönder'}</button></div>
@@ -319,8 +319,8 @@
     else if (act === 'odSatKaydet') satKaydet();
     else if (act === 'odGeri') basit({ islem: 'odendi_geri', id: el.dataset.id, donem: el.dataset.donem }, 'Ödenmedi olarak geri alındı');
     else if (act === 'odDeneme') nbDeneme();
-    else if (act === 'nbKaydet') nbKaydet(false);
-    else if (act === 'nbSil') nbKaydet(true);
+    else if (act === 'odNbKaydet') nbKaydet(false);
+    else if (act === 'odNbSil') nbKaydet(true);
     else prevAct?.(act, el, e);
   };
 
