@@ -1555,6 +1555,7 @@ button.mh-sb:hover{background:var(--bg)}
 .bd-a>span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
 .bd-a input[type=tel]{width:100%;min-width:0;min-height:var(--tap);border:1px solid var(--line-2);border-radius:13px;background:#fff;padding:11px 14px;font-size:16px}
 .bd-genis{grid-column:1/-1}
+.bd-c{grid-column:1/-1;display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4;cursor:pointer}.bd-c input{width:20px;height:20px;margin:1px 0 0;flex:none}.bd-c small{color:var(--muted)}
 .bd-p{color:var(--muted);font-size:12px;line-height:1.4;overflow-wrap:anywhere}.bd-p .link{font-size:12px;margin-left:4px}
 .bd-d{display:flex;gap:8px;flex-wrap:wrap}.bd-d .btn{flex:0 0 auto}
 @media (max-width:600px){.bd-g{grid-template-columns:minmax(0,1fr)}.bd-d .btn{flex:1 1 0}}

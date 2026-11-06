@@ -336,7 +336,9 @@ window.CLK = (() => {
     const acik = dokunmatik() && yaziAlani(document.activeElement) && (!vv || performance.now() - odakAn < 1000 || vv.height < vvEn - 120);
     document.documentElement.classList.toggle('klavye', acik);
   }
-  document.addEventListener('focusin', klavye, true);
+  // düğmeye ya da kutucuğa dokunulunca (Android odağı ona verir) çubuklar dokunuş bitince döner: hemen dönerse alttaki menü dokunulan yerin üstüne
+  // çıkıp tıklamayı alıyordu (06.11, sayfanın en altındaki Kaydet)
+  document.addEventListener('focusin', e => { if (yaziAlani(e.target)) klavye(e); else setTimeout(klavye, 60); }, true);
   document.addEventListener('focusout', () => setTimeout(klavye, 60), true);
   window.visualViewport?.addEventListener('resize', () => klavye());
   function draw() {

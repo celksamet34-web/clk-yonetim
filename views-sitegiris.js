@@ -193,7 +193,16 @@
     else if (id === 'sgiAd' && G.form) G.form.kullanici = e.target.value;
     else if (id === 'sgiLimit') { const uid = e.target.dataset.u; G.cari = { ...(G.cari?.uid === uid ? G.cari : { uid, is: false, hata: '' }), limit: e.target.value }; }
   });
-  CLK.siteGiris = { html };
+  // Bilgileri düzenle'deki açık hesap limiti (yalnız yönetici): sitede eksi bakiye limiti, 0 = kapalı; bayi: üyeyi bayi de yapar
+  async function limitYaz(uid, limit, bayi) {
+    uid = String(uid);
+    const r = await sor({ islem: 'cari_ac', uye: Number(uid), limit, bayi: !!bayi });
+    const u = (S.users || []).find(x => String(x.id) === uid);
+    if (u) { u.nBalanceStatus = limit > 0 ? 1 : 0; u.nBalanceLimit = limit; if (bayi) u.dealerStatus = 1; }
+    G.d[uid] = { ...(G.d[uid] || {}), ...r };
+    return r;
+  }
+  CLK.siteGiris = { html, limit: limitYaz };
   const prevAct = views.onAct;
   views.onAct = (act, el, e) => {
     if (act === 'sgiAc') ac(el.dataset.u);
