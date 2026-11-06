@@ -1539,3 +1539,9 @@ button.mh-sb:hover{background:var(--bg)}
   .mo-ay small{font-size:10px}
 }
 .mo-yas-not{margin:8px 0 0;font-size:12px}
+/* Ürün Giriş · perakende (BenimPOS) */
+.ug-p.bp{flex-direction:column;align-items:stretch;gap:2px;min-width:240px}.ug-p.bp .ug-yeni{white-space:normal}
+.ug-tablo .ug-barkod{width:130px}
+.ug-tur{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.ug-tur .sk-f{flex:1 1 220px}
+.ug-bp-form select{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;max-width:100%;background:var(--card,#fff);color:inherit}
+.sk-f.ug-pr small{color:#7a5a12}
