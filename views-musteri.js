@@ -348,7 +348,7 @@
         <div><span>En eski borç</span><b class="num">${a.acik <= 0.5 ? 'Yok' : a.enEski?.gun !== null && a.enEski?.gun !== undefined ? a.enEski.gun + ' gün' : v.sonraki ? '1 yıldan eski' : 'Devir'}</b><small>${a.acik > 0.5 && a.enEski?.t ? dt(a.enEski.t) + ' satışı' : a.acik > 0.5 ? 'açık borç ' + tl(a.acik) : 'açık borç yok'}</small></div>
       </div>
       ${tamam ? '' : '<p class="hint mo-yuk">1 yıllık hareketler okunuyor, rakamlar tamamlanıyor…</p>'}
-      ${a.acik > 0.5 ? `<h3 class="mk-h3">Açık borcun yaşı <small>${tl(a.acik)}</small></h3>${yasHtml(a)}` : ''}
+      ${a.acik > 0.5 ? `<h3 class="mk-h3">Ödenmemiş borç ne kadar eski? <small>toplam ${tl(a.acik)}</small></h3>${yasHtml(a)}<p class="hint mo-yas-not">Ödemeler en eski satıştan başlayarak düşülür; kalan borç hangi satışlardan kaldıysa o satışların tarihine göre ayrılır.</p>` : ''}
       <h3 class="mk-h3">Aylık satış ve tahsilat <small>son 12 ay, aya dokunun</small></h3>${grafikHtml(v)}
       <ul class="mo-not"><li><span class="mo-ik">↻</span><span>${alim}</span></li>${evrakHtml(pid, v, a)}</ul>
       ${favHtml}
