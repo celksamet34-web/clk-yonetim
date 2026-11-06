@@ -89,6 +89,7 @@
       </div>
       ${CLK.senetPanel && gor.cek ? CLK.senetPanel.kisa() : ''}
       ${gor.cari ? CLK.cariNot?.panel() || '' : ''}
+      ${CLK.odeme?.bildirim?.() || ''}
       ${CLK.odeme?.panel() || ''}
       <div class="card"><div class="card-h"><div><h3>Kategoriler</h3><p class="sub">Üst kategoriler · seçince alt kategorilere ve ürünlere geçilir</p></div><button class="btn sm ghost" data-go="urunler">Tümü</button></div>${views.catTiles(S.products, true)}</div>
       ${gor.ciro ? `<div class="grid2">

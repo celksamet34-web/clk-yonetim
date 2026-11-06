@@ -1559,3 +1559,15 @@ button.mh-sb:hover{background:var(--bg)}
 .bd-d{display:flex;gap:8px;flex-wrap:wrap}.bd-d .btn{flex:0 0 auto}
 @media (max-width:600px){.bd-g{grid-template-columns:minmax(0,1fr)}.bd-d .btn{flex:1 1 0}}
 @media (max-width:600px){.bd-form{border:0;padding:0;background:none}}
+/* telefon bildirimleri (views-odeme.js nbHtml) */
+.nb-d{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px;font-size:13px}
+.nb-d li{display:flex;gap:10px;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:6px}
+.nb-d li>span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;flex:0 0 auto}
+.nb-d b{text-align:right;font-weight:600}.nb-d .ok{color:var(--ok)}.nb-d .bad{color:var(--bad)}
+.nb-a{display:flex;flex-direction:column;gap:5px;margin:4px 0 8px}
+.nb-a>span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.nb-a input{width:100%;min-width:0;min-height:var(--tap);border:1px solid var(--line-2);border-radius:13px;background:#fff;padding:11px 14px;font-size:16px}
+.nb-btn{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.od-bildirim .msg{margin:8px 0 0}
+.nb-uyari{display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;border-color:var(--bad)}
+.nb-uyari b{display:block;color:var(--bad)}.nb-uyari small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}

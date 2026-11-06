@@ -168,12 +168,13 @@
         </div>
         <div class="card od-bildirim"><div class="card-h"><div><h3>Telefona bildirim</h3><p class="sub">ntfy uygulaması · sipariş bildirimleriyle aynı kanal</p></div></div>
           <p>Hatırlatmalar sipariş bildirimlerinin geldiği <b>ntfy</b> kanalına gelir, telefonda ayrıca bir şey kurmanız gerekmez: seçtiğiniz günlerde saat 09:00'da, son gün sabah 09:00'da ve akşam 20:00'de, ödeme gecikirse ertesi gün bir kez daha. Son gün "Ödendi" derseniz akşamki gelmez.</p>
-          <button class="btn gold sm" data-act="odDeneme" ${OD.is ? 'disabled' : ''}>Deneme bildirimi gönder</button>
+          ${nbHtml()}
         </div>
       </div>`;
   };
 
   views.bind_odemeler = () => {
+    $('#nbAnahtar')?.addEventListener('input', e => { NB.a = e.target.value; NB.hata = ''; });
     const f = OD.f;
     if (f) for (const [id, k] of [['odAd', 'ad'], ['odTutar', 'tutar'], ['odTaksit', 'taksit'], ['odNot', 'not'], ['odTarih', 'tarih'], ['odGun', 'gun']]) {
       const el = $('#' + id);
@@ -223,6 +224,66 @@
     catch (e) { toast(e.message); }
     OD.is = false; S.keepScroll = true; render();
   }
+  /* telefon bildirimleri (06.11: ntfy.sh ücretsiz kotayı internet adresine göre sayıyor; Supabase'in ortak çıkış adresinde 19:00'da doldu, sipariş bildirimleri dahil
+     hiçbiri gitmedi). Hesap anahtarı (sp_ayar.ntfy_token) girilince kota yalnız bize ait olur. Her bildirim bildirim_kayit'a yazılır, ulaşmayan 15 dk'da bir yeniden
+     gönderilir (cron bildirim-kontrol). Veritabanı fonksiyonları (yalnız yönetici): bildirim_durum, bildirim_hesap, bildirim_deneme, bildirim_sonuc; kurulum
+     /mnt/project-files/sunucu/bildirim.sql. Kurulmamışsa eski deneme (odeme-takvim) kullanılır. */
+  const NB = (OD.nb ||= { d: null, yuk: false, zaman: 0, hata: '', kurulu: true, a: '', kay: false, den: '', denHata: '' });
+  const nbCiz = () => { S.keepScroll = true; render(); };
+  const nbHataYazi = h => !h ? '' : h.kod === 429 ? 'ntfy.sh günlük ücretsiz kotası doldu (429). Ulaşmayan bildirimler bekletilir, kota açılınca gönderilir; hesap anahtarı girilirse bu olmaz.'
+    : h.kod === 401 || h.kod === 403 ? `ntfy.sh anahtarı kabul etmedi (${h.kod}). Anahtarı yeniden kopyalayıp kaydedin.` : 'ntfy.sh hatası' + (h.kod ? ` (${h.kod})` : '') + (h.hata ? ': ' + String(h.hata).slice(0, 120) : '');
+  async function nbYukle(zorla) {
+    if (NB.yuk || (!zorla && Date.now() - NB.zaman < 60000)) return;
+    NB.yuk = true; NB.zaman = Date.now();
+    const { data, error } = await sb.rpc('bildirim_durum');
+    NB.yuk = false;
+    if (error) { NB.kurulu = !/bildirim_durum|PGRST202|Could not find|does not exist/i.test(`${error.message} ${error.code || ''}`); NB.hata = NB.kurulu ? error.message : ''; }
+    else { NB.d = data; NB.kurulu = true; NB.hata = ''; }
+    nbCiz();
+  }
+  async function nbKaydet(sil) {
+    const a = sil ? '' : NB.a.trim();
+    if (!sil && !/^tk_[A-Za-z0-9]{20,60}$/.test(a)) { NB.hata = 'Anahtar tk_ ile başlamalı: ntfy.sh › Account › Access tokens bölümünden kopyalayın.'; return nbCiz(); }
+    NB.kay = true; NB.hata = ''; nbCiz();
+    const { error } = await sb.rpc('bildirim_hesap', { anahtar: a });
+    NB.kay = false;
+    if (error) { NB.hata = error.message; return nbCiz(); }
+    NB.a = ''; toast(sil ? 'Bildirim hesabı kaldırıldı' : 'Anahtar kaydedildi, deneme bildirimi gidiyor');
+    if (sil) nbYukle(true); else nbDeneme();
+    nbCiz();
+  }
+  async function nbDeneme() {
+    if (!NB.kurulu) return basit({ islem: 'deneme' }, 'Deneme bildirimi gönderildi, telefona bakın');
+    if (NB.den === 'gidiyor') return;
+    NB.den = 'gidiyor'; NB.denHata = ''; nbCiz();
+    const { data: id, error } = await sb.rpc('bildirim_deneme');
+    if (error) { NB.den = 'hata'; NB.denHata = error.message; return nbCiz(); }
+    for (let i = 0; i < 12 && NB.den === 'gidiyor'; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      const { data: s } = await sb.rpc('bildirim_sonuc', { istek: id });
+      if (s && !s.bekliyor) { NB.den = s.tamam ? 'tamam' : 'hata'; NB.denHata = s.tamam ? '' : nbHataYazi(s); }
+    }
+    if (NB.den === 'gidiyor') { NB.den = 'hata'; NB.denHata = 'ntfy.sh yanıt vermedi; birkaç dakika sonra yeniden deneyin.'; }
+    nbYukle(true);
+  }
+  const saat = t => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+  function nbHtml() {
+    nbYukle();
+    const d = NB.d, g = d?.gun || {};
+    const durum = !NB.kurulu ? `<p class="msg err">Kurulum bekleniyor: Supabase SQL Editor'da bildirim.sql çalıştırılmalı.</p>`
+      : !d ? `<p class="sub">${NB.yuk ? 'Durum okunuyor…' : ''}</p>`
+      : `<ul class="nb-d">
+          <li><span>Gönderim</span><b class="${d.hesap ? 'ok' : 'bad'}">${d.hesap ? 'ntfy hesabıyla (kota bize ait)' : 'Hesapsız · ortak ücretsiz kota'}</b></li>
+          <li><span>Son 24 saat</span><b>${num(g.toplam || 0)} bildirim · ${num(g.tamam || 0)} ulaştı${g.bekliyor ? ` · <span class="bad">${num(g.bekliyor)} bekliyor</span>` : ''}${g.hata ? ` · <span class="bad">${num(g.hata)} gitmedi</span>` : ''}</b></li>
+          ${d.sonHata && Date.now() - Date.parse(d.sonHata.zaman) < 864e5 ? `<li><span>Son hata</span><b class="bad">${saat(d.sonHata.zaman)} · ${esc(nbHataYazi(d.sonHata))}</b></li>` : ''}
+        </ul>`;
+    const form = NB.kurulu ? `<label class="nb-a"><span>ntfy hesap anahtarı</span><input id="nbAnahtar" type="password" autocomplete="off" spellcheck="false" placeholder="${d?.hesap ? 'Kayıtlı · değiştirmek için yenisini yapıştırın' : 'tk_…'}" value="${esc(NB.a)}"></label>
+        <div class="nb-btn"><button class="btn dark sm" data-act="nbKaydet" ${NB.kay ? 'disabled' : ''}>${NB.kay ? 'Kaydediliyor…' : 'Anahtarı kaydet'}</button>${d?.hesap ? '<button class="btn sm ghost" data-act="nbSil">Anahtarı kaldır</button>' : ''}</div>
+        <p class="hint">ntfy.sh/signup ile ücretsiz hesap açın, ntfy.sh/account › Access tokens › Create access token (süre: never). Anahtar yalnız sunucuda saklanır, burada geri gösterilmez. Telefondaki uygulamada değişiklik gerekmez.</p>` : '';
+    return `${durum}${NB.hata ? `<p class="msg err">${esc(NB.hata)}</p>` : ''}${form}
+      <div class="nb-btn"><button class="btn gold sm" data-act="odDeneme" ${OD.is || NB.den === 'gidiyor' ? 'disabled' : ''}>${NB.den === 'gidiyor' ? 'Gönderiliyor…' : 'Deneme bildirimi gönder'}</button></div>
+      ${NB.den === 'tamam' ? '<p class="msg ok">ntfy.sh bildirimi aldı; telefonunuza gelmiş olmalı.</p>' : NB.den === 'hata' ? `<p class="msg err">${esc(NB.denHata)}</p>` : ''}`;
+  }
   const bulKalem = id => (OD.v?.kalemler || []).find(k => k.id === id);
   const bulDonem = (id, donem) => { const k = bulKalem(id); return k && acikDonemler(k, OD.v.donemler || {}, bugun()).find(p => p.donem === donem); };
 
@@ -257,12 +318,22 @@
     else if (act === 'odSatKapat') { OD.sat = null; S.keepScroll = true; render(); }
     else if (act === 'odSatKaydet') satKaydet();
     else if (act === 'odGeri') basit({ islem: 'odendi_geri', id: el.dataset.id, donem: el.dataset.donem }, 'Ödenmedi olarak geri alındı');
-    else if (act === 'odDeneme') basit({ islem: 'deneme' }, 'Deneme bildirimi gönderildi, telefona bakın');
+    else if (act === 'odDeneme') nbDeneme();
+    else if (act === 'nbKaydet') nbKaydet(false);
+    else if (act === 'nbSil') nbKaydet(true);
     else prevAct?.(act, el, e);
   };
 
   // ana panel: 7 gün içindeki ve geciken ödemeler (yalnız yönetici)
   CLK.odeme = {
+    // telefon bildirimleri gitmiyorsa ana panelde uyarı (yalnız yönetici)
+    bildirim: () => {
+      if (!CLK.yonetici()) return '';
+      nbYukle();
+      const g = NB.d?.gun, sorun = (g?.bekliyor || 0) + (g?.hata || 0);
+      if (!NB.d || !sorun) return '';
+      return `<div class="card nb-uyari" data-go="odemeler"><div><b>Telefon bildirimleri gitmiyor</b><small>Son 24 saatte ${num(sorun)} bildirim ulaşmadı${NB.d.hesap ? '' : ' · ntfy hesap anahtarı girilmemiş'}. Ödeme takvimi › Telefona bildirim.</small></div><span class="pill bad">${num(sorun)}</span></div>`;
+    },
     panel: () => {
       if (!CLK.yonetici()) return '';
       gerekirse();
