@@ -24,7 +24,7 @@
 /* Panel her açılışta en son yayınlanan dosyaları alır (06.11.2026: GitHub Pages dosyaları 10 dk önbellekte tutuyor, telefon yeniledikten sonra da eski
    sürümü açıyordu). Dosyalar cache: 'no-cache' ile istenir (değişmediyse 304, kısa), sırayla eklenir. İstek olmazsa eski usul script etiketleriyle yüklenir. */
 (function () {
-  var L = ['core.js', 'views-main.js', 'views-crm.js', 'editor.js', 'views-banner.js', 'views-parasut.js', 'views-ekstre.js', 'views-perakende.js', 'views-urunlistesi.js', 'views-stokkart.js', 'views-stokesitle.js', 'views-fiyat.js', 'views-sitegonder.js', 'views-siparisgir.js', 'views-urungiris.js', 'views-valizsiparis.js', 'views-westpolo.js', 'views-gider.js', 'views-cek.js', 'views-senet.js', 'views-tahsilat.js', 'views-musteri.js', 'views-sitegiris.js', 'il-ilce.js', 'views-yenimusteri.js', 'views-katalog.js', 'views-instagram.js', 'views-odeme.js', 'views-personel.js', 'views-parasutbag.js'];
+  var L = ['core.js', 'views-main.js', 'views-crm.js', 'editor.js', 'views-banner.js', 'views-parasut.js', 'views-ekstre.js', 'views-perakende.js', 'views-urunlistesi.js', 'views-stokkart.js', 'views-stokesitle.js', 'views-fiyat.js', 'views-sitegonder.js', 'views-siparisgir.js', 'views-urungiris.js', 'views-valizsiparis.js', 'views-tedarikci.js', 'views-westpolo.js', 'views-gider.js', 'views-cek.js', 'views-senet.js', 'views-tahsilat.js', 'views-musteri.js', 'views-sitegiris.js', 'il-ilce.js', 'views-yenimusteri.js', 'views-katalog.js', 'views-instagram.js', 'views-odeme.js', 'views-personel.js', 'views-parasutbag.js'];
   var bitti = false;
   function bitir() { if (bitti) return; bitti = true; CLK.boot(); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {}); }
   function eskiUsul() {

@@ -155,6 +155,8 @@
     f.onload = () => { setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300); };
   }
   CLK.kontrolListesi = (baslik, bilgiler, kalemler) => yazdir(sayfaHtml(baslik, bilgiler, kalemler, []));
+  // başka sayfaların A4 belgeleri (Tedarikçi raporu, mutabakat) aynı yazdırma ve PDF yolunu kullanır; html2pdf aynı sürüm
+  CLK.htmlBelge = { pdf: (html, ad, blob) => indir(html, ad, !!blob), yazdir: html => yazdir(html) };
   /* müşteri sayfası (celik 06.11: "ekstre ve satış sayfalarını orda toplayalım"): Paraşüt satışı (satis işleminin yanıtı) buradaki
      kontrol listesiyle yazdırılır ya da PDF olur; numarası yoksa Satış faturası sayfasındaki gibi CLK-SF numarası Paraşüt'e yazılır */
   CLK.satisBelge = async (v, pdf) => {
