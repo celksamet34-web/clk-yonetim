@@ -2,6 +2,7 @@
    06.11: lüks temalar (Fildişi, Siyah ve altın, Mocha; eski düzen "Klasik"), kemerli kapak, arka kapak (WhatsApp QR), sayfada 16 ürünlü fiyat listesi,
    PDF'te ürüne dokununca WhatsApp'ta o ürünün adıyla mesaj. 07.11: sayfalar iki kat çözünürlükte (A4 2480×3508, ~300 dpi) çizilir,
    fotoğraflar yüksek kaliteli küçültmeyle konur (celik: "görüntü doğru ama kalitesi düşük"); "Normal" seçilirse eski boyut.
+   07.11: lüks temalarda ürünün ikinci fotoğrafı kemerin sol alt köşesinde altın halkalı yuvarlak çerçevede (celik: "ürünün 2 adet fotosunu eklesek").
    Sayfalar tarayıcıda tuvale çizilir, jsPDF ile tek PDF yapılır; indirilir ya da WhatsApp'ta paylaşılır. Sunucuya bir şey yazılmaz. */
 (() => {
   const { S, $, esc, num, toast, head, views, render, loadProducts, P } = CLK;
@@ -15,7 +16,7 @@
   const COZ = [['yuksek', 'Yüksek (net, ~300 dpi)'], ['normal', 'Normal (küçük dosya)']];
   const ayYil = () => new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
-  const VARS = { tema: 'kurumsal', ktema: 'fildisi', arka: true, coz: 'yuksek', baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, olcu: true, kat: '', stokta: true, aktif: true };
+  const VARS = { tema: 'kurumsal', ktema: 'fildisi', arka: true, coz: 'yuksek', iki: true, baslik: 'Ürün Kataloğu', alt: '', fiyat: 'yok', bicim: 'a4', adet: 4, sira: 'kat', not: '', kapak: true, katSayfa: true, kod: true, renk: true, olcu: true, kat: '', stokta: true, aktif: true };
   let kayit = {};
   try { kayit = JSON.parse(localStorage.getItem('clk-katalog') || '{}'); } catch {}
   const D = (S.ui.kt ||= { ...VARS, ...kayit, cikar: new Set(kayit.cikar || []), ara: '', goster: 60, durum: '', calisiyor: false, url: '', blob: null, onizleme: [] });
@@ -346,8 +347,8 @@
     g.textBaseline = 'alphabetic'; g.font = F(600, 23); g.fillStyle = '#a39c91'; g.letterSpacing = '3px'; g.fillText(buyuk(SITE), W / 2, byy + bh + 52); g.letterSpacing = '0px'; g.textAlign = 'left';
   }
 
-  function durumResmi(g, W, H, p, im, i) {
-    if (String(D.tema).startsWith('l-')) { T = KTEMA[D.tema.slice(2)] || KTEMA.fildisi; return durumLuks(g, W, H, p, im); }
+  function durumResmi(g, W, H, p, im, i, im2) {
+    if (String(D.tema).startsWith('l-')) { T = KTEMA[D.tema.slice(2)] || KTEMA.fildisi; return durumLuks(g, W, H, p, im, im2); }
     if (D.tema === 'renkli') return durumRenkli(g, W, H, p, im, i);
     if (D.tema !== 'koyu') return durumKurumsal(g, W, H, p, im);
     const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2c2824'); gr.addColorStop(0.55, RENK.INK); gr.addColorStop(1, '#0b0a09');
@@ -520,12 +521,19 @@
       for (let yy = 0; yy < ch; yy++) for (const xx of [0, cw - 1]) { const i = (yy * cw + xx) * 4; for (let j = 0; j < 3; j++) kn[j].push(d[i + j]); }
       const fon = kn.map(a => a.sort((p, q) => p - q)[a.length >> 1]), gri = Math.min(...fon) < 247 && Math.min(...fon) > 200;
       const esik = fon.map(v => Math.min(239, v - 16));
-      let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
-      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) { const i = (yy * cw + xx) * 4; if (d[i] < esik[0] || d[i + 1] < esik[1] || d[i + 2] < esik[2]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; } }
+      let x0 = cw, y0 = ch, x1 = -1, y1 = -1, ax = 0, ay = 0, an = 0;
+      const koyu = fon.map(v => v - 60);
+      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) {
+        const i = (yy * cw + xx) * 4;
+        if (d[i] < esik[0] || d[i + 1] < esik[1] || d[i + 2] < esik[2]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+        if (d[i] < koyu[0] || d[i + 1] < koyu[1] || d[i + 2] < koyu[2]) { ax += xx; ay += yy; an++; }
+      }
       if (x1 > x0 && y1 > y0) {
         const pay = gri ? 0.08 : 0.04, px = (x1 - x0) * pay, py = (y1 - y0) * pay;
         const a0 = Math.max(0, (x0 - px) / k), b0 = Math.max(0, (y0 - py) / k), a1 = Math.min(im.width, (x1 + 1 + px) / k), b1 = Math.min(im.height, (y1 + 1 + py) / k);
-        kutu = [a0, b0, a1 - a0, b1 - b0, { fon: gri ? fon : null, bos: [x0 / k - a0, y0 / k - b0, a1 - (x1 + 1) / k, b1 - (y1 + 1) / k] }];
+        // tas: ürün (ya da manken) kadrajın üstüne/altına değiyor; mx/my: koyu piksellerin ağırlık merkezi (madalyon yakınlaştırması)
+        kutu = [a0, b0, a1 - a0, b1 - b0, { fon: gri ? fon : null, bos: [x0 / k - a0, y0 / k - b0, a1 - (x1 + 1) / k, b1 - (y1 + 1) / k],
+          tas: y0 <= 1 || y1 >= ch - 2, mx: an ? ax / an / k : im.width / 2, my: an ? ay / an / k : im.height / 2 }];
       } else if (gri) kutu[4] = { fon, bos: [0, 0, 0, 0] };
     } catch {}
     icBellek.set(im, kutu); return kutu;
@@ -558,15 +566,46 @@
     }
     g.drawImage(c, dx, dy, iw, ih);
   }
+  // İkinci fotoğraf (celik 07.11: "kataloga ürünün 2 adet fotosunu eklesek"): kemerin sol alt köşesinde, yarısı kemerin dışına taşan
+  // altın halkalı yuvarlak çerçeve; ana ürün o zaman kemerde biraz sağa ve küçüğe alınır (IKI_YER), üst üste binmez. Fonu beyaz
+  // fotoğraf (detay, arka) çerçeveye sığdırılıp kemer tonuna çarpılır; mankenli ya da fonlu fotoğraf çerçeveyi doldurur (ortası,
+  // biraz yukarıdan: mankende çanta gövdede durur). Pikseller değişmez.
+  const IKI_YER = { sol: 0.21, gen: 0.75 };
+  const madalyonOlcu = (ax, ay, aw, ah) => { const r = aw * 0.19; return [ax + aw * 0.01, ay + ah - r * 1.06, r]; };
+  const ikinci = p => P.imgs(p)[1] || '';
+  function madalyon(g, im, cx, cy, r, k) {
+    if (!im) return;
+    g.save(); g.shadowColor = T.koyu ? 'rgba(0,0,0,.5)' : 'rgba(80,60,30,.24)'; g.shadowBlur = 18 * k; g.shadowOffsetY = 5 * k;
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = '#fffdf9'; g.fill(); g.restore();
+    const ic = r * 0.92;
+    g.save(); g.beginPath(); g.arc(cx, cy, ic, 0, 7); g.clip();
+    if (beyazFon(im)) {
+      const gr = g.createLinearGradient(0, cy - ic, 0, cy + ic); gr.addColorStop(0, T.kemer[0]); gr.addColorStop(1, T.kemer[1]); g.fillStyle = gr; g.fillRect(cx - ic, cy - ic, 2 * ic, 2 * ic);
+      const kt = icerik(im), [bx, by, bw, bh, ek] = kt;
+      g.globalCompositeOperation = 'multiply';
+      if (ek?.tas) { // kadraja değen (manken) fotoğraf: koyu kısmın ortasına, gövde ve çanta yakından
+        const kn = Math.min(im.width, im.height) * 0.8, sx = Math.max(0, Math.min(im.width - kn, ek.mx - kn / 2)), sy = Math.max(0, Math.min(im.height - kn, Math.min(ek.my, im.height * 0.45) - kn / 2));
+        yumusakCiz(g, im, [sx, sy, kn, kn, { fon: ek.fon, bos: [0, 0, 0, 0] }], cx - ic, cy - ic, 2 * ic, 2 * ic);
+      } else { const kut = ic * 1.56, s = Math.min(kut / bw, kut / bh, 3), iw = bw * s, ih = bh * s; yumusakCiz(g, im, kt, cx - iw / 2, cy - ih / 2, iw, ih); }
+    } else {
+      // fotoğrafın dolu kısmı (beyaz pay atılır), kare kesit; mankende gövde hizası
+      const [bx, by, bw, bh] = icerik(im), kn = Math.min(bw, bh, Math.max(im.width * 0.5, Math.min(bw, bh) * 0.9));
+      const sx = Math.max(0, Math.min(im.width - kn, bx + bw / 2 - kn / 2)), sy = Math.max(0, Math.min(im.height - kn, by + bh * 0.43 - kn / 2));
+      g.drawImage(im, sx, sy, kn, kn, cx - ic, cy - ic, 2 * ic, 2 * ic);
+    }
+    g.restore();
+    g.save(); g.lineWidth = Math.max(1.4, r * 0.04); g.strokeStyle = varak(g, cx - r, cx + r, true); g.beginPath(); g.arc(cx, cy, r - g.lineWidth / 2, 0, 7); g.stroke();
+    g.lineWidth = Math.max(0.8, r * 0.012); g.strokeStyle = 'rgba(154,119,65,.55)'; g.beginPath(); g.arc(cx, cy, ic, 0, 7); g.stroke(); g.restore();
+  }
   // kemer içinde ürün: beyaz fonlu fotoğraf kemerin tabanına oturur (çarpma), değilse kemeri doldurur
-  function kemerFoto(g, im, x, y, w, h, cerceve, k) {
+  function kemerFoto(g, im, x, y, w, h, cerceve, k, yer) {
     const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, T.kemer[0]); gr.addColorStop(1, T.kemer[1]);
     if (cerceve) { const o = 12 * k; g.save(); g.strokeStyle = T.cizgi; g.lineWidth = 1.3 * k; kemerYol(g, x - o, y - o, w + 2 * o, h + o); g.stroke(); g.restore(); }
     g.save(); g.shadowColor = T.koyu ? 'rgba(0,0,0,.42)' : 'rgba(80,60,30,.10)'; g.shadowBlur = (T.koyu ? 40 : 26) * k; g.shadowOffsetY = 10 * k; kemerYol(g, x, y, w, h); g.fillStyle = gr; g.fill(); g.restore();
     g.save(); kemerYol(g, x, y, w, h); g.clip();
     if (!im) { g.fillStyle = '#8b8174'; g.font = F(600, Math.max(11, 18 * k)); g.textAlign = 'center'; g.fillText('Fotoğraf yüklenemedi', x + w / 2, y + h * 0.6); g.textAlign = 'left'; }
     else if (beyazFon(im)) {
-      const kt = icerik(im), [, , sw, sh] = kt, kw = w * 0.8, kx = x + (w - kw) / 2, ky = y + Math.min(w, h) * 0.2, kh = h - Math.min(w, h) * 0.2 - h * 0.07;
+      const kt = icerik(im), [, , sw, sh] = kt, kw = w * (yer?.gen ?? 0.8), kx = x + w * (yer?.sol ?? 0.1), ky = y + Math.min(w, h) * 0.2, kh = h - Math.min(w, h) * 0.2 - h * 0.07;
       const s = Math.min(kw / sw, kh / sh, 3), iw = sw * s, ih = sh * s;
       g.globalCompositeOperation = 'multiply'; yumusakCiz(g, im, kt, kx + (kw - iw) / 2, ky + kh - ih, iw, ih);
     } else { const s = Math.max(w / im.width, h / im.height), iw = im.width * s, ih = im.height * s; g.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih); }
@@ -625,7 +664,7 @@
   const bilgiSatiri = p => { const b = D.olcu ? bilgi(p) : {}; return [D.kod && kodAl(p), b.olcu, b.malzeme, b.su].filter(Boolean).join('  ·  '); };
   // yazı boyları (px, A4 1240 genişliğe göre); r: mühür yarıçapı (0 = fiyat adın altında yazıyla)
   const LX = { 1: { ad: 52, bi: 17, fy: 50, r: 118, rk: 14 }, 4: { ad: 33, bi: 13.5, fy: 34, r: 74, rk: 11 }, 6: { ad: 27, bi: 12, fy: 28, r: 0, rk: 10 }, 9: { ad: 23, bi: 11, fy: 24, r: 0, rk: 9 } };
-  function luxSayfa(g, W, H, liste, imgs, kat, no, toplam, lk) {
+  function luxSayfa(g, W, H, liste, imgs, kat, no, toplam, lk, imgs2 = []) {
     const s = W / 1240, n = +D.adet, m = 96 * s, ust = 318 * s, alt = H - altPay(s);
     zeminLux(g, W, H); ustLux(g, W, H, kat);
     if (n === 16) listeLux(g, W, H, liste, imgs, ust, alt, lk);
@@ -637,7 +676,9 @@
       liste.forEach((p, i) => {
         const x = m + (i % sut) * (cw + gx), y = ust + Math.floor(i / sut) * (ch + gy), ah = ch - th - o;
         const aw = Math.min(cw * (n === 1 ? 0.8 : 0.84), ah * (n === 1 ? 0.84 : 0.92)), ax = x + (cw - aw) / 2, ay = y + o;
-        kemerFoto(g, imgs[i], ax, ay, aw, ah, cerceve, s);
+        const im2 = imgs[i] && imgs2[i] && imgs2[i] !== imgs[i] ? imgs2[i] : null;
+        kemerFoto(g, imgs[i], ax, ay, aw, ah, cerceve, s, im2 ? IKI_YER : null);
+        if (im2) { const [mx, my, mr] = madalyonOlcu(ax, ay, aw, ah); madalyon(g, im2, mx, my, mr, s); }
         const f = fiyatAl(p), cx = x + cw / 2;
         if (muhurlu && f) muhur(g, ax + aw - L.r * s * 0.3, ay + aw * 0.27, L.r * s, f);
         let ty = ay + ah + 8 * s, z = L.ad * s;
@@ -763,7 +804,7 @@
   function arkaKapak(g, W, H, qrf, l, lk) { const t = T; if (D.ktema === 'klasik') T = KTEMA.koyu; try { luxArka(g, W, H, qrf, l, lk); } finally { T = t; } }
 
   /* WhatsApp durumu, lüks (1080×1920): üst ~260 px ve alt ~260 px WhatsApp arayüzüne boş; kemer, mühürde fiyat, ad, bilgi, renkler, çağrı */
-  function durumLuks(g, W, H, p, im) {
+  function durumLuks(g, W, H, p, im, im2) {
     zeminLux(g, W, H);
     const lg = T.koyu ? logoAltin : logoKoyu;
     if (lg) { const lh = 54, lw = lg.width / lg.height * lh; g.drawImage(lg, (W - lw) / 2, 268, lw, lh); }
@@ -771,7 +812,8 @@
     const kat = P.cat(p);
     if (kat && kat !== 'Kategorisiz') { const w = aralikli(g, kat, W / 2, 432, 19, 7, T.altin, 'center', 600, 640); g.fillStyle = T.cizgi; g.fillRect(W / 2 - w / 2 - 76, 425, 54, 1.4); g.fillRect(W / 2 + w / 2 + 22, 425, 54, 1.4); }
     const aw = 740, ax = (W - aw) / 2, ay = 496, ah = 1268 - ay;
-    kemerFoto(g, im, ax, ay, aw, ah, true, 1);
+    kemerFoto(g, im, ax, ay, aw, ah, true, 1, im && im2 ? IKI_YER : null);
+    if (im && im2) { const [mx, my, mr] = madalyonOlcu(ax, ay, aw, ah); madalyon(g, im2, mx, my, mr, 1); }
     const f = fiyatAl(p); if (f) muhur(g, ax + aw - 24, ay + aw * 0.28, 104, f);
     g.textAlign = 'center'; g.fillStyle = T.yazi; g.font = FP(500, 54);
     let sat = satirlar(g, adYaz(p.name), W - 200, 2), y = 1352;
@@ -842,10 +884,11 @@
       for (let i = 0; i < sl.length; i++) {
         D.durum = `Sayfa ${no + 1} / ${toplam} hazırlanıyor…`; const d = $('#ktDurum'); if (d) d.textContent = D.durum;
         // sonraki sayfanın fotoğrafları da şimdiden istenir
-        if (sl[i + 1]) sl[i + 1].l.forEach(p => gorsel(P.img(p)));
-        const imgs = await Promise.all(sl[i].l.map(p => gorsel(P.img(p))));
+        const iki = lux && D.iki && +D.adet !== 16;
+        if (sl[i + 1]) sl[i + 1].l.forEach(p => { gorsel(P.img(p)); if (iki) gorsel(ikinci(p)); });
+        const [imgs, imgs2] = await Promise.all([Promise.all(sl[i].l.map(p => gorsel(P.img(p)))), iki ? Promise.all(sl[i].l.map(p => gorsel(ikinci(p)))) : []]);
         eksik += imgs.filter(x => !x).length;
-        hazirla(); if (lux) luxSayfa(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); else urunSayfasi(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); ekle();
+        hazirla(); if (lux) luxSayfa(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk, imgs2); else urunSayfasi(g, W, H, sl[i].l, imgs, sl[i].kat, no + 1, toplam, lk); ekle();
       }
       if (D.arka) { hazirla(); arkaKapak(g, W, H, qrf, l, lk); ekle(); }
       c.width = c.height = 1; // büyük tuvalin belleği bırakılır
@@ -861,9 +904,10 @@
     if (String(D.tema).startsWith('l-')) await bodoniYukle();
     for (let i = 0; i < l.length; i++) {
       D.durum = `Resim ${i + 1} / ${l.length} hazırlanıyor…`; const d = $('#ktDurum'); if (d) d.textContent = D.durum;
-      if (l[i + 1]) gorsel(P.img(l[i + 1]));
-      const im = await gorsel(P.img(l[i])); if (!im) eksik++;
-      hazirla(); durumResmi(g, W, H, l[i], im, i);
+      const iki = D.iki && String(D.tema).startsWith('l-');
+      if (l[i + 1]) { gorsel(P.img(l[i + 1])); if (iki) gorsel(ikinci(l[i + 1])); }
+      const [im, im2] = await Promise.all([gorsel(P.img(l[i])), iki ? gorsel(ikinci(l[i])) : null]); if (!im) eksik++;
+      hazirla(); durumResmi(g, W, H, l[i], im, i, im2);
       const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
       const ad = `CLK-durum-${String(i + 1).padStart(2, '0')}-${String(kodAl(l[i]) || l[i].id).replace(/[^\w-]+/g, '')}.jpg`;
       out.push({ blob, ad, url: URL.createObjectURL(blob) });
@@ -923,7 +967,7 @@
           <label>Sıralama${sec('ktSira', SIRA, D.sira)}</label>
           <label>Alt not<input id="ktNot" value="${esc(D.not)}" placeholder="örn. Fiyatlar 1 Kasım'a kadar geçerlidir"></label>
         </div>
-        <div class="kt-kutular">${resim ? '' : kutu('ktKapak', D.kapak, 'Kapak sayfası') + kutu('ktArka', D.arka, 'Arka kapak (iletişim, QR)') + kutu('ktKatSayfa', D.katSayfa, 'Her kategori yeni sayfada')}${kutu('ktKod', D.kod, 'Ürün kodu yazılsın')}${kutu('ktRenk', D.renk, 'Renkler yazılsın')}${kutu('ktOlcu', D.olcu, 'Ölçü ve malzeme yazılsın')}</div>
+        <div class="kt-kutular">${(resim ? String(D.tema).startsWith('l-') : D.ktema !== 'klasik' && +D.adet !== 16) ? kutu('ktIki', D.iki, 'İkinci fotoğraf da (yuvarlak çerçevede)') : ''}${resim ? '' : kutu('ktKapak', D.kapak, 'Kapak sayfası') + kutu('ktArka', D.arka, 'Arka kapak (iletişim, QR)') + kutu('ktKatSayfa', D.katSayfa, 'Her kategori yeni sayfada')}${kutu('ktKod', D.kod, 'Ürün kodu yazılsın')}${kutu('ktRenk', D.renk, 'Renkler yazılsın')}${kutu('ktOlcu', D.olcu, 'Ölçü ve malzeme yazılsın')}</div>
       </div>
       <div class="card kt-urunler">
         <h3>Ürünler</h3><p class="sub">Filtreye uyan ve fotoğrafı olan ürünlerin hepsi kataloğa girer; istemediğinizin işaretini kaldırın.</p>
@@ -957,7 +1001,7 @@
       if (ciz) { S.keepScroll = true; render(); }
     });
     yaz('ktBaslik', 'baslik'); yaz('ktAlt', 'alt'); yaz('ktNot', 'not');
-    for (const [id, k] of [['ktTema', 'tema'], ['ktKtema', 'ktema'], ['ktArka', 'arka'], ['ktCoz', 'coz'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktOlcu', 'olcu'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
+    for (const [id, k] of [['ktTema', 'tema'], ['ktKtema', 'ktema'], ['ktArka', 'arka'], ['ktIki', 'iki'], ['ktCoz', 'coz'], ['ktBicim', 'bicim'], ['ktAdet', 'adet'], ['ktSira', 'sira'], ['ktKat', 'kat'], ['ktKapak', 'kapak'], ['ktKatSayfa', 'katSayfa'], ['ktKod', 'kod'], ['ktRenk', 'renk'], ['ktOlcu', 'olcu'], ['ktStokta', 'stokta'], ['ktAktif', 'aktif']]) yaz(id, k, true);
     const a = $('#ktAra');
     a?.addEventListener('input', () => { clearTimeout(a.t); a.t = setTimeout(() => { D.ara = a.value; D.goster = 60; S.keepScroll = true; render.yazinca(); }, 200); });
     $('.kt-liste')?.addEventListener('change', e => {
